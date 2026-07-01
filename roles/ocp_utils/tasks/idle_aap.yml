@@ -10,6 +10,8 @@
     definition:
       spec:
         idle_aap: "{{ ocp_idle_aap | bool }}"
+        database:
+          idle_disabled: "{{ ocp_idle_aap | bool }}"
 
 - name: Wait for AAP to idle
   when: ocp_idle_aap | bool
