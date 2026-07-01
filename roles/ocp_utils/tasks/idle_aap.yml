@@ -29,19 +29,6 @@
       retries: "{{ ocp_utils_idle_wait_retries }}"
       delay: "{{ ocp_utils_idle_wait_delay }}"
 
-    - name: Wait for statefulsets to scale to zero
-      kubernetes.core.k8s_info:
-        kind: StatefulSet
-        namespace: "{{ ocp_utils_ocp_namespace }}"
-        label_selectors:
-          - "app.kubernetes.io/part-of"
-      register: _ocp_utils_idle_statefulsets
-      until: >-
-        _ocp_utils_idle_statefulsets.resources
-        | selectattr('spec.replicas', 'greaterthan', 0)
-        | list | length == 0
-      retries: "{{ ocp_utils_idle_wait_retries }}"
-      delay: "{{ ocp_utils_idle_wait_delay }}"
 
 - name: Wait for AAP pods to start
   when: not (ocp_idle_aap | bool)
