@@ -1,0 +1,6 @@
+---
+bugfixes:
+  - Remove aap-snapshot-latest.tar symlink from export packaging - k8s_cp copies the symlink instead of the file content, breaking imports.
+  - Resolve symlinks and relative paths to absolute real paths before artifact transfer to prevent dangling links inside the temporary pod.
+breaking_changes:
+  - The ``artifact_file`` variable is now required for import and verify playbooks. It no longer defaults to ``aap-snapshot-latest.tar``.
