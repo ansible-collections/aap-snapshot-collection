@@ -32,6 +32,43 @@
       delay: "{{ ocp_utils_idle_wait_delay }}"
 
 
+- name: Cascade idle_deployment to child CRs
+  when: not (ocp_idle_aap | bool)
+  block:
+    - name: Discover child component CRs
+      kubernetes.core.k8s_info:
+        kind: "{{ item.kind }}"
+        api_version: "{{ item.api_version }}"
+        namespace: "{{ ocp_utils_ocp_namespace }}"
+      register: _ocp_utils_child_crs
+      loop:
+        - kind: AutomationController
+          api_version: automationcontroller.ansible.com/v1beta1
+        - kind: AutomationHub
+          api_version: automationhub.ansible.com/v1beta1
+        - kind: EDA
+          api_version: eda.ansible.com/v1alpha1
+      loop_control:
+        label: "{{ item.kind }}"
+
+    - name: Set idle_deployment to false on child CRs
+      kubernetes.core.k8s:
+        api_version: "{{ item.item.api_version }}"
+        kind: "{{ item.item.kind }}"
+        name: "{{ cr.metadata.name }}"
+        namespace: "{{ ocp_utils_ocp_namespace }}"
+        state: patched
+        merge_type: merge
+        definition:
+          spec:
+            idle_deployment: false
+      loop: "{{ _ocp_utils_child_crs.results }}"
+      loop_control:
+        label: "{{ item.item.kind }}"
+      vars:
+        cr: "{{ item.resources[0] }}"
+      when: item.resources | length > 0
+
 - name: Wait for AAP pods to start
   when: not (ocp_idle_aap | bool)
   block:
