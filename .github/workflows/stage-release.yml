@@ -71,8 +71,8 @@ jobs:
       - name: Create draft GitHub Release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65  # v2
         with:
-          tag_name: v${{ env.VERSION }}
+          tag_name: ${{ env.VERSION }}
           target_commitish: ${{ steps.commit.outputs.sha }}
-          name: ansible.aap_snapshot v${{ env.VERSION }}
+          name: ${{ env.VERSION }}
           draft: true
           generate_release_notes: true
