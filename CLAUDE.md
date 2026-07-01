@@ -1,7 +1,7 @@
 # AAP Snapshot Collection
 
-## Agent Guidelines
+## Agent Skills
 
-See `.agents/` for detailed context:
+See `.agents/skills/` for contribution guidance:
 
-- [Changelog fragments](.agents/changelog.md) — when and how to include a changelog fragment with commits.
+- [Collection authoring](.agents/skills/aap-snapshot-collection-authoring/SKILL.md) — changelog fragments, coding conventions.

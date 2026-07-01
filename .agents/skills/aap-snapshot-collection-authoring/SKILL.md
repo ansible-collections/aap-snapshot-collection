@@ -1,8 +1,12 @@
-# Changelog Fragments
+# AAP Snapshot Collection Authoring
+
+Conventions for contributing to the `ansible.aap_snapshot` collection.
+
+## Changelog Fragments
 
 This project uses [antsibull-changelog](https://github.com/ansible-community/antsibull-changelog) to generate release notes.
 
-## When to include a fragment
+### When to include a fragment
 
 Every commit that changes user-facing behavior **must** include a changelog fragment in `changelogs/fragments/`. This includes bug fixes, new features, breaking changes, deprecations, and security fixes.
 
@@ -13,7 +17,7 @@ Commits that do **not** need a fragment:
 - Refactors with no user-visible effect
 - Linter config or dev tooling updates
 
-## Creating a fragment
+### Creating a fragment
 
 1. Create a YAML file in `changelogs/fragments/` named after your change:
 
@@ -29,7 +33,7 @@ Commits that do **not** need a fragment:
      - Fix hub content export when tarball path contains spaces.
    ```
 
-## Section keys
+### Section keys
 
 | Key                   | When to use                                  |
 |-----------------------|----------------------------------------------|
@@ -42,13 +46,13 @@ Commits that do **not** need a fragment:
 | `bugfixes`            | Bug fixes                                    |
 | `known_issues`        | Known issues in the release                  |
 
-## Fragment description style
+### Fragment description style
 
 - Write in imperative mood ("Fix ...", "Add ...", "Remove ...").
 - One line per entry. Keep it concise but specific enough to be useful in release notes.
 - Reference the affected role, plugin, or playbook when the scope isn't obvious.
 
-## Validating
+### Validating
 
 ```bash
 antsibull-changelog lint
