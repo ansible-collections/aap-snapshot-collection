@@ -51,6 +51,19 @@
             name: ansible.aap_snapshot.preflight
             tasks_from: check_version_match.yml
 
+        # --- Stage artifact while AAP is still running ---
+        - name: Create temporary migration resources
+          ansible.builtin.include_role:
+            name: ansible.aap_snapshot.ocp_utils
+            tasks_from: create_temp_resources.yml
+
+        - name: Transfer artifact to temporary pod
+          ansible.builtin.include_role:
+            name: ansible.aap_snapshot.ocp_utils
+            tasks_from: transfer_artifact.yml
+          vars:
+            artifact_path: "{{ artifact_file }}"
+
         # --- Idle AAP for import ---
         - name: Set AAP to idle
           ansible.builtin.include_role:
@@ -66,19 +79,7 @@
           vars:
             ocp_operator_replicas: 0
 
-        # --- Transfer artifact and import databases ---
-        - name: Create temporary migration resources
-          ansible.builtin.include_role:
-            name: ansible.aap_snapshot.ocp_utils
-            tasks_from: create_temp_resources.yml
-
-        - name: Transfer artifact to temporary pod
-          ansible.builtin.include_role:
-            name: ansible.aap_snapshot.ocp_utils
-            tasks_from: transfer_artifact.yml
-          vars:
-            artifact_path: "{{ artifact_file }}"
-
+        # --- Import databases ---
         - name: Import controller
           ansible.builtin.include_role:
             name: ansible.aap_snapshot.automationcontroller
