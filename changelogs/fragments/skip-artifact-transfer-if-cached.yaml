@@ -4,3 +4,5 @@ minor_changes:
 bugfixes:
   - Remove statefulset idle wait that caused timeout failures during import - the operator does not scale statefulsets during idle.
   - Set database.idle_disabled on the AAP CR before idling to keep postgres running during database import.
+  - Cascade idle_deployment false directly to child CRs when un-idling to work around AAP-77947 where the gateway operator fails to propagate it.
+  - Reconcile gateway before waiting for other components to clear stale service_nodes that block the gateway operator reconciliation loop.
