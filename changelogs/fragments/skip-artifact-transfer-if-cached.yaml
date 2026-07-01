@@ -1,0 +1,5 @@
+---
+minor_changes:
+  - Skip artifact transfer to temporary pod when the file already exists with a matching checksum.
+bugfixes:
+  - Remove statefulset idle wait that caused timeout failures during import - the operator does not scale statefulsets during idle.
