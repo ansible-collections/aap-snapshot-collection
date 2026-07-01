@@ -241,7 +241,7 @@ ansible-playbook ansible.aap_snapshot.artifact_import \
 
 | Decision | Variable | Default | When to Override |
 |----------|----------|---------|------------------|
-| Artifact location | `artifact_file` | `aap-snapshot-latest.tar` | Always pass the path explicitly |
+| Artifact location | `artifact_file` | (required) | Path to the exported artifact archive |
 | Target namespace | `ocp_namespace` | `aap` | Non-default namespace |
 | Operator namespace | `operator_namespace` | `{{ ocp_namespace }}` | Cluster-scoped operators in `openshift-operators` |
 | Keep temp on failure | `keep_temp_on_failure` | `true` | Set `false` to auto-cleanup on failure |

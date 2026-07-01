@@ -12,7 +12,7 @@ These apply to both export and import workflows.
 |----------|---------|-------------|
 | `aap_platform` | (required) | Source/target platform: `rpm`, `containerized`, or `operator` |
 | `artifact_dir` | `$PWD` | Directory where the artifact is created (export) or read from (import) |
-| `artifact` | `aap-snapshot-latest.tar` | Artifact filename |
+| `artifact_file` | (required for import/verify) | Path to the artifact archive |
 | `disable_no_log` | `false` | Set `true` to show sensitive values in output for debugging |
 
 ## Export Variables
@@ -57,7 +57,7 @@ Control artifact restoration to the target platform.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `artifact_file` | `aap-snapshot-latest.tar` | Path to the artifact archive to import. Validated at preflight before any destructive operations |
+| `artifact_file` | (required) | Path to the artifact archive to import. Validated at preflight before any destructive operations |
 | `target_aap_version` | (optional) | Target AAP version for compatibility validation |
 | `keep_temp_on_failure` | `true` | Keep temporary OCP migration resources (PVC, pod) on failure for debugging. Set `false` to auto-cleanup |
 | `postgresql_restore_admin_user` | `postgres` | PostgreSQL superuser for database restore operations |

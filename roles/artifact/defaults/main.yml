@@ -10,7 +10,7 @@ artifact_collection_version: >-
   }}
 
 ### input variables
-artifact_filename: '{{ __artifact_latest_filename }}'
+artifact_filename: '{{ __artifact_filename }}'
 artifact_dir: '{{ lookup("env", "PWD") }}'
 
 ### export control
@@ -26,5 +26,4 @@ __artifact_dest_dir: '{{ artifact_dest_dir.rstrip("/") }}'
 artifact_prefix: 'aap-snapshot'
 artifact_extension: 'tar'
 __artifact_filename: '{{ artifact_prefix }}-{{ _operations_aap_version }}-{{ artifact_date }}.{{ artifact_extension }}'
-__artifact_latest_filename: '{{ artifact_prefix }}-latest.{{ artifact_extension }}'
 ...

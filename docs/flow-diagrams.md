@@ -80,9 +80,8 @@ flowchart TD
         G3[Write sha256sum.txt]
         G4["Archive -> aap-snapshot-{ver}-{date}.tar"]
         G5[Compute + write artifact checksum]
-        G6[Symlink aap-snapshot-latest.tar]
 
-        G1 --> G2 --> G3 --> G4 --> G5 --> G6
+        G1 --> G2 --> G3 --> G4 --> G5
     end
 
     subgraph PLAY5["PLAY 5: Validate Artifact (localhost)"]

@@ -1,16 +1,30 @@
 ---
-- name: Resolve artifact file path
-  ansible.builtin.set_fact:
-    _preflight_artifact_file: "{{ artifact_file | default('aap-snapshot-latest.tar') }}"
+- name: Assert artifact_file is provided
+  ansible.builtin.assert:
+    that: artifact_file is defined and artifact_file | length > 0
+    fail_msg: >-
+      artifact_file is required. Pass the artifact path with: -e artifact_file=/path/to/artifact.tar
 
-- name: Build resolved artifact path
+- name: Resolve artifact file to absolute path
   ansible.builtin.set_fact:
-    _preflight_resolved_path: >-
-      {{ ((_preflight_artifact_file | dirname) or lookup('env', 'PWD')) ~ '/' ~ (_preflight_artifact_file | basename) }}
+    _preflight_resolved_artifact: >-
+      {{ artifact_file if (artifact_file | first == '/')
+         else (lookup('env', 'PWD') ~ '/' ~ artifact_file) }}
+
+- name: Check artifact path for symlinks
+  ansible.builtin.stat:
+    path: "{{ _preflight_resolved_artifact }}"
+    follow: false
+  register: _preflight_artifact_raw
+
+- name: Resolve symlink to real path
+  ansible.builtin.set_fact:
+    _preflight_resolved_artifact: "{{ _preflight_artifact_raw.stat.lnk_source }}"
+  when: _preflight_artifact_raw.stat.islnk | default(false)
 
 - name: Check artifact file exists
   ansible.builtin.stat:
-    path: "{{ _preflight_resolved_path }}"
+    path: "{{ _preflight_resolved_artifact }}"
     follow: true
   register: _preflight_artifact_stat
 
@@ -18,5 +32,5 @@
   ansible.builtin.assert:
     that: _preflight_artifact_stat.stat.exists
     fail_msg: >-
-      Artifact file not found: {{ _preflight_resolved_path }}.
+      Artifact file not found: {{ _preflight_resolved_artifact }}.
       Pass the artifact path with: -e artifact_file=/path/to/artifact.tar

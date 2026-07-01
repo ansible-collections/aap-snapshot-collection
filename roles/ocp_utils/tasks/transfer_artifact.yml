@@ -1,7 +1,20 @@
 ---
-- name: Resolve artifact path (follow symlinks)
+- name: Check artifact path
   ansible.builtin.stat:
     path: "{{ artifact_path }}"
+    follow: false
+  register: _ocp_utils_artifact_raw
+
+- name: Resolve artifact real path
+  ansible.builtin.set_fact:
+    _ocp_utils_artifact_real_path: >-
+      {{ _ocp_utils_artifact_raw.stat.lnk_source
+         if (_ocp_utils_artifact_raw.stat.islnk | default(false))
+         else artifact_path }}
+
+- name: Verify resolved artifact exists
+  ansible.builtin.stat:
+    path: "{{ _ocp_utils_artifact_real_path }}"
     follow: true
   register: _ocp_utils_artifact_stat
 
@@ -9,14 +22,14 @@
   ansible.builtin.assert:
     that: _ocp_utils_artifact_stat.stat.exists
     fail_msg: >-
-      Artifact file not found: {{ artifact_path }}.
+      Artifact file not found: {{ _ocp_utils_artifact_real_path }}.
       Ensure artifact_file points to a valid archive path.
 
 - name: Copy artifact to temporary pod
   kubernetes.core.k8s_cp:
     namespace: "{{ ocp_utils_ocp_namespace }}"
     pod: "{{ ocp_utils_temp_pod_name }}"
-    local_path: "{{ _ocp_utils_artifact_stat.stat.path }}"
+    local_path: "{{ _ocp_utils_artifact_real_path }}"
     remote_path: "/tmp/migration/artifact.tar"
     state: to_pod
 

@@ -5,7 +5,7 @@
   gather_facts: false
   become: false
   vars:
-    _artifact_path: "{{ artifact_file | default('aap-snapshot-latest.tar') }}"
+    _artifact_path: "{{ artifact_file }}"
     artifact_filename: "{{ _artifact_path | basename }}"
     artifact_dir: "{{ _artifact_path | dirname or lookup('env', 'PWD') }}"
   tasks:

@@ -119,13 +119,12 @@ Restore a migration artifact into a target AAP deployment:
 ansible-playbook -i inventory ansible.aap_snapshot.artifact_import \
   -e aap_platform=containerized \
   -e artifact_dir=/path/to/artifacts \
-  -e artifact=aap-snapshot-latest.tar
+  -e artifact_file=/path/to/aap-snapshot-2.6-20260701-120000.tar
 
 # Into an OCP operator deployment
 ansible-playbook -i inventory ansible.aap_snapshot.artifact_import \
   -e aap_platform=operator \
-  -e artifact_dir=/path/to/artifacts \
-  -e artifact=aap-snapshot-latest.tar \
+  -e artifact_file=/path/to/aap-snapshot-2.6-20260701-120000.tar \
   -e ocp_namespace=aap \
   -e aap_instance_name=aap
 ```
@@ -136,8 +135,7 @@ Validate an artifact without importing it:
 
 ```bash
 ansible-playbook ansible.aap_snapshot.artifact_verify \
-  -e artifact_dir=/path/to/artifacts \
-  -e artifact=aap-snapshot-latest.tar
+  -e artifact_file=/path/to/aap-snapshot-2.6-20260701-120000.tar
 ```
 
 ## Key Variables
@@ -146,7 +144,7 @@ ansible-playbook ansible.aap_snapshot.artifact_verify \
 |----------|----------|---------|-------------|
 | `aap_platform` | Yes | - | Platform type: `rpm`, `containerized`, or `operator` |
 | `artifact_dir` | No | `$PWD` | Directory for artifact creation/extraction |
-| `artifact` | No | `aap-snapshot-latest.tar` | Artifact filename |
+| `artifact_file` | Import/Verify | - | Path to the artifact archive |
 | `ocp_namespace` | OCP | `aap` | OpenShift namespace |
 | `aap_instance_name` | OCP | `aap` | AAP CR instance name |
 | `artifact_export_hub_content` | No | `true` | Include Pulp content data in artifact |

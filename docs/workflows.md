@@ -48,7 +48,6 @@ see [artifact-format.md](artifact-format.md).
 - Writes `secrets.yml` with base64-encoded secrets
 - Generates `sha256sum.txt` checksums for all artifact files
 - Creates tar archive with timestamp-based filename
-- Creates `aap-snapshot-latest.tar` symlink
 
 ### Phase 5: Validate
 

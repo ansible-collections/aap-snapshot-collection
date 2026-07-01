@@ -60,19 +60,6 @@
     dest: '{{ __artifact_dest_dir }}/{{ __artifact_filename }}.{{ artifact_checksum_algo }}'
     mode: '0640'
 
-- name: Create symbolic link to the most recent artifact
-  ansible.builtin.file:
-    force: true
-    path: '{{ __artifact_dest_dir }}/{{ __artifact_latest_filename }}'
-    src: '{{ __artifact_dest_dir }}/{{ __artifact_filename }}'
-    state: link
-
-- name: Create artifact checksum file for the latest artifact package
-  ansible.builtin.copy:
-    content: '{{ artifact_file_stat.stat.checksum }}  {{ __artifact_latest_filename }}'
-    dest: '{{ __artifact_dest_dir }}/{{ __artifact_latest_filename }}.{{ artifact_checksum_algo }}'
-    mode: '0640'
-
 - name: Persist artifact path facts for post-package plays
   ansible.builtin.set_fact:
     __artifact_dest_dir: '{{ __artifact_dest_dir }}'
