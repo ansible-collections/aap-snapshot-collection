@@ -12,6 +12,15 @@
       Artifact file not found: {{ artifact_path }}.
       Ensure artifact_file points to a valid archive path.
 
+- name: Check if artifact already exists on temporary pod
+  kubernetes.core.k8s_exec:
+    namespace: "{{ ocp_utils_ocp_namespace }}"
+    pod: "{{ ocp_utils_temp_pod_name }}"
+    command: "sha1sum /tmp/migration/artifact.tar"
+  register: _ocp_utils_remote_checksum
+  failed_when: false
+  changed_when: false
+
 - name: Copy artifact to temporary pod
   kubernetes.core.k8s_cp:
     namespace: "{{ ocp_utils_ocp_namespace }}"
@@ -19,6 +28,10 @@
     local_path: "{{ _ocp_utils_artifact_stat.stat.path }}"
     remote_path: "/tmp/migration/artifact.tar"
     state: to_pod
+  when: >-
+    _ocp_utils_remote_checksum.rc | default(1) != 0
+    or (_ocp_utils_remote_checksum.stdout | default('') | split(' ') | first)
+       != _ocp_utils_artifact_stat.stat.checksum
 
 - name: Extract artifact inside temporary pod
   kubernetes.core.k8s_exec:
@@ -27,3 +40,7 @@
     command: "tar xf /tmp/migration/artifact.tar -C /tmp/migration"
   register: _ocp_utils_extract_result
   failed_when: _ocp_utils_extract_result.rc != 0
+  when: >-
+    _ocp_utils_remote_checksum.rc | default(1) != 0
+    or (_ocp_utils_remote_checksum.stdout | default('') | split(' ') | first)
+       != _ocp_utils_artifact_stat.stat.checksum
