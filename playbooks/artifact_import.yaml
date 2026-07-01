@@ -119,23 +119,31 @@
           vars:
             ocp_idle_aap: false
 
-        - name: Wait for component pods to be reachable
-          ansible.builtin.include_role:
-            name: ansible.aap_snapshot.ocp_utils
-            tasks_from: wait_for_pods.yml
+        # --- Gateway-first reconcile (unblocks operator) ---
+        - name: Wait for gateway pod
+          kubernetes.core.k8s_info:
+            kind: Pod
+            namespace: "{{ ocp_utils_ocp_namespace }}"
+            label_selectors:
+              - "app.kubernetes.io/component={{ ocp_utils_aap_instance_name }}-gateway"
+            field_selectors:
+              - status.phase=Running
+          register: _import_gw_pods
+          until: _import_gw_pods.resources | length > 0
+          retries: 60
+          delay: 10
 
-        - name: Discover component pods for reconcile
-          ansible.builtin.include_role:
-            name: ansible.aap_snapshot.ocp_utils
-            tasks_from: discover_components.yml
+        - name: Set gateway pod facts for early reconcile
+          ansible.builtin.set_fact:
+            _ocp_utils_gateway_pod_name: "{{ _import_gw_pods.resources[0].metadata.name }}"
+            _ocp_utils_gateway_container_name: "api"
 
         - name: Load secret mapping from ocp_utils
           ansible.builtin.include_role:
             name: ansible.aap_snapshot.ocp_utils
             tasks_from: set_secret_mapping.yml
-          when: aap_platform == 'operator'
 
-        - name: Re-apply encryption secrets overwritten by operator
+        - name: Re-apply gateway encryption secret
           kubernetes.core.k8s:
             kind: Secret
             name: "{{ item.secret_name }}"
@@ -143,13 +151,11 @@
             state: patched
             definition:
               data: "{{ {item.field: artifact_secrets[item.artifact_key]} }}"
-          loop: "{{ _ocp_utils_secret_mapping }}"
+          loop: "{{ _ocp_utils_secret_mapping | selectattr('component', 'equalto', 'gateway') | list }}"
           loop_control:
             label: "{{ item.secret_name }}"
           no_log: "{{ not (disable_no_log | default(false) | bool) }}"
-          when:
-            - aap_platform == 'operator'
-            - artifact_secrets[item.artifact_key] is defined
+          when: artifact_secrets[item.artifact_key] is defined
 
         - name: Restart gateway pod to pick up restored encryption secret
           kubernetes.core.k8s:
@@ -157,7 +163,6 @@
             namespace: "{{ ocp_utils_ocp_namespace }}"
             name: "{{ _ocp_utils_gateway_pod_name }}"
             state: absent
-          when: aap_platform == 'operator'
 
         - name: Wait for new gateway pod
           ansible.builtin.include_role:
@@ -166,11 +171,10 @@
           vars:
             _discover_label: "gateway"
             _discover_selectors:
-              - "app.kubernetes.io/component=aap-gateway"
+              - "app.kubernetes.io/component={{ ocp_utils_aap_instance_name }}-gateway"
             _discover_pod_fact: "_ocp_utils_gateway_pod_name"
             _discover_container_fact: "_ocp_utils_gateway_container_name"
             _discover_container_name: "api"
-          when: aap_platform == 'operator'
 
         - name: Detect Django version for manage shell compatibility
           kubernetes.core.k8s_exec:
@@ -189,12 +193,39 @@
           delegate_facts: true
           delegate_to: localhost
 
-        # --- Reconcile ---
         - name: Reconcile gateway
           ansible.builtin.include_role:
             name: ansible.aap_snapshot.automationgateway
             tasks_from: reconcile.yml
 
+        # --- Wait for remaining components ---
+        - name: Wait for component pods to be reachable
+          ansible.builtin.include_role:
+            name: ansible.aap_snapshot.ocp_utils
+            tasks_from: wait_for_pods.yml
+
+        - name: Discover component pods for reconcile
+          ansible.builtin.include_role:
+            name: ansible.aap_snapshot.ocp_utils
+            tasks_from: discover_components.yml
+
+        - name: Re-apply remaining encryption secrets
+          kubernetes.core.k8s:
+            kind: Secret
+            name: "{{ item.secret_name }}"
+            namespace: "{{ ocp_utils_ocp_namespace }}"
+            state: patched
+            definition:
+              data: "{{ {item.field: artifact_secrets[item.artifact_key]} }}"
+          loop: "{{ _ocp_utils_secret_mapping | rejectattr('component', 'equalto', 'gateway') | list }}"
+          loop_control:
+            label: "{{ item.secret_name }}"
+          no_log: "{{ not (disable_no_log | default(false) | bool) }}"
+          when:
+            - aap_platform == 'operator'
+            - artifact_secrets[item.artifact_key] is defined
+
+        # --- Reconcile remaining components ---
         - name: Reconcile controller
           ansible.builtin.include_role:
             name: ansible.aap_snapshot.automationcontroller
