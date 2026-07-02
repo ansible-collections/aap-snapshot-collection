@@ -1,0 +1,4 @@
+---
+minor_changes:
+  - Reduce default ocp_utils_temp_pvc_size from 200Gi to 60Gi to avoid over-provisioning on smaller clusters.
+  - Add preflight check that fails early when the artifact file is too large for the configured temp PVC size.

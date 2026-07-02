@@ -1,0 +1,36 @@
+---
+# Validates that ocp_utils_temp_pvc_size is large enough for the artifact.
+# Fails early with a clear message and override example if the PVC would
+# be too small (artifact needs ~2x headroom for extraction).
+
+- name: Parse temp PVC size to bytes
+  ansible.builtin.set_fact:
+    _preflight_pvc_bytes: >-
+      {% set raw = ocp_utils_temp_pvc_size | string | trim -%}
+      {% if raw.endswith('Ti') -%}
+        {{ (raw[:-2] | float * 1099511627776) | int }}
+      {%- elif raw.endswith('Gi') -%}
+        {{ (raw[:-2] | float * 1073741824) | int }}
+      {%- elif raw.endswith('Mi') -%}
+        {{ (raw[:-2] | float * 1048576) | int }}
+      {%- elif raw.endswith('Ki') -%}
+        {{ (raw[:-2] | float * 1024) | int }}
+      {%- else -%}
+        {{ raw | int }}
+      {%- endif %}
+
+- name: Calculate minimum PVC size needed (2x artifact for extraction headroom)
+  ansible.builtin.set_fact:
+    _preflight_artifact_bytes: "{{ _preflight_artifact_stat.stat.size }}"
+    _preflight_min_pvc_bytes: "{{ (_preflight_artifact_stat.stat.size | int) * 2 }}"
+
+- name: Fail if temp PVC is too small for artifact
+  ansible.builtin.fail:
+    msg: >-
+      The artifact file is {{ (_preflight_artifact_bytes | int / 1073741824) | round(1) }}Gi
+      but ocp_utils_temp_pvc_size is set to {{ ocp_utils_temp_pvc_size }}.
+      The PVC needs at least {{ ((_preflight_min_pvc_bytes | int / 1073741824) | round(0)) | int }}Gi
+      to hold the artifact and allow extraction headroom.
+      Increase the PVC size with:
+        -e ocp_utils_temp_pvc_size={{ ((_preflight_min_pvc_bytes | int / 1073741824) | round(0)) | int }}Gi
+  when: (_preflight_pvc_bytes | int) < (_preflight_min_pvc_bytes | int)
