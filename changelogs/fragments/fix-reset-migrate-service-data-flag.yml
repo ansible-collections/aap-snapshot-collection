@@ -1,0 +1,3 @@
+---
+bugfixes:
+  - Reset gateway migrate_service_data flag during vestigial cleanup so the operator re-runs service registration after database restore.
