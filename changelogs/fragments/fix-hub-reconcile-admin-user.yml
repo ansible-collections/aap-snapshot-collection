@@ -1,0 +1,6 @@
+---
+bugfixes:
+  - Fix hub reconcile failing with ``automationgateway_admin_user is undefined``
+    by defining the admin username in the hub role's own defaults instead of
+    depending on the gateway role's defaults
+    (https://github.com/ansible-collections/aap-snapshot-collection/issues/46).

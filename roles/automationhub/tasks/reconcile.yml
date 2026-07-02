@@ -54,7 +54,7 @@
         body_format: json
         body:
           verify_checksums: true
-        url_username: "{{ automationgateway_admin_user }}"
+        url_username: "{{ automationhub_gateway_admin_user }}"
         url_password: "{{ _automationhub_gw_admin_pw }}"
         force_basic_auth: true
         validate_certs: "{{ operations_validate_certs | default(false) }}"
@@ -76,7 +76,7 @@
           curl -sf -X POST
           -H 'Content-Type: application/json'
           -d '{"verify_checksums": true}'
-          -u {{ (automationgateway_admin_user ~ ':' ~ _automationhub_gw_admin_pw) | quote }}
+          -u {{ (automationhub_gateway_admin_user ~ ':' ~ _automationhub_gw_admin_pw) | quote }}
           {{ _automationhub_gw_api_url }}/api/galaxy/pulp/api/v3/repair/
       register: _automationhub_repair_curl
       failed_when: false
