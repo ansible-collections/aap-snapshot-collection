@@ -1,0 +1,3 @@
+---
+bugfixes:
+  - Fix orphan instance detection to include nodes with null health check or null capacity after database restore.

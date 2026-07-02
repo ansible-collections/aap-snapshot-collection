@@ -32,11 +32,13 @@
     _orphan_script: >-
       import json;
       from datetime import timedelta;
+      from django.db.models import Q;
       from django.utils import timezone;
       from awx.main.models import Instance;
       cutoff = timezone.now() - timedelta(seconds=600);
-      orphans = list(Instance.objects.filter(
-      last_health_check__lt=cutoff, capacity=0).values_list(
+      stale = Q(last_health_check__lt=cutoff) | Q(last_health_check__isnull=True);
+      dead = Q(capacity=0) | Q(capacity__isnull=True);
+      orphans = list(Instance.objects.filter(stale, dead).values_list(
       'hostname', flat=True));
       print(json.dumps(orphans))
     _manage_label: "controller list orphaned instances"
