@@ -125,7 +125,7 @@
             kind: Pod
             namespace: "{{ ocp_namespace | default('aap') }}"
             label_selectors:
-              - "app.kubernetes.io/component={{ aap_instance_name | default('aap') }}-gateway"
+              - "app.kubernetes.io/component=aap-gateway"
             field_selectors:
               - status.phase=Running
           register: _import_gw_pods
@@ -171,7 +171,7 @@
           vars:
             _discover_label: "gateway"
             _discover_selectors:
-              - "app.kubernetes.io/component={{ aap_instance_name | default('aap') }}-gateway"
+              - "app.kubernetes.io/component=aap-gateway"
             _discover_pod_fact: "_ocp_utils_gateway_pod_name"
             _discover_container_fact: "_ocp_utils_gateway_container_name"
             _discover_container_name: "api"

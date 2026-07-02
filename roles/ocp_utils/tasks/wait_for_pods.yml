@@ -4,7 +4,7 @@
     kind: Pod
     namespace: "{{ ocp_utils_ocp_namespace }}"
     label_selectors:
-      - "app.kubernetes.io/component={{ __ocp_utils_aap_deployment_type }}-gateway"
+      - "app.kubernetes.io/component=aap-gateway"
     field_selectors:
       - status.phase=Running
   register: _ocp_utils_gw_pods

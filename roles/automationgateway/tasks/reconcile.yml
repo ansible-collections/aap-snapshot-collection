@@ -14,7 +14,7 @@
     component_name: "{{ automationgateway_component_name }}"
     _discover_label: "gateway"
     _discover_selectors:
-      - "app.kubernetes.io/component={{ __ocp_utils_aap_deployment_type }}-gateway"
+      - "app.kubernetes.io/component=aap-gateway"
     _discover_pod_fact: "_ocp_utils_gateway_pod_name"
     _discover_container_fact: "_ocp_utils_gateway_container_name"
     _discover_container_name: "api"

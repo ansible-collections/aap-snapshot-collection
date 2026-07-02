@@ -17,8 +17,6 @@ ocp_utils_aap_instance_name: "{{ aap_instance_name | default('aap') }}"
 ocp_utils_aap_cr_kind: "AnsibleAutomationPlatform"
 ocp_utils_aap_cr_api_version: "aap.ansible.com/v1alpha1"
 
-__ocp_utils_aap_deployment_type: "aap"
-
 ocp_utils_temp_pvc_name: "aap-snapshot-temp"
 ocp_utils_temp_pvc_size: "200Gi"
 ocp_utils_temp_pvc_access_mode: "ReadWriteOnce"
