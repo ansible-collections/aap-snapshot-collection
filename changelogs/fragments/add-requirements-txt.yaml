@@ -1,0 +1,7 @@
+---
+bugfixes:
+  - >-
+    Added missing ``kubernetes`` dependency to ``meta/ee-requirements.txt``
+    so that ``ansible-builder`` can resolve all Python dependencies when
+    constructing execution environments
+    (https://github.com/ansible-collections/aap-snapshot-collection/pull/48).
