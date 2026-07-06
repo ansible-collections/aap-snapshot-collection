@@ -1,0 +1,9 @@
+---
+bugfixes:
+  - >-
+    Added top-level ``requirements.txt`` to the collection so that
+    ``ansible-builder`` can resolve Python dependencies (``pyyaml``,
+    ``kubernetes``) when constructing execution environments.
+    Also added missing ``kubernetes`` dependency to
+    ``meta/ee-requirements.txt``
+    (https://github.com/ansible-collections/aap-snapshot-collection/issues/48).
