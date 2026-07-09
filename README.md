@@ -123,7 +123,7 @@ ansible-playbook -i inventory ansible.aap_snapshot.artifact_import \
   -e artifact_file=/path/to/aap-snapshot-2.6-20260701-120000.tar
 
 # Into an OCP operator deployment
-ansible-playbook -i inventory ansible.aap_snapshot.artifact_import \
+ansible-playbook ansible.aap_snapshot.artifact_import \
   -e aap_platform=operator \
   -e artifact_file=/path/to/aap-snapshot-2.6-20260701-120000.tar \
   -e ocp_namespace=aap \
