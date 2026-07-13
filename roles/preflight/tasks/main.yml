@@ -13,6 +13,7 @@
   when:
     - _snapshot_operation | default('') == 'import'
     - aap_platform == 'operator'
+    - inventory_hostname == 'localhost'
 
 - name: Check OCP target requirements
   ansible.builtin.include_tasks: check_ocp_target.yml
