@@ -311,97 +311,57 @@
             tasks_from: cleanup_temp_resources.yml
           when: (_import_succeeded | default(false) | bool) or not (keep_temp_on_failure | default(true) | bool)
 
-- name: Stop containerized services
-  ansible.builtin.import_playbook: common/stop_services.yaml
-  when: aap_platform == 'containerized'
-
-- name: Import databases (containerized)
+- name: Import (containerized)
   hosts: controller_groups:eda_groups:gateway_groups:hub_groups
   gather_facts: false
   any_errors_fatal: true
   max_fail_percentage: 0
   tasks:
-    - name: Import controller
-      ansible.builtin.include_role:
-        name: ansible.aap_snapshot.automationcontroller
-        tasks_from: import.yml
-      when:
-        - aap_platform == 'containerized'
-        - groups.get('controller_groups', []) | length > 0
-        - inventory_hostname == groups['controller_groups'][0]
+    - name: Import and reconcile containerized components
+      when: aap_platform == 'containerized'
+      block:
+        - name: Stop services
+          ansible.builtin.include_role:
+            name: ansible.aap_snapshot.common
+            tasks_from: manage_services.yml
+          vars:
+            _service_action: stop_service.yml
 
-    - name: Import hub
-      ansible.builtin.include_role:
-        name: ansible.aap_snapshot.automationhub
-        tasks_from: import.yml
-      when:
-        - aap_platform == 'containerized'
-        - groups.get('hub_groups', []) | length > 0
-        - inventory_hostname == groups['hub_groups'][0]
+        - name: Import databases
+          ansible.builtin.include_role:
+            name: ansible.aap_snapshot.common
+            tasks_from: import_components.yml
 
-    - name: Import gateway
-      ansible.builtin.include_role:
-        name: ansible.aap_snapshot.automationgateway
-        tasks_from: import.yml
-      when:
-        - aap_platform == 'containerized'
-        - groups.get('gateway_groups', []) | length > 0
-        - inventory_hostname == groups['gateway_groups'][0]
+        - name: Start services
+          ansible.builtin.include_role:
+            name: ansible.aap_snapshot.common
+            tasks_from: manage_services.yml
+          vars:
+            _service_action: start_service.yml
 
-    - name: Import EDA
-      ansible.builtin.include_role:
-        name: ansible.aap_snapshot.automationeda
-        tasks_from: import.yml
-      when:
-        - aap_platform == 'containerized'
-        - groups.get('eda_groups', []) | length > 0
-        - inventory_hostname == groups['eda_groups'][0]
+        - name: Reconcile components
+          ansible.builtin.include_role:
+            name: ansible.aap_snapshot.common
+            tasks_from: reconcile_components.yml
 
-- name: Start containerized services
-  ansible.builtin.import_playbook: common/start_services.yaml
-  when: aap_platform == 'containerized'
+        - name: Mark import as succeeded
+          ansible.builtin.set_fact:
+            _import_succeeded: true
 
-- name: Reconcile (containerized)
-  hosts: controller_groups:eda_groups:gateway_groups:hub_groups
-  gather_facts: false
-  any_errors_fatal: true
-  max_fail_percentage: 0
-  tasks:
-    - name: Reconcile gateway
-      ansible.builtin.include_role:
-        name: ansible.aap_snapshot.automationgateway
-        tasks_from: reconcile.yml
-      when:
-        - aap_platform == 'containerized'
-        - groups.get('gateway_groups', []) | length > 0
-        - inventory_hostname == groups['gateway_groups'][0]
+      rescue:
+        - name: Start services (recovery)
+          ansible.builtin.include_role:
+            name: ansible.aap_snapshot.common
+            tasks_from: manage_services.yml
+          vars:
+            _service_action: start_service.yml
 
-    - name: Reconcile controller
-      ansible.builtin.include_role:
-        name: ansible.aap_snapshot.automationcontroller
-        tasks_from: reconcile.yml
-      when:
-        - aap_platform == 'containerized'
-        - groups.get('controller_groups', []) | length > 0
-        - inventory_hostname == groups['controller_groups'][0]
-
-    - name: Reconcile hub
-      ansible.builtin.include_role:
-        name: ansible.aap_snapshot.automationhub
-        tasks_from: reconcile.yml
-      when:
-        - aap_platform == 'containerized'
-        - groups.get('hub_groups', []) | length > 0
-        - inventory_hostname == groups['hub_groups'][0]
-
-    - name: Reconcile EDA
-      ansible.builtin.include_role:
-        name: ansible.aap_snapshot.automationeda
-        tasks_from: reconcile.yml
-      when:
-        - aap_platform == 'containerized'
-        - groups.get('eda_groups', []) | length > 0
-        - inventory_hostname == groups['eda_groups'][0]
+        - name: Report import failure
+          ansible.builtin.fail:
+            msg: >-
+              Import failed. Services have been restarted.
+              Failed task: {{ ansible_failed_task.name | default('unknown') }}.
+              Error: {{ ansible_failed_result.msg | default(ansible_failed_result | to_nice_json) }}
 
 - name: Post-import validation and report
   hosts: localhost

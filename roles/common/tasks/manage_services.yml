@@ -1,0 +1,38 @@
+---
+# Parametrized service management for all AAP components.
+# _service_action: stop_service.yml | start_service.yml
+- name: Monitoring (pre)
+  ansible.builtin.include_role:
+    name: ansible.aap_snapshot.pcp
+    tasks_from: "{{ _service_action }}"
+  when: _service_action == 'stop_service.yml'
+
+- name: EDA services
+  ansible.builtin.include_role:
+    name: ansible.aap_snapshot.automationeda
+    tasks_from: "{{ _service_action }}"
+  when: inventory_hostname in groups.get('eda_groups', [])
+
+- name: Hub services
+  ansible.builtin.include_role:
+    name: ansible.aap_snapshot.automationhub
+    tasks_from: "{{ _service_action }}"
+  when: inventory_hostname in groups.get('hub_groups', [])
+
+- name: Controller services
+  ansible.builtin.include_role:
+    name: ansible.aap_snapshot.automationcontroller
+    tasks_from: "{{ _service_action }}"
+  when: inventory_hostname in groups.get('controller_groups', [])
+
+- name: Gateway services
+  ansible.builtin.include_role:
+    name: ansible.aap_snapshot.automationgateway
+    tasks_from: "{{ _service_action }}"
+  when: inventory_hostname in groups.get('gateway_groups', [])
+
+- name: Monitoring (post)
+  ansible.builtin.include_role:
+    name: ansible.aap_snapshot.pcp
+    tasks_from: "{{ _service_action }}"
+  when: _service_action == 'start_service.yml'
