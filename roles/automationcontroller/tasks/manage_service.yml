@@ -1,8 +1,0 @@
----
-# _service_state: stopped | started
-- name: Manage controller services
-  ansible.builtin.include_role:
-    name: ansible.aap_snapshot.operations
-    tasks_from: manage_service.yml
-  vars:
-    component_name: "{{ automationcontroller_component_name }}"

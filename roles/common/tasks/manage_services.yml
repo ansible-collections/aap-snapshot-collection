@@ -9,26 +9,34 @@
 
 - name: EDA services
   ansible.builtin.include_role:
-    name: ansible.aap_snapshot.automationeda
+    name: ansible.aap_snapshot.operations
     tasks_from: manage_service.yml
+  vars:
+    component_name: "{{ automationeda_component_name }}"
   when: inventory_hostname in groups.get('eda_groups', [])
 
 - name: Hub services
   ansible.builtin.include_role:
-    name: ansible.aap_snapshot.automationhub
+    name: ansible.aap_snapshot.operations
     tasks_from: manage_service.yml
+  vars:
+    component_name: "{{ automationhub_component_name }}"
   when: inventory_hostname in groups.get('hub_groups', [])
 
 - name: Controller services
   ansible.builtin.include_role:
-    name: ansible.aap_snapshot.automationcontroller
+    name: ansible.aap_snapshot.operations
     tasks_from: manage_service.yml
+  vars:
+    component_name: "{{ automationcontroller_component_name }}"
   when: inventory_hostname in groups.get('controller_groups', [])
 
 - name: Gateway services
   ansible.builtin.include_role:
-    name: ansible.aap_snapshot.automationgateway
+    name: ansible.aap_snapshot.operations
     tasks_from: manage_service.yml
+  vars:
+    component_name: "{{ automationgateway_component_name }}"
   when: inventory_hostname in groups.get('gateway_groups', [])
 
 - name: Monitoring (post)
