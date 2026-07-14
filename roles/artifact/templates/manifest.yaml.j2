@@ -4,6 +4,9 @@ schema_version: "1.0"
 aap_version: "{{ _parsed_version.major_minor }}"
 aap_version_patch: "{{ _parsed_version.patch }}"
 source_topology: "{{ aap_platform }}"
+{% if groups.get('hub_groups', []) | length > 0 %}
+source_hub_hostname: "{{ hostvars[groups['hub_groups'][0]].ansible_host | default(groups['hub_groups'][0]) }}"
+{% endif %}
 export_timestamp: "{{ artifact_timestamp }}"
 exported_by: "ansible.aap_snapshot/{{ artifact_collection_version }}"
 

@@ -79,3 +79,60 @@
     _reset_pod_name: "{{ _ocp_utils_controller_pod_name | default('') }}"
     _reset_container_name: "{{ _ocp_utils_controller_container_name | default(_operations_current_component.container_name) }}"
   when: aap_platform == 'operator'
+
+- name: Resolve hub hostnames for EE image URL rewrite
+  ansible.builtin.set_fact:
+    _automationcontroller_ee_source_hub: >-
+      {{ automationcontroller_ee_source_hub_hostname
+         | default(artifact_manifest.source_hub_hostname | default(''), true) | trim }}
+    _automationcontroller_ee_dest_hub: >-
+      {{ automationcontroller_ee_dest_hub_hostname
+         | default(ocp_utils_hub_hostname | default(''), true) | trim }}
+
+- name: List EEs pointing to source Hub
+  ansible.builtin.uri:
+    url: "https://{{ ocp_utils_gateway_hostname }}/api/v2/execution_environments/?image__startswith={{ _automationcontroller_ee_source_hub }}/&page_size=200"
+    url_username: "admin"
+    url_password: "{{ ocp_utils_gateway_admin_password }}"
+    force_basic_auth: true
+    validate_certs: "{{ operations_validate_certs | default(false) }}"
+  register: _automationcontroller_ee_list
+  retries: 6
+  delay: 10
+  until: _automationcontroller_ee_list is not failed
+  no_log: "{{ not (disable_no_log | default(false) | bool) }}"
+  when:
+    - (_automationcontroller_ee_source_hub | default('')) | length > 0
+    - (_automationcontroller_ee_dest_hub | default('')) | length > 0
+    - _automationcontroller_ee_source_hub != _automationcontroller_ee_dest_hub
+
+- name: Rewrite EE image URLs to destination Hub
+  ansible.builtin.uri:
+    url: "https://{{ ocp_utils_gateway_hostname }}/api/v2/execution_environments/{{ item.id }}/"
+    method: PATCH
+    url_username: "admin"
+    url_password: "{{ ocp_utils_gateway_admin_password }}"
+    force_basic_auth: true
+    validate_certs: "{{ operations_validate_certs | default(false) }}"
+    body_format: json
+    body:
+      image: "{{ item.image | replace(_automationcontroller_ee_source_hub, _automationcontroller_ee_dest_hub) }}"
+    status_code: [200]
+  loop: "{{ _automationcontroller_ee_list.json.results | default([]) }}"
+  loop_control:
+    label: "{{ item.name }}"
+  no_log: "{{ not (disable_no_log | default(false) | bool) }}"
+  when:
+    - (_automationcontroller_ee_source_hub | default('')) | length > 0
+    - (_automationcontroller_ee_dest_hub | default('')) | length > 0
+    - _automationcontroller_ee_source_hub != _automationcontroller_ee_dest_hub
+    - _automationcontroller_ee_list.json is defined
+
+- name: Report EE image rewrite result
+  ansible.builtin.debug:
+    msg: "Rewrote {{ _automationcontroller_ee_list.json.results | default([]) | length }} EE image(s) from {{ _automationcontroller_ee_source_hub }} to {{ _automationcontroller_ee_dest_hub }}"
+  when:
+    - (_automationcontroller_ee_source_hub | default('')) | length > 0
+    - (_automationcontroller_ee_dest_hub | default('')) | length > 0
+    - _automationcontroller_ee_source_hub != _automationcontroller_ee_dest_hub
+    - _automationcontroller_ee_list.json is defined

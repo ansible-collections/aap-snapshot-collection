@@ -26,6 +26,17 @@
     label: "{{ item.item.kind }}"
   when: item.resources | length > 0
 
+- name: Set hub hostname from CR public_base_url
+  ansible.builtin.set_fact:
+    ocp_utils_hub_hostname: "{{ item.resources[0].spec.public_base_url | urlsplit('hostname') }}"
+  loop: "{{ _ocp_utils_component_crs.results }}"
+  loop_control:
+    label: "{{ item.item.kind }}"
+  when:
+    - item.item.kind == 'AutomationHub'
+    - item.resources | length > 0
+    - item.resources[0].spec.public_base_url is defined
+
 - name: Wait for gateway pod to be running
   kubernetes.core.k8s_info:
     kind: Pod
