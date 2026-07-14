@@ -1,0 +1,24 @@
+---
+- name: Find hub file-storage PVC
+  kubernetes.core.k8s_info:
+    kind: PersistentVolumeClaim
+    namespace: "{{ ocp_utils_ocp_namespace }}"
+    label_selectors:
+      - "app.kubernetes.io/component=automationhub"
+      - "app.kubernetes.io/part-of={{ _hub_cr_name }}"
+  register: _ocp_utils_hub_pvcs
+
+- name: Delete hub file-storage PVC
+  kubernetes.core.k8s:
+    kind: PersistentVolumeClaim
+    namespace: "{{ ocp_utils_ocp_namespace }}"
+    name: "{{ item.metadata.name }}"
+    state: absent
+    wait: true
+    wait_timeout: 120
+  loop: >-
+    {{ _ocp_utils_hub_pvcs.resources | default([])
+       | selectattr('metadata.name', 'search', 'file-storage')
+       | list }}
+  loop_control:
+    label: "{{ item.metadata.name }}"

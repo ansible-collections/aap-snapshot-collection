@@ -1,0 +1,6 @@
+---
+bugfixes:
+  - automationhub - Delete the hub file-storage PVC after database restore and
+    before un-idling so the operator provisions a fresh empty volume; content can
+    then be re-synced from configured remotes instead of running pulp repair on
+    stale source artifacts.

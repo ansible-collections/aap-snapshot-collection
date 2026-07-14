@@ -240,6 +240,12 @@
         tasks_from: import.yml
       when: "'hub' in _artifact_import_components"
 
+    - name: Delete hub file-storage PVC
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.ocp_utils
+        tasks_from: delete_hub_file_storage_pvc.yml
+      when: "'hub' in _artifact_import_components"
+
     - name: Import gateway
       ansible.builtin.include_role:
         name: ansible.aap_snapshot.automationgateway
