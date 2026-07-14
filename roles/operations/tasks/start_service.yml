@@ -1,45 +1,5 @@
 ---
-- name: Set component config
-  ansible.builtin.set_fact:
-    _operations_current_component: "{{ _operations_component_config[component_name] }}"
-
-# Pattern 1: Fixed service list (controller, gateway)
-- name: "Start static services"
-  ansible.builtin.systemd:
-    name: "{{ item }}"
-    state: started
-    scope: user
-  loop: "{{ _operations_current_component.services }}"
-  when:
-    - aap_platform == 'containerized'
-    - not (_operations_current_component.has_worker_discovery | bool)
-
-# Pattern 2: Worker discovery + static services (eda, hub)
-- name: "Start all services"
-  when:
-    - aap_platform == 'containerized'
-    - _operations_current_component.has_worker_discovery | bool
-  block:
-    - name: Gather user home directory
-      ansible.builtin.setup:
-        filter:
-          - 'ansible_user_dir'
-
-    - name: "Discover worker service units"
-      ansible.builtin.find:
-        paths: "{{ ansible_user_dir }}/.config/systemd/user"
-        patterns: "{{ _operations_current_component.worker_service_pattern }}"
-        file_type: any
-      register: _operations_worker_files
-
-    - name: "Start worker services"
-      ansible.builtin.systemd:
-        name: "{{ item }}"
-        state: started
-        scope: user
-      loop: >-
-        {{ _operations_worker_files.files
-           | map(attribute='path') | map('basename')
-           | map('regex_replace', '\.service$', '')
-           | list
-           + _operations_current_component.static_services }}
+- name: Start services
+  ansible.builtin.include_tasks: manage_service.yml
+  vars:
+    _service_state: started

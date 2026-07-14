@@ -325,7 +325,7 @@
             name: ansible.aap_snapshot.common
             tasks_from: manage_services.yml
           vars:
-            _service_action: stop_service.yml
+            _service_state: stopped
 
         - name: Import databases
           ansible.builtin.include_role:
@@ -337,7 +337,7 @@
             name: ansible.aap_snapshot.common
             tasks_from: manage_services.yml
           vars:
-            _service_action: start_service.yml
+            _service_state: started
 
         - name: Reconcile components
           ansible.builtin.include_role:
@@ -354,7 +354,7 @@
             name: ansible.aap_snapshot.common
             tasks_from: manage_services.yml
           vars:
-            _service_action: start_service.yml
+            _service_state: started
 
         - name: Report import failure
           ansible.builtin.fail:

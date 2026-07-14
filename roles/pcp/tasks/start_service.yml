@@ -1,7 +1,5 @@
 ---
 - name: Start monitoring service
-  ansible.builtin.systemd:
-    name: pcp
-    state: started
-    scope: user
-  when: aap_platform == 'containerized'
+  ansible.builtin.include_tasks: manage_service.yml
+  vars:
+    _service_state: started
