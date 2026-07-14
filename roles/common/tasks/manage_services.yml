@@ -2,10 +2,13 @@
 # Parametrized service management for all AAP components.
 # _service_state: stopped | started
 - name: Monitoring (pre)
-  ansible.builtin.include_role:
-    name: ansible.aap_snapshot.pcp
-    tasks_from: manage_service.yml
-  when: _service_state == 'stopped'
+  ansible.builtin.systemd:
+    name: pcp
+    state: "{{ _service_state }}"
+    scope: user
+  when:
+    - _service_state == 'stopped'
+    - aap_platform == 'containerized'
 
 - name: EDA services
   ansible.builtin.include_role:
@@ -40,7 +43,10 @@
   when: inventory_hostname in groups.get('gateway_groups', [])
 
 - name: Monitoring (post)
-  ansible.builtin.include_role:
-    name: ansible.aap_snapshot.pcp
-    tasks_from: manage_service.yml
-  when: _service_state == 'started'
+  ansible.builtin.systemd:
+    name: pcp
+    state: "{{ _service_state }}"
+    scope: user
+  when:
+    - _service_state == 'started'
+    - aap_platform == 'containerized'

@@ -1,5 +1,7 @@
 ---
 - name: Stop monitoring service
-  ansible.builtin.include_tasks: manage_service.yml
-  vars:
-    _service_state: stopped
+  ansible.builtin.systemd:
+    name: pcp
+    state: stopped
+    scope: user
+  when: aap_platform == 'containerized'

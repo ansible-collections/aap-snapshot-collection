@@ -1,8 +1,0 @@
----
-# _service_state: stopped | started
-- name: Manage monitoring service
-  ansible.builtin.systemd:
-    name: pcp
-    state: "{{ _service_state }}"
-    scope: user
-  when: aap_platform == 'containerized'
