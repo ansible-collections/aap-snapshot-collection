@@ -28,7 +28,20 @@
         name: ansible.aap_snapshot.artifact
         tasks_from: init.yml
 
-- name: Export into artifact
+- name: Export (OCP)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  any_errors_fatal: true
+  max_fail_percentage: 0
+  environment: "{{ ocp_utils_ocp_environment | default({}) }}"
+  tasks:
+    - name: Export from OCP
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.export_ocp
+      when: aap_platform | default('') == 'operator'
+
+- name: Export (containerized)
   hosts: controller_groups:eda_groups:gateway_groups:hub_groups
   gather_facts: false
   any_errors_fatal: true
@@ -36,8 +49,20 @@
   tasks:
     - name: Export components into artifact
       ansible.builtin.include_role:
-        name: ansible.aap_snapshot.artifact
-        tasks_from: build.yml
+        name: ansible.aap_snapshot.export_containerized
+      when: aap_platform | default('') == 'containerized'
+
+- name: Export (RPM)
+  hosts: controller_groups:eda_groups:gateway_groups:hub_groups
+  gather_facts: false
+  any_errors_fatal: true
+  max_fail_percentage: 0
+  become: true
+  tasks:
+    - name: Export components into artifact
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.export_rpm
+      when: aap_platform | default('') == 'rpm'
 
 - name: Package artifact
   hosts: localhost

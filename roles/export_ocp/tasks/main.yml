@@ -1,0 +1,20 @@
+---
+- name: Export gateway (includes AAP version discovery)
+  ansible.builtin.include_role:
+    name: ansible.aap_snapshot.automationgateway
+    tasks_from: export.yml
+
+- name: Export controller
+  ansible.builtin.include_role:
+    name: ansible.aap_snapshot.automationcontroller
+    tasks_from: export.yml
+
+- name: Export hub
+  ansible.builtin.include_role:
+    name: ansible.aap_snapshot.automationhub
+    tasks_from: export.yml
+
+- name: Export EDA
+  ansible.builtin.include_role:
+    name: ansible.aap_snapshot.automationeda
+    tasks_from: export.yml

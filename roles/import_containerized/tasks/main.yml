@@ -1,0 +1,32 @@
+---
+- name: Import controller
+  ansible.builtin.include_role:
+    name: ansible.aap_snapshot.automationcontroller
+    tasks_from: import.yml
+  when:
+    - groups.get('controller_groups', []) | length > 0
+    - inventory_hostname == groups['controller_groups'][0]
+
+- name: Import hub
+  ansible.builtin.include_role:
+    name: ansible.aap_snapshot.automationhub
+    tasks_from: import.yml
+  when:
+    - groups.get('hub_groups', []) | length > 0
+    - inventory_hostname == groups['hub_groups'][0]
+
+- name: Import gateway
+  ansible.builtin.include_role:
+    name: ansible.aap_snapshot.automationgateway
+    tasks_from: import.yml
+  when:
+    - groups.get('gateway_groups', []) | length > 0
+    - inventory_hostname == groups['gateway_groups'][0]
+
+- name: Import EDA
+  ansible.builtin.include_role:
+    name: ansible.aap_snapshot.automationeda
+    tasks_from: import.yml
+  when:
+    - groups.get('eda_groups', []) | length > 0
+    - inventory_hostname == groups['eda_groups'][0]

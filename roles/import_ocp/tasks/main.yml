@@ -1,0 +1,266 @@
+---
+- name: Import and reconcile on OCP
+  block:
+    # --- Pre-import checks ---
+    - name: Validate target version matches artifact
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.preflight
+        tasks_from: check_version_match.yml
+
+    # --- Determine which components to import ---
+    - name: Discover target components
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.ocp_utils
+        tasks_from: discover_components.yml
+
+    - name: Determine importable components
+      ansible.builtin.set_fact:
+        _import_components: >-
+          {{ artifact_manifest.components | map(attribute='name') | list
+             | intersect(
+               (['controller'] if _controller_cr_name is defined else [])
+               + (['hub'] if _hub_cr_name is defined else [])
+               + (['eda'] if _eda_cr_name is defined else [])
+               + (['gateway'])
+             ) }}
+
+    - name: Warn about components in artifact but not on target
+      ansible.builtin.debug:
+        msg: >-
+          Component '{{ item }}' is in the artifact but not deployed
+          on the target - skipping.
+      loop: >-
+        {{ artifact_manifest.components | map(attribute='name') | list
+           | difference(_import_components) }}
+
+    - name: Warn about components on target but not in artifact
+      ansible.builtin.debug:
+        msg: >-
+          Component '{{ item }}' is deployed on the target but not
+          present in the artifact - skipping.
+      loop: >-
+        {{ ((['controller'] if _controller_cr_name is defined else [])
+            + (['hub'] if _hub_cr_name is defined else [])
+            + (['eda'] if _eda_cr_name is defined else [])
+            + (['gateway']))
+           | difference(_import_components) }}
+
+    # --- Stage artifact while AAP is still running ---
+    - name: Create temporary migration resources
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.ocp_utils
+        tasks_from: create_temp_resources.yml
+
+    - name: Transfer artifact to temporary pod
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.ocp_utils
+        tasks_from: transfer_artifact.yml
+      vars:
+        artifact_path: "{{ _preflight_resolved_artifact | default(artifact_file) }}"
+
+    # --- Idle AAP for import ---
+    - name: Set AAP to idle
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.ocp_utils
+        tasks_from: idle_aap.yml
+      vars:
+        ocp_idle_aap: true
+
+    - name: Scale operators to zero
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.ocp_utils
+        tasks_from: scale_operators.yml
+      vars:
+        ocp_operator_replicas: 0
+
+    # --- Import databases ---
+    - name: Import controller
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.automationcontroller
+        tasks_from: import.yml
+      when: "'controller' in _import_components"
+
+    - name: Import hub
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.automationhub
+        tasks_from: import.yml
+      when: "'hub' in _import_components"
+
+    - name: Import gateway
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.automationgateway
+        tasks_from: import.yml
+      when: "'gateway' in _import_components"
+
+    - name: Import EDA
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.automationeda
+        tasks_from: import.yml
+      when: "'eda' in _import_components"
+
+    # --- Delete controller migration jobs before scaling operators ---
+    - name: Delete controller migration jobs
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.ocp_utils
+        tasks_from: delete_controller_migration_jobs.yml
+      when: "'controller' in _import_components"
+
+    # --- Resume AAP ---
+    - name: Scale operators back up
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.ocp_utils
+        tasks_from: scale_operators.yml
+      vars:
+        ocp_operator_replicas: 1
+
+    - name: Resume AAP
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.ocp_utils
+        tasks_from: idle_aap.yml
+      vars:
+        ocp_idle_aap: false
+
+    # --- Gateway-first reconcile (unblocks operator) ---
+    - name: Set gateway pod facts for early reconcile
+      ansible.builtin.set_fact:
+        _ocp_utils_gateway_pod_name: "{{ _ocp_utils_gateway_pods.resources[0].metadata.name }}"
+        _ocp_utils_gateway_container_name: "api"
+
+    - name: Load secret mapping from ocp_utils
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.ocp_utils
+        tasks_from: set_secret_mapping.yml
+
+    - name: Re-apply gateway encryption secret
+      kubernetes.core.k8s:
+        kind: Secret
+        name: "{{ item.secret_name }}"
+        namespace: "{{ ocp_namespace | default('aap') }}"
+        state: patched
+        definition:
+          data: "{{ {item.field: artifact_secrets[item.artifact_key]} }}"
+      loop: "{{ _ocp_utils_secret_mapping | selectattr('component', 'equalto', 'gateway') | list }}"
+      loop_control:
+        label: "{{ item.secret_name }}"
+      no_log: "{{ not (disable_no_log | default(false) | bool) }}"
+      when: artifact_secrets[item.artifact_key] is defined
+
+    - name: Restart gateway pod to pick up restored encryption secret
+      kubernetes.core.k8s:
+        kind: Pod
+        namespace: "{{ ocp_namespace | default('aap') }}"
+        name: "{{ _ocp_utils_gateway_pod_name }}"
+        state: absent
+
+    - name: Wait for new gateway pod
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.ocp_utils
+        tasks_from: discover_pod.yml
+      vars:
+        _discover_label: "gateway"
+        _discover_selectors:
+          - "app.kubernetes.io/component=aap-gateway"
+        _discover_pod_fact: "_ocp_utils_gateway_pod_name"
+        _discover_container_fact: "_ocp_utils_gateway_container_name"
+        _discover_container_name: "api"
+
+    - name: Detect Django version for manage shell compatibility
+      kubernetes.core.k8s_exec:
+        namespace: "{{ ocp_namespace | default('aap') }}"
+        pod: "{{ _ocp_utils_gateway_pod_name }}"
+        container: "{{ _ocp_utils_gateway_container_name }}"
+        command: >-
+          aap-gateway-manage shell -c "import django; print(django.VERSION[0])"
+      register: _django_version_check
+      changed_when: false
+      failed_when: false
+
+    - name: Set manage shell args for Django 5.x compatibility
+      ansible.builtin.set_fact:
+        _operations_manage_shell_args: "{{ '--no-imports' if (_django_version_check.stdout_lines | default(['4']) | last | trim | int) >= 5 else '' }}"
+      delegate_facts: true
+      delegate_to: localhost
+
+    - name: Reconcile gateway
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.automationgateway
+        tasks_from: reconcile.yml
+
+    # --- Wait for remaining components ---
+    - name: Wait for and discover component pods for reconcile
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.ocp_utils
+        tasks_from: discover_components.yml
+      vars:
+        _wait_for_running: true
+
+    - name: Re-apply remaining encryption secrets
+      kubernetes.core.k8s:
+        kind: Secret
+        name: "{{ item.secret_name }}"
+        namespace: "{{ ocp_namespace | default('aap') }}"
+        state: patched
+        definition:
+          data: "{{ {item.field: artifact_secrets[item.artifact_key]} }}"
+      loop: "{{ _ocp_utils_secret_mapping | rejectattr('component', 'equalto', 'gateway') | list }}"
+      loop_control:
+        label: "{{ item.secret_name }}"
+      no_log: "{{ not (disable_no_log | default(false) | bool) }}"
+      when: artifact_secrets[item.artifact_key] is defined
+
+    # --- Reconcile remaining components ---
+    - name: Reconcile controller
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.automationcontroller
+        tasks_from: reconcile.yml
+      when: "'controller' in _import_components"
+
+    - name: Reconcile hub
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.automationhub
+        tasks_from: reconcile.yml
+      when: "'hub' in _import_components"
+
+    - name: Reconcile EDA
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.automationeda
+        tasks_from: reconcile.yml
+      when: "'eda' in _import_components"
+
+    - name: Wait for AAP CR to reach ready state
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.ocp_utils
+        tasks_from: wait_aap_ready.yml
+
+    - name: Mark import as succeeded
+      ansible.builtin.set_fact:
+        _import_succeeded: true
+
+  rescue:
+    - name: Scale operators back up (recovery)
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.ocp_utils
+        tasks_from: scale_operators.yml
+      vars:
+        ocp_operator_replicas: 1
+
+    - name: Resume AAP (recovery)
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.ocp_utils
+        tasks_from: idle_aap.yml
+      vars:
+        ocp_idle_aap: false
+
+    - name: Report import failure
+      ansible.builtin.fail:
+        msg: >-
+          Import failed. Operators and AAP have been restored.
+          Failed task: {{ ansible_failed_task.name | default('unknown') }}.
+          Error: {{ ansible_failed_result.msg | default(ansible_failed_result | to_nice_json) }}
+
+  always:
+    - name: Remove temporary migration resources
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.ocp_utils
+        tasks_from: cleanup_temp_resources.yml
+      when: (_import_succeeded | default(false) | bool) or not (keep_temp_on_failure | default(true) | bool)

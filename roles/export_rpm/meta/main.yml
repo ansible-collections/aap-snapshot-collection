@@ -1,0 +1,13 @@
+---
+galaxy_info:
+  role_name: export_rpm
+  author: Red Hat
+  description: Export AAP artifact from an RPM-based deployment
+  license: GPL-3.0-or-later
+  min_ansible_version: "2.16"
+  platforms:
+    - name: EL
+      versions:
+        - "8"
+        - "9"
+dependencies: []
