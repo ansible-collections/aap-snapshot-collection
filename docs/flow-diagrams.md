@@ -179,10 +179,11 @@ flowchart TD
         subgraph RESTORE["Restore Databases (per component)"]
             D1["import_controller<br/>Read K8s Secret: aap-controller-postgres-configuration<br/>Find postgres pod: aap-postgres-15-0<br/>GRANT CREATEDB via k8s_exec on PG pod<br/>pg_restore via k8s_exec on TEMP pod<br/>REVOKE CREATEDB<br/>Patch aap-controller-secret-key"]
             D2["import_hub<br/>Same pattern with hub credentials<br/>Patch aap-hub-db-fields-encryption<br/>+ aap-hub-secret-key"]
+            D2a["delete_hub_file_storage_pvc<br/>Find PVC by label selector<br/>Delete hub file-storage PVC"]
             D3["import_gateway<br/>Same pattern with gateway credentials<br/>Patch aap-db-fields-encryption-secret"]
             D4["import_eda<br/>Same pattern with eda credentials<br/>Patch aap-eda-secret-key"]
 
-            D1 --> D2 --> D3 --> D4
+            D1 --> D2 --> D2a --> D3 --> D4
         end
 
         subgraph RESUME["Resume Environment"]
@@ -197,7 +198,7 @@ flowchart TD
         subgraph RECONCILE["Post-Import Reconciliation"]
             F1["reconcile_gateway<br/>aap-gateway-manage migrate<br/>Delete HTTPPort, Route, ServiceNode,<br/>ServiceCluster objects<br/>Delete aap-resource-server secret"]
             F2["reconcile_controller<br/>Find instances w/ stale heartbeats<br/>deprovision_instance per orphan"]
-            F3["reconcile_hub<br/>pulpcore-manager repair-artifacts"]
+            F3["reconcile_hub<br/>Pulp repair (POST /api/galaxy/pulp/api/v3/repair/)<br/>Reconcile DB artifacts against fresh volume"]
             F4["reconcile_eda<br/>aap-eda-manage resource_sync"]
 
             F1 --> F2 --> F3 --> F4

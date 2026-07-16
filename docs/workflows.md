@@ -111,6 +111,12 @@ For each component listed in the artifact manifest:
    - OCP: patches Kubernetes Secrets with artifact values
    - Containerized: creates/updates podman secrets
 
+**Hub-specific:** After the hub database is restored, the hub file-storage
+PVC is deleted (OCP only) so the operator provisions a fresh empty volume on
+resume. Content is then re-synced from configured remotes. Pulp repair during
+reconciliation cleans up any remaining stale artifact references in the
+restored database.
+
 **Platform routing:**
 - OCP: all imports run on `localhost` using `kubernetes.core.k8s_exec`
   against the temporary PostgreSQL pod
@@ -173,8 +179,10 @@ against the new environment.
 ### Hub Reconciliation
 
 1. **Trigger Pulp content repair** - sends a POST to
-   `/api/galaxy/pulp/api/v3/repair/` via the gateway API to verify content
-   checksums and restore integrity after database restore
+   `/api/galaxy/pulp/api/v3/repair/` via the gateway API to reconcile the
+   restored database's artifact records against the fresh file-storage volume
+   (the original PVC was deleted during import) and re-download remote-backed
+   content
 2. **Reset admin password** (OCP) - reads the `hub-admin-password` K8s Secret
    and runs `pulpcore-manager reset-admin-password` to sync the database
    password
