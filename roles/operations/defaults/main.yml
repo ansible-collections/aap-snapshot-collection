@@ -8,3 +8,5 @@ operations_aap_instance_name: "{{ aap_instance_name | default('aap') }}"
 
 operations_gateway_admin_user: "admin"
 operations_validate_certs: false
+
+_operations_manage_shell_args: "--no-imports"

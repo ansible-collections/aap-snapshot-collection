@@ -1,0 +1,6 @@
+---
+bugfixes:
+  - Gather minimal facts for containerized preflight service check to resolve undefined ``ansible_user_dir``.
+  - Fix secret payload dict keys not evaluating in ``set_fact`` by using Jinja template blocks.
+  - Prevent hub resource server register from overwriting the standard component register variable.
+  - Replace ``omit`` sentinel with explicit default for ``django_manage_get_cmd`` in containerized DB export.

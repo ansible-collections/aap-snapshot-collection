@@ -1,0 +1,3 @@
+---
+bugfixes:
+  - Default ``_operations_manage_shell_args`` to ``--no-imports`` so containerized DB auth works for components where the Django version detection is skipped.

@@ -78,10 +78,15 @@
           One or more AAP pods are in a failed state.
           Check pod status in namespace {{ preflight_ocp_namespace }}.
 
-# NOT YET VALIDATED - containerized platform
 - name: Check component services (containerized)
   when: aap_platform == 'containerized'
   block:
+    - name: Gather minimal facts for user home directory
+      ansible.builtin.setup:
+        gather_subset:
+          - "!all"
+          - user_dir
+
     - name: Discover all AAP service units
       ansible.builtin.find:
         paths: "{{ ansible_user_dir }}/.config/systemd/user"

@@ -45,7 +45,7 @@
     postgresql_component_name: "{{ component_name }}"
     postgresql_django_manage_user: "{{ _operations_current_component.django_user }}"
     postgresql_django_manage_cmd: "{{ _operations_current_component.manage_cmd }}"
-    postgresql_django_manage_get_cmd: "{{ _operations_current_component.django_manage_get_cmd | default(omit, true) }}"
+    postgresql_django_manage_get_cmd: "{{ _operations_current_component.django_manage_get_cmd | default('from django.conf import settings; print(settings.DATABASES)', true) }}"
     postgresql_django_environment: "{{ _operations_current_component.django_environment if _operations_current_component.django_environment | length > 0 else omit }}"
     postgresql_container_name: '{{ _operations_current_component.container_name }}'
     postgresql_no_log: '{{ __operations_no_log }}'
