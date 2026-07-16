@@ -15,7 +15,7 @@
           requests:
             storage: "{{ ocp_utils_temp_pvc_size }}"
 
-- name: Create temporary PostgreSQL deployment for migration
+- name: Create temporary deployment for migration
   kubernetes.core.k8s:
     state: present
     definition:
@@ -36,15 +36,18 @@
           spec:
             containers:
               - name: postgres
-                image: "{{ ocp_utils_temp_postgres_image }}"
+                image: "{{ ocp_utils_temp_pod_image | default(ocp_utils_temp_postgres_image) }}"
                 command: ["sleep", "infinity"]
-                volumeMounts:
-                  - name: migration-data
-                    mountPath: /tmp/migration
-            volumes:
-              - name: migration-data
-                persistentVolumeClaim:
-                  claimName: "{{ ocp_utils_temp_pvc_name }}"
+                volumeMounts: "{{ _ocp_utils_temp_volume_mounts }}"
+            volumes: "{{ _ocp_utils_temp_volumes }}"
+  vars:
+    _ocp_utils_temp_volume_mounts:
+      - name: migration-data
+        mountPath: /tmp/migration
+    _ocp_utils_temp_volumes:
+      - name: migration-data
+        persistentVolumeClaim:
+          claimName: "{{ ocp_utils_temp_pvc_name }}"
 
 - name: Wait for temporary pod to be ready
   kubernetes.core.k8s_info:

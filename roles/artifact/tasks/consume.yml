@@ -178,6 +178,14 @@
                + (['gateway'])
              ) }}
 
+    - name: Check if hub content data is available in artifact
+      ansible.builtin.set_fact:
+        artifact_hub_has_content_data: >-
+          {{ artifact_manifest.components
+             | selectattr('name', 'equalto', 'hub')
+             | map(attribute='has_content_data')
+             | first | default(false) | bool }}
+
     - name: Warn about components in artifact but not on target
       ansible.builtin.debug:
         msg: >-
@@ -258,6 +266,15 @@
         name: ansible.aap_snapshot.ocp_utils
         tasks_from: delete_controller_migration_jobs.yml
       when: "'controller' in _artifact_import_components"
+
+    # --- Restore hub content files ---
+    - name: Restore hub content to file-storage PVC
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.automationhub
+        tasks_from: import_hub_content.yml
+      when:
+        - "'hub' in _artifact_import_components"
+        - artifact_hub_has_content_data | default(false)
 
     # --- Resume AAP ---
     - name: Scale operators back up

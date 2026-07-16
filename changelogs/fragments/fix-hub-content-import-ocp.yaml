@@ -1,0 +1,3 @@
+---
+bugfixes:
+  - Restore hub content files to the file-storage PVC during OCP import. Previously only the hub database was restored, leaving the storage backend empty and causing broken collection downloads.

@@ -1,0 +1,93 @@
+---
+- name: Restore hub content to file-storage PVC
+  when:
+    - aap_platform == 'operator'
+    - artifact_hub_has_content_data | default(false)
+  block:
+    - name: Load ocp_utils defaults for temp resource names
+      ansible.builtin.include_vars:
+        file: "{{ role_path }}/../ocp_utils/defaults/main.yml"
+
+    - name: Discover hub file-storage PVC name
+      kubernetes.core.k8s_info:
+        kind: PersistentVolumeClaim
+        namespace: "{{ automationhub_ocp_namespace }}"
+        label_selectors:
+          - "app.kubernetes.io/name=automationhub-storage"
+          - "app.kubernetes.io/managed-by=automationhub-operator"
+      register: _automationhub_pvcs
+
+    - name: Assert hub file-storage PVC was found
+      ansible.builtin.assert:
+        that: _automationhub_pvcs.resources | length > 0
+        fail_msg: >-
+          No hub file-storage PVC found in namespace {{ automationhub_ocp_namespace }}
+          with labels app.kubernetes.io/name=automationhub-storage,
+          app.kubernetes.io/managed-by=automationhub-operator.
+          Hub may be using S3 or Azure storage (content file restore
+          is only supported for file-storage PVCs).
+
+    - name: Set hub file-storage PVC fact
+      ansible.builtin.set_fact:
+        _automationhub_file_storage_pvc: "{{ _automationhub_pvcs.resources[0].metadata.name }}"
+
+    - name: Delete temporary deployment for recreation
+      kubernetes.core.k8s:
+        kind: Deployment
+        name: "{{ ocp_utils_temp_deployment_name }}"
+        namespace: "{{ automationhub_ocp_namespace }}"
+        state: absent
+        wait: true
+        wait_timeout: 120
+
+    - name: Wait for old temporary pod to terminate
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: "{{ automationhub_ocp_namespace }}"
+        label_selectors:
+          - "app={{ ocp_utils_temp_deployment_name }}"
+      register: _automationhub_old_temp_pods
+      until: _automationhub_old_temp_pods.resources | length == 0
+      retries: 30
+      delay: 10
+
+    - name: Recreate temporary deployment with hub file-storage PVC
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.ocp_utils
+        tasks_from: create_temp_resources.yml
+      vars:
+        _ocp_utils_temp_volume_mounts:
+          - name: migration-data
+            mountPath: /tmp/migration
+          - name: hub-file-storage
+            mountPath: /mnt/hub-storage
+        _ocp_utils_temp_volumes:
+          - name: migration-data
+            persistentVolumeClaim:
+              claimName: "{{ ocp_utils_temp_pvc_name }}"
+          - name: hub-file-storage
+            persistentVolumeClaim:
+              claimName: "{{ _automationhub_file_storage_pvc }}"
+
+    - name: Verify hub content tar has no path traversal entries
+      kubernetes.core.k8s_exec:
+        namespace: "{{ automationhub_ocp_namespace }}"
+        pod: "{{ ocp_utils_temp_pod_name }}"
+        container: postgres
+        command: >-
+          sh -c "tar tf /tmp/migration/artifact/hub/{{ automationhub_content_tar_name }}
+          | grep -q '\.\./'"
+      register: _automationhub_tar_traversal_check
+      failed_when: _automationhub_tar_traversal_check.rc == 0
+      changed_when: false
+
+    - name: Extract hub content to file-storage PVC
+      kubernetes.core.k8s_exec:
+        namespace: "{{ automationhub_ocp_namespace }}"
+        pod: "{{ ocp_utils_temp_pod_name }}"
+        container: postgres
+        command: >-
+          tar xf /tmp/migration/artifact/hub/{{ automationhub_content_tar_name }}
+          -C /mnt/hub-storage/media/
+      register: _automationhub_content_extract
+      failed_when: _automationhub_content_extract.rc != 0
