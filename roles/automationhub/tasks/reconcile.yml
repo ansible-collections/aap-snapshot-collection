@@ -20,23 +20,10 @@
     _discover_container_name: "api"
   when: aap_platform == 'operator'
 
-- name: Read gateway admin password
-  kubernetes.core.k8s_info:
-    kind: Secret
-    namespace: "{{ automationhub_ocp_namespace }}"
-    name: "{{ aap_instance_name | default('aap') }}-admin-password"
-  register: _automationhub_gw_admin_secret
-  no_log: "{{ not (disable_no_log | default(false) | bool) }}"
-  when: aap_platform == 'operator'
-
-- name: Set gateway credentials (OCP)
+- name: Set gateway API URL (OCP)
   ansible.builtin.set_fact:
     _automationhub_gw_api_url: "http://{{ aap_instance_name | default('aap') }}.{{ automationhub_ocp_namespace }}.svc.cluster.local"
-    _automationhub_gw_admin_pw: "{{ _automationhub_gw_admin_secret.resources[0].data.password | b64decode }}"
-  no_log: "{{ not (disable_no_log | default(false) | bool) }}"
-  when:
-    - aap_platform == 'operator'
-    - _automationhub_gw_admin_secret.resources | default([]) | length > 0
+  when: aap_platform == 'operator'
 
 - name: Set gateway credentials (containerized)
   ansible.builtin.set_fact:
@@ -81,8 +68,45 @@
     - aap_platform == 'operator'
     - _ocp_utils_gateway_pod_name is defined
 
+- name: Read gateway operator OAuth2 token secret (OCP)
+  kubernetes.core.k8s_info:
+    kind: Secret
+    namespace: "{{ automationhub_ocp_namespace }}"
+    name: "{{ aap_instance_name | default('aap') }}-gateway-oauth2-token-secret"
+  register: _automationhub_gw_oauth2_secret
+  no_log: "{{ not (disable_no_log | default(false) | bool) }}"
+  when: aap_platform == 'operator'
+
+- name: Set operator OAuth2 token (OCP)
+  ansible.builtin.set_fact:
+    _automationhub_operator_token: "{{ _automationhub_gw_oauth2_secret.resources[0].data.token | b64decode }}"
+  no_log: "{{ not (disable_no_log | default(false) | bool) }}"
+  when:
+    - aap_platform == 'operator'
+    - _automationhub_gw_oauth2_secret.resources | default([]) | length > 0
+
 - name: Run Pulp content repair
   block:
+    - name: Trigger Pulp repair via API (OCP)
+      ansible.builtin.uri:
+        url: "https://{{ ocp_utils_gateway_hostname }}/api/galaxy/pulp/api/v3/repair/"
+        method: POST
+        body_format: json
+        body:
+          verify_checksums: true
+        headers:
+          Authorization: "Bearer {{ _automationhub_operator_token }}"
+        validate_certs: "{{ operations_validate_certs | default(false) }}"
+        status_code: [200, 202]
+      register: _automationhub_repair_ocp
+      no_log: "{{ not (disable_no_log | default(false) | bool) }}"
+      retries: 6
+      delay: 10
+      until: _automationhub_repair_ocp is not failed
+      when:
+        - aap_platform == 'operator'
+        - _automationhub_operator_token is defined
+
     - name: Trigger Pulp repair via API
       ansible.builtin.uri:
         url: "https://{{ ocp_utils_gateway_hostname }}/api/galaxy/pulp/api/v3/repair/"
@@ -95,15 +119,20 @@
         force_basic_auth: true
         validate_certs: "{{ operations_validate_certs | default(false) }}"
         status_code: [200, 202]
-      register: _automationhub_repair_result
+      register: _automationhub_repair_containerized
       no_log: "{{ not (disable_no_log | default(false) | bool) }}"
       retries: 6
       delay: 10
-      until: _automationhub_repair_result is not failed
+      until: _automationhub_repair_containerized is not failed
+      when: aap_platform != 'operator'
 
     - name: Report Pulp repair status
       ansible.builtin.debug:
-        msg: "Pulp repair initiated - status {{ _automationhub_repair_result.status }}"
+        msg: >-
+          Pulp repair initiated - status
+          {{ _automationhub_repair_ocp.status
+             if not (_automationhub_repair_ocp.skipped | default(false))
+             else _automationhub_repair_containerized.status | default('unknown') }}
 
   rescue:
     - name: Fallback - run Pulp repair via curl from hub pod
@@ -114,8 +143,8 @@
         command: >-
           curl -sf -X POST
           -H 'Content-Type: application/json'
+          -H {{ ('Authorization: Bearer ' ~ _automationhub_operator_token) | quote }}
           -d '{"verify_checksums": true}'
-          -u {{ (automationhub_gateway_admin_user ~ ':' ~ _automationhub_gw_admin_pw) | quote }}
           {{ _automationhub_gw_api_url }}/api/galaxy/pulp/api/v3/repair/
       register: _automationhub_repair_curl
       failed_when: false
@@ -124,6 +153,7 @@
       when:
         - aap_platform == 'operator'
         - _ocp_utils_hub_pod_name is defined
+        - _automationhub_operator_token is defined
 
     - name: Report Pulp repair fallback status
       ansible.builtin.debug:
