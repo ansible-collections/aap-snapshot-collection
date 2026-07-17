@@ -7,7 +7,7 @@ see [artifact-format.md](artifact-format.md).
 ## Export Workflow
 
 **Playbook:** `artifact_export.yaml`
-**Supported platforms:** RPM, containerized, OCP
+**Supported platforms:** RPM (containerized and OCP: planned)
 
 ### Phase 1: Preflight
 
@@ -58,7 +58,7 @@ see [artifact-format.md](artifact-format.md).
 ## Import Workflow
 
 **Playbook:** `artifact_import.yaml`
-**Supported platforms:** containerized, OCP
+**Supported platforms:** OCP (containerized: planned)
 
 ### Phase 1: Preflight
 
@@ -86,7 +86,7 @@ When `aap_platform: operator`:
 2. **Scale operators to zero** - scales gateway and controller operator
    deployments to 0 replicas
 
-### Phase 3: Quiesce Target (Containerized)
+### Phase 3: Quiesce Target (Containerized) *(planned)*
 
 When `aap_platform: containerized`:
 
