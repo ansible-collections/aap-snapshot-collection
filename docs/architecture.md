@@ -3,7 +3,7 @@
 ## Migration Pipeline Overview
 
 ```
- SOURCE (RPM)                                 TARGET (OCP)
+ SOURCE (RPM / Containerized / OCP)          TARGET (Containerized / OCP)
  ┌──────────────────────────────────┐        ┌──────────────────────────────┐
  │  1. Preflight                    │        │  1. Preflight                │
  │  2. Initialize artifact          │        │  2. Extract artifact         │
@@ -31,7 +31,7 @@ The collection implements a three-phase migration model:
 | Playbook | Description |
 |----------|-------------|
 | `artifact_export.yaml` | Multi-play export workflow (all platforms) |
-| `artifact_import.yaml` | Multi-play import workflow (OCP; containerized planned) |
+| `artifact_import.yaml` | Multi-play import workflow (containerized + OCP) |
 | `artifact_verify.yaml` | Standalone artifact verification |
 
 ### Platform Sub-Playbooks
@@ -90,7 +90,7 @@ checks, and service management.
 
 | Role | Purpose | Called By |
 |------|---------|----------|
-| `import_component` | Generic component import: DB restore + secret update (OCP; containerized planned) | `import_controller`, `import_hub`, `import_gateway`, `import_eda` |
+| `import_component` | Generic component import: DB restore + secret update (OCP and containerized) | `import_controller`, `import_hub`, `import_gateway`, `import_eda` |
 | `import_controller` | Import controller (delegates to `import_component`) | `artifact_import.yaml` |
 | `import_hub` | Import hub (delegates to `import_component`) | `artifact_import.yaml` |
 | `import_gateway` | Import gateway (delegates to `import_component`) | `artifact_import.yaml` |

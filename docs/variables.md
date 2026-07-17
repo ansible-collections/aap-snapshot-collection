@@ -10,7 +10,7 @@ These apply to both export and import workflows.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `aap_platform` | (required) | Platform type: `rpm` (export) or `operator` (import); `containerized` is planned |
+| `aap_platform` | (required) | Source/target platform: `rpm`, `containerized`, or `operator` |
 | `artifact_dir` | `$PWD` | Directory where the artifact is created (export) or read from (import) |
 | `artifact_file` | (required for import/verify) | Path to the artifact archive |
 | `disable_no_log` | `false` | Set `true` to show sensitive values in output for debugging |
