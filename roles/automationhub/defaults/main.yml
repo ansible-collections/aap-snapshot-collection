@@ -8,3 +8,6 @@ automationhub_content_tar_name: "hub_content.tar"
 # Set this to a larger filesystem if /tmp is too small for your hub data.
 automationhub_content_staging_dir: "/tmp"
 automationhub_export_hub_content: true
+
+automationhub_temp_deployment_name: "{{ ocp_utils_temp_deployment_name | default('aap-snapshot-temp-postgres') }}"
+automationhub_temp_pvc_name: "{{ ocp_utils_temp_pvc_name | default('aap-snapshot-temp') }}"

@@ -185,6 +185,7 @@
              | selectattr('name', 'equalto', 'hub')
              | map(attribute='has_content_data')
              | first | default(false) | bool }}
+      # first catches missing hub component, default catches older artifacts without has_content_data
 
     - name: Warn about components in artifact but not on target
       ansible.builtin.debug:

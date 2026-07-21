@@ -34,10 +34,12 @@
             labels:
               app: "{{ ocp_utils_temp_deployment_name }}"
           spec:
+            serviceAccountName: "{{ _ocp_utils_temp_service_account | default(omit) }}"
             containers:
               - name: postgres
                 image: "{{ ocp_utils_temp_pod_image | default(ocp_utils_temp_postgres_image) }}"
                 command: ["sleep", "infinity"]
+                securityContext: "{{ _ocp_utils_temp_security_context | default(omit) }}"
                 volumeMounts: "{{ _ocp_utils_temp_volume_mounts }}"
             volumes: "{{ _ocp_utils_temp_volumes }}"
   vars:
