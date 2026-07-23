@@ -8,7 +8,7 @@ jobs:
       python_version: '3.11'
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
 
       - name: Setup python
         uses: actions/setup-python@v6
@@ -31,7 +31,7 @@ jobs:
       python_version: '3.11'
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
 
       - name: Setup python
         uses: actions/setup-python@v6
@@ -47,7 +47,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
 
@@ -62,7 +62,7 @@ jobs:
       python_version: '3.11'
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
 
       - name: Setup python
         uses: actions/setup-python@v6
