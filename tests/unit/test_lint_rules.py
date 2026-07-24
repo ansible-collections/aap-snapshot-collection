@@ -36,7 +36,18 @@ _stub_ansiblelint.rules = _stub_rules
 sys.modules.setdefault("ansiblelint", _stub_ansiblelint)
 sys.modules.setdefault("ansiblelint.rules", _stub_rules)
 
+_stub_file_utils = types.ModuleType("ansiblelint.file_utils")
+sys.modules.setdefault("ansiblelint.file_utils", _stub_file_utils)
+
 _rules_dir = os.path.join(os.path.dirname(__file__), "..", "..", "rules")
+
+_spec_boilerplate = importlib.util.spec_from_file_location(
+    "play_boilerplate",
+    os.path.join(_rules_dir, "play_boilerplate.py"),
+)
+boilerplate_mod = importlib.util.module_from_spec(_spec_boilerplate)
+_spec_boilerplate.loader.exec_module(boilerplate_mod)
+PlayBoilerplateRule = boilerplate_mod.PlayBoilerplateRule
 
 _spec_nolog = importlib.util.spec_from_file_location(
     "no_log_consistency",
@@ -145,3 +156,47 @@ class TestLoopControlLabelRule:
         result = self.rule.matchtask(task)
         assert result
         assert "missing label" in result
+
+
+class _FakeLintable:
+    def __init__(self, kind="playbook"):
+        self.kind = kind
+
+
+class TestPlayBoilerplateRule:
+    """Tests for custom-play-boilerplate rule."""
+
+    def setup_method(self):
+        self.rule = PlayBoilerplateRule()
+
+    def test_non_playbook_file_passes(self):
+        result = self.rule.matchplay(_FakeLintable(kind="tasks"), {})
+        assert result == []
+
+    def test_import_playbook_passes(self):
+        data = {"import_playbook": "other.yml"}
+        assert self.rule.matchplay(_FakeLintable(), data) == []
+
+    def test_fqcn_import_playbook_passes(self):
+        data = {"ansible.builtin.import_playbook": "other.yml"}
+        assert self.rule.matchplay(_FakeLintable(), data) == []
+
+    def test_missing_both_fails(self):
+        result = self.rule.matchplay(_FakeLintable(), {"__line__": 1})
+        assert len(result) == 2
+
+    def test_gather_facts_true_fails(self):
+        data = {"gather_facts": True, "any_errors_fatal": True, "__line__": 1}
+        result = self.rule.matchplay(_FakeLintable(), data)
+        assert len(result) == 1
+        assert "gather_facts" in result[0]["message"]
+
+    def test_any_errors_fatal_false_fails(self):
+        data = {"gather_facts": False, "any_errors_fatal": False, "__line__": 1}
+        result = self.rule.matchplay(_FakeLintable(), data)
+        assert len(result) == 1
+        assert "any_errors_fatal" in result[0]["message"]
+
+    def test_both_correct_passes(self):
+        data = {"gather_facts": False, "any_errors_fatal": True}
+        assert self.rule.matchplay(_FakeLintable(), data) == []

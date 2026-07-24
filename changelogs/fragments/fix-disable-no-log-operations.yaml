@@ -5,4 +5,5 @@ bugfixes:
   - Add loop_control with label to all loops to prevent sensitive data in output.
 minor_changes:
   - Standardize no_log across all roles to use role-level toggle variables with a single disable_no_log input.
+  - Remove explicit postgresql_no_log parameter from operations role; the postgresql role now manages its own no_log toggle internally.
 ...

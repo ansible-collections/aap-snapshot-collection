@@ -15,7 +15,9 @@ CANONICAL = "{{ not (disable_no_log | default(false) | bool) }}"
 
 _CANONICAL_NORM = CANONICAL.replace(" ", "")
 
-_ROLE_VAR_RE = re.compile(r"\{\{\s*__\w+_no_log\s*\}\}")
+_ROLE_VAR_RE = re.compile(r"\{\{\s*__\w{1,100}_no_log\s*\}\}")
+
+_DESCRIPTION = f"All no_log directives must use: {CANONICAL!r} or a __<role>_no_log variable. Hard-coded values are not allowed."
 
 
 def _normalize(value: str) -> str:
@@ -26,11 +28,7 @@ class NoLogConsistencyRule(AnsibleLintRule):
     id = "custom-no-log"
     version_changed = "1.0.5"
     shortdesc = "no_log must use the canonical toggle pattern"
-    description = (
-        f"All no_log directives must use: {CANONICAL!r} "
-        "or a role-level variable matching __<role>_no_log. "
-        "Hard-coded true/false and alternative expressions are not allowed."
-    )
+    description = _DESCRIPTION
     tags = ["custom", "security"]
 
     def matchtask(self, task: Task, file: Lintable | None = None) -> bool | str:
