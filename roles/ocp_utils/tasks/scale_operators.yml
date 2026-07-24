@@ -18,3 +18,4 @@
     replicas: "{{ ocp_operator_replicas | int }}"
     wait: "{{ ocp_operator_replicas | int > 0 }}"
     wait_timeout: "{{ ocp_utils_scale_wait_retries | int * ocp_utils_scale_wait_delay | int }}"
+...

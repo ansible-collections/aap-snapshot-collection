@@ -3,3 +3,4 @@
   ansible.builtin.file:
     path: "{{ postgresql_export_dir }}"
     state: absent
+...

@@ -30,3 +30,4 @@
   when:
     - groups.get('hub_groups', []) | length > 0
     - inventory_hostname == groups['hub_groups'][0]
+...

@@ -19,3 +19,4 @@
     tasks_from: update_secret.yml
   vars:
     component_name: "{{ automationgateway_component_name }}"
+...

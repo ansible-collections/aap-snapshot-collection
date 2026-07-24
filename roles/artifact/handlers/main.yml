@@ -3,3 +3,4 @@
   ansible.builtin.file:
     path: "{{ __artifact_build_dir }}"
     state: absent
+...

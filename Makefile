@@ -18,7 +18,7 @@ install: build
 	ansible-galaxy collection install $(BUILD_DIR)/$(COLLECTION_TARBALL) --force
 
 lint:
-	ansible-lint roles/
+	ansible-lint roles/ playbooks/
 
 syntax-check:
 	ansible-playbook --syntax-check playbooks/artifact_export.yaml

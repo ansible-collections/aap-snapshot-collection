@@ -20,3 +20,4 @@
       ansible.builtin.file:
         path: "{{ __artifact_dest_dir }}/{{ __artifact_build_dir | basename }}"
         state: absent
+...

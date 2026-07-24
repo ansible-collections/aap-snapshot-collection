@@ -30,3 +30,4 @@
       The AAP operator must be installed before running the import.
       Install it via OperatorHub or apply the operator subscription manually.
   when: _preflight_crd_check.resources | length == 0
+...

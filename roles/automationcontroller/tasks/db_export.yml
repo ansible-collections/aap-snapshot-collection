@@ -5,3 +5,4 @@
     tasks_from: db_export.yml
   vars:
     component_name: "{{ automationcontroller_component_name }}"
+...

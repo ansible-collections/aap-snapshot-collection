@@ -51,3 +51,4 @@
     name: ansible.aap_snapshot.ocp_utils
     tasks_from: discover_components.yml
   when: _ocp_utils_aap_cr_exists | default(false) | bool
+...

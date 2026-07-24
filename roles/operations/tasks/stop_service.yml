@@ -10,6 +10,8 @@
     state: stopped
     scope: user
   loop: "{{ _operations_current_component.services }}"
+  loop_control:
+    label: "{{ item }}"
   when:
     - aap_platform == 'containerized'
     - not (_operations_current_component.has_worker_discovery | bool)
@@ -43,3 +45,6 @@
            | map('regex_replace', '\.service$', '')
            | list
            + _operations_current_component.static_services }}
+      loop_control:
+        label: "{{ item }}"
+...

@@ -58,3 +58,4 @@
     _reset_pod_name: "{{ _ocp_utils_eda_pod_name | default('') }}"
     _reset_container_name: "{{ _ocp_utils_eda_container_name | default(_operations_current_component.container_name) }}"
   when: aap_platform == 'operator'
+...

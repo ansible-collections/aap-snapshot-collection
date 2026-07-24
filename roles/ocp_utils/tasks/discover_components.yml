@@ -120,12 +120,12 @@
     namespace: "{{ ocp_utils_ocp_namespace }}"
     name: "{{ ocp_utils_aap_instance_name }}-admin-password"
   register: _ocp_utils_admin_secret
-  no_log: "{{ (disable_no_log | default(false) | bool) | ternary(false, true) }}"
+  no_log: "{{ __ocp_utils_no_log }}"
 
 - name: Set gateway admin password
   ansible.builtin.set_fact:
     ocp_utils_gateway_admin_password: "{{ _ocp_utils_admin_secret.resources[0].data.password | b64decode }}"
-  no_log: "{{ (disable_no_log | default(false) | bool) | ternary(false, true) }}"
+  no_log: "{{ __ocp_utils_no_log }}"
   when: _ocp_utils_admin_secret.resources | length > 0
 
 - name: Wait for controller pod to be running
@@ -240,3 +240,4 @@
   when:
     - _hub_cr_name is defined
     - _ocp_utils_found_hub_pods.resources | default([]) | length > 0
+...

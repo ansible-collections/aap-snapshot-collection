@@ -1,5 +1,5 @@
 ---
-__operations_no_log: "{{ (disable__no_log | default(false) | bool) | ternary(false, true) }}"
+__operations_no_log: "{{ not (disable_no_log | default(false) | bool) }}"
 
 __operations_artifact_extract_dir: "{{ artifact_dir }}/artifact"
 
@@ -10,3 +10,4 @@ operations_gateway_admin_user: "admin"
 operations_validate_certs: false
 
 _operations_manage_shell_args: "--no-imports"
+...

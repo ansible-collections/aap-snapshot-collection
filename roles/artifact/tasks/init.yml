@@ -35,6 +35,8 @@
     state: directory
     mode: '0750'
   loop: '{{ groups.get("controller_groups", []) }}'
+  loop_control:
+    label: "{{ item }}"
   when:
     - groups.get('controller_groups', []) | length > 0
     - aap_platform | default('') == 'rpm'

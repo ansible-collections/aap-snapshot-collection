@@ -125,3 +125,4 @@ _operations_component_config:
         artifact_key: "hub_secret"
       - name: "hub_database_fields"
         artifact_key: "hub_db_fields_encryption_key"
+...

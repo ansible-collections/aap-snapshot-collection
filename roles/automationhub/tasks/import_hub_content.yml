@@ -79,3 +79,4 @@
       register: _automationhub_content_extract
       failed_when: _automationhub_content_extract.rc != 0
       changed_when: _automationhub_content_extract.rc == 0
+...

@@ -8,7 +8,7 @@
         gather: [db_credentials]
         environment: "{{ postgresql_django_environment | default({}) }}"
       register: _postgresql_component_db_info
-      no_log: '{{ postgresql_no_log }}'
+      no_log: "{{ __postgresql_no_log }}"
 
     - name: Set db settings from module output
       ansible.builtin.set_fact:
@@ -20,7 +20,7 @@
             USER: "{{ _postgresql_component_db_info.db_credentials.user }}"
             PASSWORD: "{{ _postgresql_component_db_info.db_credentials.password }}"
             OPTIONS: "{{ _postgresql_component_db_info.db_credentials.options | default({}) }}"
-      no_log: '{{ postgresql_no_log }}'
+      no_log: "{{ __postgresql_no_log }}"
 
 - name: Containerized
   when: aap_platform == 'containerized'
@@ -35,7 +35,7 @@
     - name: Set db settings
       ansible.builtin.set_fact:
         postgresql_auth_settings: "{{ _postgresql_dump_result.stdout | trim }}"
-      no_log: '{{ postgresql_no_log }}'
+      no_log: "{{ __postgresql_no_log }}"
 
 - name: OCP - Get DB credentials from K8s secret
   when: aap_platform == 'operator'
@@ -57,7 +57,7 @@
             USER: "{{ _ocp_utils_db_user }}"
             PASSWORD: "{{ _ocp_utils_db_password }}"
             OPTIONS: {}
-      no_log: '{{ postgresql_no_log }}'
+      no_log: "{{ __postgresql_no_log }}"
 
 - name: Set database name fact for manifest
   ansible.builtin.set_fact:
@@ -78,7 +78,7 @@
       }) }}
   delegate_to: localhost
   delegate_facts: true
-  no_log: '{{ postgresql_no_log }}'
+  no_log: "{{ __postgresql_no_log }}"
   when: _operations_component_secrets is defined
 
 - name: Set PostgreSQL environment for cert auth
@@ -87,7 +87,8 @@
       PGSSLCERT: "{{ postgresql_auth_settings.default.OPTIONS.sslcert }}"
       PGSSLKEY: "{{ postgresql_auth_settings.default.OPTIONS.sslkey }}"
       PGSSLROOTCERT: "{{ postgresql_auth_settings.default.OPTIONS.sslrootcert }}"
-  no_log: '{{ postgresql_no_log }}'
+  no_log: "{{ __postgresql_no_log }}"
   when:
     - postgresql_auth_settings.default.OPTIONS.sslcert is defined
     - postgresql_auth_settings.default.OPTIONS.sslkey is defined
+...

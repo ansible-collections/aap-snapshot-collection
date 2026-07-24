@@ -67,3 +67,4 @@
 - name: Set temporary pod name fact
   ansible.builtin.set_fact:
     ocp_utils_temp_pod_name: "{{ _ocp_utils_temp_pods.resources[0].metadata.name }}"
+...

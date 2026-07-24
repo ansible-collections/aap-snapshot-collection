@@ -20,3 +20,4 @@
 - name: Set manage command result
   ansible.builtin.set_fact:
     _ocp_utils_manage_result: "{{ _ocp_utils_manage_result_ocp if aap_platform == 'operator' else _ocp_utils_manage_result_ctr }}"
+...

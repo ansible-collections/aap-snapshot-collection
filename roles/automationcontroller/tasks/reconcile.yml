@@ -66,6 +66,8 @@
     _manage_pod_name: '{{ _ocp_utils_controller_pod_name }}'
     _manage_container_name: '{{ _ocp_utils_controller_container_name | default(_operations_current_component.container_name) }}'
   loop: '{{ _automationcontroller_orphaned_instances }}'
+  loop_control:
+    label: "{{ item }}"
   when:
     - _ocp_utils_controller_pod_name is defined
     - _automationcontroller_orphaned_instances | length > 0
@@ -136,3 +138,4 @@
     - (_automationcontroller_ee_dest_hub | default('')) | length > 0
     - _automationcontroller_ee_source_hub != _automationcontroller_ee_dest_hub
     - _automationcontroller_ee_list.json is defined
+...

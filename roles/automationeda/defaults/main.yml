@@ -3,3 +3,4 @@ automationeda_ocp_namespace: "{{ ocp_namespace | default('aap') }}"
 automationeda_aap_instance_name: "{{ aap_instance_name | default('aap') }}"
 automationeda_aap_cr_kind: "AnsibleAutomationPlatform"
 automationeda_aap_cr_api_version: "aap.ansible.com/v1alpha1"
+...

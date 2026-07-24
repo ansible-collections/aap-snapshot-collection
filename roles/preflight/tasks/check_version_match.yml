@@ -32,3 +32,4 @@
       when:
         - _preflight_target_aap_version is defined
         - _preflight_target_aap_version != artifact_manifest.aap_version
+...

@@ -18,3 +18,4 @@
       - "--exclude=__pycache__"
   become: true
   become_user: "awx"
+...

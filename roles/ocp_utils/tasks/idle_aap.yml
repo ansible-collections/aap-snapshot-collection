@@ -84,3 +84,4 @@
         and (_ocp_utils_gateway_pods.resources | map(attribute='status.phase') | select('equalto', 'Running') | list | length > 0)
       retries: "{{ ocp_utils_idle_wait_retries }}"
       delay: "{{ ocp_utils_idle_wait_delay }}"
+...

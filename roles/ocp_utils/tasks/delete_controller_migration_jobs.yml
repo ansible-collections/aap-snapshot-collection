@@ -25,3 +25,4 @@
        | list }}
   loop_control:
     label: "{{ item.metadata.name }}"
+...

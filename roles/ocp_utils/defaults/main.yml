@@ -1,4 +1,6 @@
 ---
+__ocp_utils_no_log: "{{ not (disable_no_log | default(false) | bool) }}"
+
 # Kubeconfig resolution: -e kubeconfig=/path > K8S_AUTH_KUBECONFIG > KUBECONFIG > default (~/.kube/config)
 __ocp_utils_resolved_kubeconfig: >-
   {{ kubeconfig
@@ -59,3 +61,4 @@ __ocp_utils_artifact_secret_mapping:
     secret_name: "{{ ocp_utils_aap_instance_name }}-eda-db-fields-encryption-secret"
     field: "secret_key"
     artifact_key: "eda_secret_key"
+...

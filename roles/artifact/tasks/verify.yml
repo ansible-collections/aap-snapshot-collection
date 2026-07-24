@@ -36,3 +36,4 @@
   ansible.builtin.debug:
     msg: "{{ _artifact_verify_results.stdout }}"
   failed_when: _artifact_verify_results is failed
+...

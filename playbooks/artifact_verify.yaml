@@ -3,6 +3,7 @@
   hosts: localhost
   connection: local
   gather_facts: false
+  any_errors_fatal: true
   become: false
   vars:
     _artifact_path: "{{ artifact_file }}"

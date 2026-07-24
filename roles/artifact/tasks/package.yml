@@ -13,7 +13,7 @@
     content: '{{ (_operations_component_secrets | default({}) | combine(_postgresql_db_secrets | default({}))) | to_nice_yaml }}'
     dest: '{{ __artifact_build_dir }}/secrets.yml'
     mode: '0600'
-  no_log: "{{ (disable_no_log | default(false) | bool) | ternary(false, true) }}"
+  no_log: "{{ __artifact_no_log }}"
 
 - name: Collect database checksums from all hosts
   ansible.builtin.set_fact:

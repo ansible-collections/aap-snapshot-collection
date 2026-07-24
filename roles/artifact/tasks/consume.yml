@@ -195,6 +195,8 @@
       loop: >-
         {{ artifact_manifest.components | map(attribute='name') | list
            | difference(_artifact_import_components) }}
+      loop_control:
+        label: "{{ item }}"
 
     - name: Warn about components on target but not in artifact
       ansible.builtin.debug:
@@ -207,6 +209,8 @@
             + (['eda'] if _eda_cr_name is defined else [])
             + (['gateway']))
            | difference(_artifact_import_components) }}
+      loop_control:
+        label: "{{ item }}"
 
     # --- Stage artifact while AAP is still running ---
     - name: Create temporary migration resources
@@ -434,3 +438,4 @@
         name: ansible.aap_snapshot.ocp_utils
         tasks_from: cleanup_temp_resources.yml
       when: (_artifact_import_succeeded | default(false) | bool) or not (keep_temp_on_failure | default(true) | bool)
+...

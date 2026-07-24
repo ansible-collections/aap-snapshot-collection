@@ -9,3 +9,4 @@
 - name: Print validation report
   ansible.builtin.debug:
     msg: "{{ _validate_artifact_result.report }}"
+...

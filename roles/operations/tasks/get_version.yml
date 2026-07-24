@@ -158,3 +158,4 @@
       delegate_facts: true
       delegate_to: localhost
       when: _operations_current_component.has_aap_version | bool
+...

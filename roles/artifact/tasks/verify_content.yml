@@ -11,3 +11,4 @@
   ansible.builtin.debug:
     msg: "{{ _artifact_verify_content_results.stdout_lines }}"
   failed_when: _artifact_verify_content_results is failed
+...

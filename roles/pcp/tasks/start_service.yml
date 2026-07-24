@@ -5,3 +5,4 @@
     state: started
     scope: user
   when: aap_platform == 'containerized'
+...

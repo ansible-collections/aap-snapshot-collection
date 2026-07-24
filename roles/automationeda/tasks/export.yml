@@ -20,3 +20,4 @@
   vars:
     component_name: "{{ automationeda_component_name }}"
     postgresql_export_dest: "{{ __artifact_build_dir }}"
+...

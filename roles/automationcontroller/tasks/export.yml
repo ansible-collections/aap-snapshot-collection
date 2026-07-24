@@ -24,3 +24,4 @@
 - name: Export controller custom configs
   ansible.builtin.include_tasks: export_custom_configs.yml
   when: aap_platform | default('') == 'rpm'
+...

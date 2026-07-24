@@ -97,3 +97,4 @@
   loop_control:
     label: "{{ item.Name }}"
   when: aap_platform == 'containerized'
+...

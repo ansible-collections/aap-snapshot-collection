@@ -22,7 +22,7 @@
        | list }}
   loop_control:
     label: "{{ item.secret_name }}"
-  no_log: "{{ (disable_no_log | default(false) | bool) | ternary(false, true) }}"
+  no_log: "{{ __ocp_utils_no_log }}"
 
 - name: Build hub spec
   ansible.builtin.set_fact:
@@ -71,3 +71,4 @@
   loop: "{{ _ocp_utils_aap_cr_components }}"
   loop_control:
     label: "{{ item }}"
+...

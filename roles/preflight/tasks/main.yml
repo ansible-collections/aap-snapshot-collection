@@ -67,3 +67,4 @@
   when:
     - groups.get('hub_groups', []) | length > 0
     - inventory_hostname in groups.get('hub_groups', [])
+...

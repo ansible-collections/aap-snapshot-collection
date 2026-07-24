@@ -5,3 +5,4 @@
     tasks_from: start_service.yml
   vars:
     component_name: "{{ automationeda_component_name }}"
+...

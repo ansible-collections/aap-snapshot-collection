@@ -1,4 +1,6 @@
 ---
+__artifact_no_log: "{{ not (disable_no_log | default(false) | bool) }}"
+
 artifact_collection_version: >-
   {{
     ((lookup("file", role_path + "/../../MANIFEST.json", errors="ignore") or "{}") | from_json).get("collection_info", {}).get("version")

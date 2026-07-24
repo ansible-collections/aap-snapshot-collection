@@ -19,3 +19,4 @@
          else '' }}
   delegate_facts: true
   delegate_to: localhost
+...

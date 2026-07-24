@@ -10,7 +10,7 @@
         login_user: '{{ postgresql_restore_admin_user }}'
         name: '{{ postgresql_restore_user }}'
         role_attr_flags: CREATEDB
-      no_log: "{{ (disable_no_log | default(false) | bool) | ternary(false, true) }}"
+      no_log: "{{ __postgresql_no_log }}"
 
     - name: "Restore database"
       community.postgresql.postgresql_db:
@@ -22,7 +22,7 @@
         state: restore
         target: '{{ postgresql_restore_source }}'
         target_opts: '--create --clean --if-exists'
-      no_log: "{{ (disable_no_log | default(false) | bool) | ternary(false, true) }}"
+      no_log: "{{ __postgresql_no_log }}"
       async: '{{ postgresql_restore_timeout }}'
       poll: 30
   always:
@@ -34,7 +34,7 @@
         login_user: '{{ postgresql_restore_admin_user }}'
         name: '{{ postgresql_restore_user }}'
         role_attr_flags: NOCREATEDB
-      no_log: "{{ (disable_no_log | default(false) | bool) | ternary(false, true) }}"
+      no_log: "{{ __postgresql_no_log }}"
 
 - name: OCP database import
   when: aap_platform == 'operator'
@@ -60,7 +60,7 @@
           -U {{ postgresql_restore_admin_user }}
           -c "ALTER USER {{ postgresql_restore_user }} WITH CREATEDB;"'
       failed_when: _postgresql_grant_result.rc != 0
-      no_log: "{{ (disable_no_log | default(false) | bool) | ternary(false, true) }}"
+      no_log: "{{ __postgresql_no_log }}"
       register: _postgresql_grant_result
 
     - name: "Restore database"
@@ -77,7 +77,7 @@
           -d {{ postgresql_restore_dbname }}
           /tmp/migration/artifact/{{ postgresql_component_name }}/{{ postgresql_component_name }}.pgc'
       failed_when: _postgresql_restore_result.rc != 0 and 'FATAL' in (_postgresql_restore_result.stderr | default(''))
-      no_log: "{{ (disable_no_log | default(false) | bool) | ternary(false, true) }}"
+      no_log: "{{ __postgresql_no_log }}"
       register: _postgresql_restore_result
   always:
     - name: "Revoke CREATEDB from restore user"
@@ -92,7 +92,7 @@
           -U {{ postgresql_restore_admin_user }}
           -c "ALTER USER {{ postgresql_restore_user }} NOCREATEDB;"'
       failed_when: _postgresql_revoke_result.rc != 0
-      no_log: "{{ (disable_no_log | default(false) | bool) | ternary(false, true) }}"
+      no_log: "{{ __postgresql_no_log }}"
       register: _postgresql_revoke_result
       when: _pg_pod_name is defined
 ...

@@ -112,3 +112,4 @@
       loop_control:
         label: "{{ item.item | basename }}"
       when: _preflight_svc_status.results is defined
+...

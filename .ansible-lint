@@ -1,5 +1,7 @@
 ---
 profile: production
+rulesdir:
+  - rules/
 exclude_paths:
   - changelogs
   - .github
@@ -10,5 +12,9 @@ exclude_paths:
   # auto-generated directories
   - extensions/molecule
   - .ansible
+enable_list:
+  - custom-no-log
+  - custom-loop-control
+  - custom-play-boilerplate
 warn_list:
   - no-log-password

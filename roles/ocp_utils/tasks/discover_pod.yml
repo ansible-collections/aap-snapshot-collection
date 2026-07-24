@@ -22,3 +22,4 @@
     "{{ _discover_pod_fact }}": "{{ _ocp_utils_discovered_pod.resources[0].metadata.name }}"
     "{{ _discover_container_fact }}": "{{ _discover_container_name }}"
   when: _ocp_utils_discovered_pod.resources | length > 0
+...

@@ -11,3 +11,4 @@ automationhub_export_hub_content: true
 
 automationhub_temp_deployment_name: "{{ ocp_utils_temp_deployment_name | default('aap-snapshot-temp-postgres') }}"
 automationhub_temp_pvc_name: "{{ ocp_utils_temp_pvc_name | default('aap-snapshot-temp') }}"
+...

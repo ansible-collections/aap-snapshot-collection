@@ -48,3 +48,4 @@
       Increase the PVC size with:
         -e temp_pvc_size={{ ((_preflight_min_pvc_bytes | int / 1073741824) | round(0, 'ceil')) | int }}Gi
   when: (_preflight_pvc_bytes | int) < (_preflight_min_pvc_bytes | int)
+...

@@ -17,3 +17,4 @@ _automationgateway_cleanup_containerized_script: >-
   ServiceNode.objects.all().delete();
   ServiceCluster.objects.all().delete();
   MigrateServiceDataHasRan.mark_migration_not_completed()
+...

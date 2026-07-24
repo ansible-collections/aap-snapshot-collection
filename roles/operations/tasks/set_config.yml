@@ -2,3 +2,4 @@
 - name: Set component config
   ansible.builtin.set_fact:
     _operations_current_component: "{{ _operations_component_config[component_name] }}"
+...

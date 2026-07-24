@@ -24,3 +24,4 @@
 - name: Export hub content data
   ansible.builtin.include_tasks: export_hub_content.yml
   when: automationhub_export_hub_content | default(true) | bool
+...

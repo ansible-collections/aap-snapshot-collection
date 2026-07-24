@@ -5,3 +5,4 @@
     tasks_from: stop_service.yml
   vars:
     component_name: "{{ automationhub_component_name }}"
+...

@@ -22,7 +22,7 @@
         login_password: "{{ postgresql_auth_settings.default.PASSWORD | default(omit) }}"
         query: "SHOW server_version"
       environment: "{{ postgresql_pg_dump_env | default({}) }}"
-      no_log: '{{ postgresql_no_log }}'
+      no_log: "{{ __postgresql_no_log }}"
       register: _postgresql_version_result
       when: _postgresql_version is not defined
 
@@ -97,7 +97,7 @@
           -t -A -c "SHOW server_version"'
       register: _postgresql_version_ocp
       failed_when: _postgresql_version_ocp.rc != 0
-      no_log: "{{ (disable_no_log | default(false) | bool) | ternary(false, true) }}"
+      no_log: "{{ __postgresql_no_log }}"
       when: _postgresql_version is not defined
 
     - name: Set PostgreSQL version fact
@@ -123,7 +123,7 @@
           -f /tmp/{{ postgresql_component_name }}.{{ postgresql_export_extension }}'
       register: _postgresql_dump_export_result
       failed_when: _postgresql_dump_export_result.rc != 0
-      no_log: "{{ (disable_no_log | default(false) | bool) | ternary(false, true) }}"
+      no_log: "{{ __postgresql_no_log }}"
 
     - name: Copy dump file from pod to localhost
       kubernetes.core.k8s_cp:
@@ -157,3 +157,4 @@
     - name: Print DB checksum
       ansible.builtin.debug:
         msg: "{{ _postgresql_db_checksum }}"
+...

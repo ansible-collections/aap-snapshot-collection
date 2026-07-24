@@ -68,3 +68,4 @@
         state: absent
       become: true
       when: _automationhub_content_stat.stat.exists | default(false)
+...

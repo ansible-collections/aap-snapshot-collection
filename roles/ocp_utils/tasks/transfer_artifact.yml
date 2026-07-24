@@ -57,3 +57,4 @@
     _ocp_utils_remote_checksum.rc | default(1) != 0
     or (_ocp_utils_remote_checksum.stdout | default('') | split(' ') | first)
        != _ocp_utils_artifact_stat.stat.checksum
+...

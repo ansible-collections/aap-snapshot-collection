@@ -53,3 +53,4 @@
       ansible.builtin.include_role:
         name: ansible.aap_snapshot.automationgateway
         tasks_from: stop_service.yml
+...

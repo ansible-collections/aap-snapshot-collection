@@ -1,4 +1,6 @@
 ---
+__postgresql_no_log: "{{ not (disable_no_log | default(false) | bool) }}"
+
 # OCP namespace (read from user-facing var, independent of ocp_utils)
 postgresql_ocp_namespace: "{{ ocp_namespace | default('aap') }}"
 
@@ -13,3 +15,4 @@ postgresql_export_extension: "pgc"
 # Import variables
 postgresql_restore_admin_user: "postgres"
 postgresql_restore_timeout: 3600
+...

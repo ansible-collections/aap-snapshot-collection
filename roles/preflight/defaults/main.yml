@@ -1,4 +1,6 @@
 ---
+__preflight_no_log: "{{ not (disable_no_log | default(false) | bool) }}"
+
 preflight_ocp_namespace: "{{ ocp_namespace | default('aap') }}"
 preflight_aap_instance_name: "{{ aap_instance_name | default('aap') }}"
 preflight_aap_cr_kind: "AnsibleAutomationPlatform"
@@ -15,3 +17,4 @@ preflight_known_rwx_storage_classes:
   - odf-cephfs
   - managed-nfs-storage
   - nfs
+...
