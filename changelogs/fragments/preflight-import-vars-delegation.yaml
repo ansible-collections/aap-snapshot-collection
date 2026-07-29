@@ -1,0 +1,3 @@
+---
+bugfixes:
+  - Fix import variable preflight check skipped on containerized targets - delegate to localhost with run_once so artifact_file is validated even when localhost is not in the inventory.
