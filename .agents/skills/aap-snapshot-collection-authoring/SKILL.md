@@ -1,3 +1,10 @@
+---
+name: aap-snapshot-collection-authoring
+description: Conventions for contributing to the ansible.aap_snapshot collection.
+  Use when writing changelog fragments, following coding standards, or preparing
+  contributions to the aap-snapshot-collection repository.
+---
+
 # AAP Snapshot Collection Authoring
 
 Conventions for contributing to the `ansible.aap_snapshot` collection.
