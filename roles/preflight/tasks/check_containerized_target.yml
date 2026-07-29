@@ -1,0 +1,54 @@
+---
+# Validate containerized target before import: check for stale containers,
+# staged files, and required PostgreSQL container.
+
+- name: Check for stale temp restore container
+  containers.podman.podman_container_info:
+    name: "{{ preflight_containerized_temp_container }}"
+  register: __preflight_temp_container
+
+- name: Warn if temp restore container exists from previous run
+  ansible.builtin.debug:
+    msg: >-
+      Temporary restore container '{{ preflight_containerized_temp_container }}'
+      exists from a previous import run. It will be reused to avoid
+      re-transferring staged artifacts. To force a clean import, remove it first:
+        podman rm -f {{ preflight_containerized_temp_container }}
+  when: __preflight_temp_container.containers | length > 0
+
+- name: Check for stale staged artifact files
+  ansible.builtin.stat:
+    path: "{{ preflight_containerized_staging_dir }}"
+  register: __preflight_staging_dir
+
+- name: Warn if staged artifact files exist from previous run
+  ansible.builtin.debug:
+    msg: >-
+      Staged artifact files found at {{ preflight_containerized_staging_dir }}
+      from a previous import run. These will be reused to avoid re-transferring
+      the artifact. To force a clean import, remove them first:
+        rm -rf {{ preflight_containerized_staging_dir }}
+  when: __preflight_staging_dir.stat.exists
+
+- name: Check PostgreSQL container status
+  containers.podman.podman_container_info:
+    name: "{{ preflight_containerized_postgresql_container }}"
+  register: __preflight_postgresql_container
+  when: inventory_hostname in groups.get('database', [])
+
+- name: Fail if PostgreSQL container is not running
+  ansible.builtin.fail:
+    msg: >-
+      PostgreSQL container is not running or not found.
+      Containerized import requires a running PostgreSQL container for database restore.
+      Check the container status:
+        podman ps -a --filter name={{ preflight_containerized_postgresql_container }}
+      Start the container if it exists but is stopped:
+        podman start {{ preflight_containerized_postgresql_container }}
+      If the container does not exist, verify the AAP containerized installation is complete.
+  when:
+    - inventory_hostname in groups.get('database', [])
+    - >
+      __preflight_postgresql_container.containers | length == 0 or
+      not (__preflight_postgresql_container.containers[0].State.Running | default(false) | bool)
+...
