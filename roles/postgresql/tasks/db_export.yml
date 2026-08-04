@@ -16,6 +16,7 @@
 
     - name: Get PostgreSQL server version
       community.postgresql.postgresql_query:
+        login_db: "{{ postgresql_auth_settings.default.NAME }}"
         login_host: "{{ postgresql_auth_settings.default.HOST }}"
         login_port: "{{ postgresql_auth_settings.default.PORT }}"
         login_user: "{{ postgresql_auth_settings.default.USER }}"
