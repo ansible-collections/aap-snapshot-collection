@@ -1,0 +1,10 @@
+---
+- name: Create temp postgres container
+  containers.podman.podman_container:
+    name: "{{ postgresql_temp_container_name }}"
+    image: "{{ postgresql_temp_container_image | mandatory('postgresql_temp_container_image must be set by the caller') }}"
+    state: started
+    command: sleep infinity
+    network: host
+    volume: "{{ postgresql_temp_container_volumes }}"
+...

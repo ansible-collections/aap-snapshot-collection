@@ -1,0 +1,21 @@
+---
+- name: Discover running postgres container image
+  containers.podman.podman_container_info:
+    name: "{{ postgresql_discover_container_name }}"
+  register: _postgresql_discovered_container_info
+  delegate_to: "{{ postgresql_discover_container_host | mandatory('postgresql_discover_container_host must be set by the caller') }}"
+  no_log: "{{ __postgresql_no_log }}"
+
+- name: Assert postgres container was found
+  ansible.builtin.assert:
+    that: _postgresql_discovered_container_info.containers | length > 0
+    fail_msg: >-
+      No container named '{{ postgresql_discover_container_name }}' found on
+      {{ postgresql_discover_container_host }}. Set postgresql_temp_container_image
+      to specify the image manually.
+
+- name: Set discovered image fact
+  ansible.builtin.set_fact:
+    postgresql_temp_container_image: "{{ (_postgresql_discovered_container_info.containers | first).ImageName }}"
+  no_log: "{{ __postgresql_no_log }}"
+...
