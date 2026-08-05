@@ -17,6 +17,7 @@ jobs:
         env:
           BASE_REF: ${{ github.base_ref }}
           HEAD_REF: ${{ github.head_ref }}
+          ACTOR: ${{ github.actor }}
         run: |
           if [[ "$HEAD_REF" == release/* ]]; then
             echo "Release PR detected -- changelog fragment check skipped."
@@ -31,6 +32,14 @@ jobs:
           if [ -z "$user_facing" ]; then
             echo "No user-facing changes detected. Changelog fragment not required."
             exit 0
+          fi
+
+          if [ "$ACTOR" = "dependabot[bot]" ]; then
+            non_requirements=$(echo "$user_facing" | grep -vE '^meta/.*requirements.*\.txt$' || true)
+            if [ -z "$non_requirements" ]; then
+              echo "Dependabot requirements-only bump detected -- changelog fragment check skipped."
+              exit 0
+            fi
           fi
 
           echo "User-facing changes detected:"
