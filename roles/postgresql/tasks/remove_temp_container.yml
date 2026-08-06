@@ -1,0 +1,6 @@
+---
+- name: Remove temp postgres container
+  containers.podman.podman_container:
+    name: "{{ postgresql_temp_container_name }}"
+    state: absent
+...

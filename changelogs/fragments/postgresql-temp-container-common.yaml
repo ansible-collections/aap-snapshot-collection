@@ -1,0 +1,4 @@
+---
+minor_changes:
+  - postgresql - Add reusable tasks (discover_container_image.yml, create_temp_container.yml, remove_temp_container.yml) to run postgres client commands inside a throwaway podman container instead of requiring pg_dump/pg_restore/psql on the target host. Not yet wired into db_import.yml or db_export.yml.
+...

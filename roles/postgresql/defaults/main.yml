@@ -15,4 +15,10 @@ postgresql_export_extension: "pgc"
 # Import variables
 postgresql_restore_admin_user: "postgres"
 postgresql_restore_timeout: 3600
+
+# Temp container variables (used to run pg_dump/pg_restore without requiring
+# postgres client tools on the target host - see create_temp_container.yml)
+postgresql_temp_container_name: "aap-snapshot-{{ postgresql_component_name }}"
+postgresql_temp_container_volumes: []
+postgresql_discover_container_name: "postgresql"
 ...
