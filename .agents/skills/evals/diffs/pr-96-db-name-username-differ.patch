@@ -12,7 +12,7 @@ index 7ef86f7..fc30a45 100644
 --- a/roles/postgresql/tasks/db_export.yml
 +++ b/roles/postgresql/tasks/db_export.yml
 @@ -16,6 +16,7 @@
- 
+
      - name: Get PostgreSQL server version
        community.postgresql.postgresql_query:
 +        login_db: "{{ postgresql_auth_settings.default.NAME }}"
