@@ -1,0 +1,2 @@
+bugfixes:
+  - Fix "'delegate_to' is not a valid attribute for a TaskInclude" error on preflight - ansible-core rejects delegate_to/run_once directly on an include_tasks task, so move them onto the tasks inside check_import_vars.yml instead.

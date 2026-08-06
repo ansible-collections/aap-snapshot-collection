@@ -5,8 +5,6 @@
 - name: Check import variable requirements
   ansible.builtin.include_tasks: check_import_vars.yml
   when: _snapshot_operation | default('') == 'import'
-  run_once: true
-  delegate_to: localhost
 
 - name: Check temp PVC size is sufficient for artifact
   ansible.builtin.include_tasks: check_temp_pvc_size.yml
