@@ -28,6 +28,12 @@
 - name: Check component services
   ansible.builtin.include_tasks: check_services.yml
 
+- name: Check containerized target for import
+  ansible.builtin.include_tasks: check_containerized_target.yml
+  when:
+    - aap_platform == 'containerized'
+    - _snapshot_operation | default('') == 'import'
+
 - name: Check database connectivity
   ansible.builtin.include_tasks: check_databases.yml
 

@@ -17,4 +17,8 @@ preflight_known_rwx_storage_classes:
   - odf-cephfs
   - managed-nfs-storage
   - nfs
+
+preflight_containerized_staging_dir: "{{ ansible_user_dir | default('~') }}/aap/backups/migration"
+preflight_containerized_temp_container: "aap-snapshot-restore"
+preflight_containerized_postgresql_container: "postgresql"
 ...
