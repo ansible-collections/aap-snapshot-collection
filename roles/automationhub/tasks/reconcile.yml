@@ -107,7 +107,20 @@
         - aap_platform == 'operator'
         - _automationhub_operator_token is defined
 
-    - name: Trigger Pulp repair via API
+    - name: Poll Pulp repair task to completion (OCP)
+      ansible.builtin.include_tasks: poll_pulp_task.yml
+      vars:
+        _pulp_task_href: "{{ _automationhub_repair_ocp.json.task }}"
+        _pulp_task_base_url: "https://{{ ocp_utils_gateway_hostname }}"
+        _pulp_task_auth_method: bearer
+        _pulp_task_bearer_token: "{{ _automationhub_operator_token }}"
+        _pulp_task_validate_certs: "{{ operations_validate_certs | default(false) }}"
+      when:
+        - aap_platform == 'operator'
+        - _automationhub_operator_token is defined
+        - _automationhub_repair_ocp.json.task is defined
+
+    - name: Trigger Pulp repair via API (containerized)
       ansible.builtin.uri:
         url: "https://{{ ocp_utils_gateway_hostname }}/api/galaxy/pulp/api/v3/repair/"
         method: POST
@@ -126,13 +139,18 @@
       until: _automationhub_repair_containerized is not failed
       when: aap_platform != 'operator'
 
-    - name: Report Pulp repair status
-      ansible.builtin.debug:
-        msg: >-
-          Pulp repair initiated - status
-          {{ _automationhub_repair_ocp.status
-             if not (_automationhub_repair_ocp.skipped | default(false))
-             else _automationhub_repair_containerized.status | default('unknown') }}
+    - name: Poll Pulp repair task to completion (containerized)
+      ansible.builtin.include_tasks: poll_pulp_task.yml
+      vars:
+        _pulp_task_href: "{{ _automationhub_repair_containerized.json.task }}"
+        _pulp_task_base_url: "https://{{ ocp_utils_gateway_hostname }}"
+        _pulp_task_auth_method: basic
+        _pulp_task_basic_user: "{{ automationhub_gateway_admin_user }}"
+        _pulp_task_basic_password: "{{ _automationhub_gw_admin_pw }}"
+        _pulp_task_validate_certs: "{{ operations_validate_certs | default(false) }}"
+      when:
+        - aap_platform != 'operator'
+        - _automationhub_repair_containerized.json.task is defined
 
   rescue:
     - name: Fallback - run Pulp repair via curl from hub pod
@@ -155,13 +173,68 @@
         - _ocp_utils_hub_pod_name is defined
         - _automationhub_operator_token is defined
 
-    - name: Report Pulp repair fallback status
+    - name: Parse repair response from curl
+      ansible.builtin.set_fact:
+        _automationhub_repair_curl_task: "{{ (_automationhub_repair_curl.stdout | from_json).task }}"
+      when:
+        - (_automationhub_repair_curl.rc | default(1)) == 0
+        - _automationhub_repair_curl.stdout | default('') | length > 0
+
+    - name: Poll Pulp repair task via curl from hub pod
+      kubernetes.core.k8s_exec:
+        namespace: "{{ automationhub_ocp_namespace }}"
+        pod: "{{ _ocp_utils_hub_pod_name }}"
+        container: "{{ _ocp_utils_hub_container_name }}"
+        command: >-
+          curl -sf
+          -H {{ ('Authorization: Bearer ' ~ _automationhub_operator_token) | quote }}
+          {{ _automationhub_gw_api_url }}{{ _automationhub_repair_curl_task }}
+      register: _automationhub_repair_curl_poll
+      changed_when: false
+      no_log: "{{ not (disable_no_log | default(false) | bool) }}"
+      until: >-
+        _automationhub_repair_curl_poll.rc == 0
+        and (_automationhub_repair_curl_poll.stdout | from_json).state
+            in ['completed', 'failed', 'canceled']
+      retries: "{{ automationhub_pulp_repair_retries | default(120) }}"
+      delay: "{{ automationhub_pulp_repair_delay | default(30) }}"
+      when:
+        - aap_platform == 'operator'
+        - _ocp_utils_hub_pod_name is defined
+        - _automationhub_repair_curl_task is defined
+
+    - name: Report Pulp repair fallback result
       ansible.builtin.debug:
         msg: >-
-          {{ 'Pulp repair initiated via fallback (curl from hub pod)'
-             if (_automationhub_repair_curl.rc | default(1)) == 0
-             else 'WARNING: Pulp content repair failed. Run manually:
-             POST ' ~ _automationhub_gw_api_url ~ '/api/galaxy/pulp/api/v3/repair/' }}
+          {%- if _automationhub_repair_curl_poll is defined
+                 and (_automationhub_repair_curl_poll.rc | default(1)) == 0 -%}
+          {%- set result = _automationhub_repair_curl_poll.stdout | from_json -%}
+          Pulp repair task {{ result.state }} (via fallback curl from hub pod).
+          {%- if result.state == 'completed' -%}
+          {{ ' Corrupted: ' ~ (result.progress_reports | default([])
+              | selectattr('code', 'defined')
+              | selectattr('code', 'equalto', 'repair.corrupted')
+              | map(attribute='done') | first | default(0))
+             ~ ', repaired: ' ~ (result.progress_reports | default([])
+              | selectattr('code', 'defined')
+              | selectattr('code', 'equalto', 'repair.repaired')
+              | map(attribute='done') | first | default(0)) }}
+          {%- endif -%}
+          {%- else -%}
+          WARNING: Pulp content repair could not be completed.
+          Run manually: POST {{ _automationhub_gw_api_url }}/api/galaxy/pulp/api/v3/repair/
+          {%- endif -%}
+
+    - name: Fail if fallback Pulp repair did not complete
+      ansible.builtin.fail:
+        msg: >-
+          Pulp repair task {{ (_automationhub_repair_curl_poll.stdout | from_json).state }}
+          via fallback. Error: {{ (_automationhub_repair_curl_poll.stdout | from_json).error
+                                  | default({}) | to_nice_json }}
+      when:
+        - _automationhub_repair_curl_poll is defined
+        - (_automationhub_repair_curl_poll.rc | default(1)) == 0
+        - (_automationhub_repair_curl_poll.stdout | from_json).state != 'completed'
 
 - name: Reset hub admin password to match K8s secret
   ansible.builtin.include_role:

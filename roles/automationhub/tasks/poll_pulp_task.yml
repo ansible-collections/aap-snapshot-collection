@@ -1,0 +1,76 @@
+---
+# Poll a Pulp async task until it reaches a terminal state.
+#
+# Input variables (set via vars: on the include_tasks call):
+#   _pulp_task_href          - task path from the Pulp API response
+#   _pulp_task_base_url      - gateway base URL to prepend
+#   _pulp_task_auth_method   - "bearer" or "basic"
+#   _pulp_task_bearer_token  - bearer token (when auth_method is bearer)
+#   _pulp_task_basic_user    - username   (when auth_method is basic)
+#   _pulp_task_basic_password - password  (when auth_method is basic)
+#   _pulp_task_validate_certs - whether to validate TLS certificates
+
+- name: Poll Pulp task until terminal state (Bearer auth)
+  ansible.builtin.uri:
+    url: "{{ _pulp_task_base_url }}{{ _pulp_task_href }}"
+    method: GET
+    headers:
+      Authorization: "Bearer {{ _pulp_task_bearer_token }}"
+    validate_certs: "{{ _pulp_task_validate_certs | default(false) }}"
+    status_code: [200]
+  register: _pulp_task_poll_bearer
+  no_log: "{{ not (disable_no_log | default(false) | bool) }}"
+  until: _pulp_task_poll_bearer.json.state in ['completed', 'failed', 'canceled']
+  retries: "{{ automationhub_pulp_repair_retries | default(120) }}"
+  delay: "{{ automationhub_pulp_repair_delay | default(30) }}"
+  when: _pulp_task_auth_method == 'bearer'
+
+- name: Poll Pulp task until terminal state (Basic auth)
+  ansible.builtin.uri:
+    url: "{{ _pulp_task_base_url }}{{ _pulp_task_href }}"
+    method: GET
+    url_username: "{{ _pulp_task_basic_user }}"
+    url_password: "{{ _pulp_task_basic_password }}"
+    force_basic_auth: true
+    validate_certs: "{{ _pulp_task_validate_certs | default(false) }}"
+    status_code: [200]
+  register: _pulp_task_poll_basic
+  no_log: "{{ not (disable_no_log | default(false) | bool) }}"
+  until: _pulp_task_poll_basic.json.state in ['completed', 'failed', 'canceled']
+  retries: "{{ automationhub_pulp_repair_retries | default(120) }}"
+  delay: "{{ automationhub_pulp_repair_delay | default(30) }}"
+  when: _pulp_task_auth_method == 'basic'
+
+- name: Set unified poll result
+  ansible.builtin.set_fact:
+    _pulp_task_result: >-
+      {{ _pulp_task_poll_bearer
+         if _pulp_task_auth_method == 'bearer'
+         else _pulp_task_poll_basic }}
+
+- name: Report Pulp task result
+  vars:
+    _progress: "{{ _pulp_task_result.json.progress_reports | default([]) }}"
+    _corrupted: >-
+      {{ _progress | selectattr('code', 'defined')
+         | selectattr('code', 'equalto', 'repair.corrupted')
+         | map(attribute='done') | first | default(0) }}
+    _repaired: >-
+      {{ _progress | selectattr('code', 'defined')
+         | selectattr('code', 'equalto', 'repair.repaired')
+         | map(attribute='done') | first | default(0) }}
+  ansible.builtin.debug:
+    msg: >-
+      Pulp repair task {{ _pulp_task_result.json.state }}.
+      {{ 'Corrupted artifacts found: ' ~ _corrupted ~ ', repaired: ' ~ _repaired
+         if _pulp_task_result.json.state == 'completed'
+         else '' }}
+
+- name: Fail if Pulp task did not complete successfully
+  ansible.builtin.fail:
+    msg: >-
+      Pulp repair task {{ _pulp_task_result.json.state }}.
+      Error: {{ _pulp_task_result.json.error | default({})
+                | to_nice_json }}
+  when: _pulp_task_result.json.state != 'completed'
+...

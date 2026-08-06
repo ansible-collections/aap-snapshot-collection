@@ -1,0 +1,8 @@
+---
+minor_changes:
+  - automationhub - Poll the Pulp repair async task to completion during
+    import reconcile instead of fire-and-forget. Reports corrupted and
+    repaired artifact counts and fails the play if the repair task does
+    not complete successfully. Adds configurable polling timeout via
+    ``automationhub_pulp_repair_retries`` and
+    ``automationhub_pulp_repair_delay`` (default 60 minutes).
