@@ -168,3 +168,47 @@ class TestBuildReport:
         report = validate_mod._build_report(manifest, results, False, True, False, ["hub.pgc not found"])
         assert "INVALID" in report
         assert "hub.pgc not found" in report
+
+    def test_report_omitted_dumps(self, artifact_dir):
+        with open(os.path.join(artifact_dir, "manifest.yml")) as f:
+            manifest = yaml.safe_load(f)
+        manifest["database"]["has_dumps"] = False
+
+        results = {c["name"]: True for c in manifest["components"]}
+        report = validate_mod._build_report(manifest, results, True, True, True, [])
+        assert "SKIPPED" in report
+        assert "dumps: omitted" in report
+
+
+class TestValidateComponents:
+    def test_requires_pgc_by_default(self, artifact_dir):
+        with open(os.path.join(artifact_dir, "manifest.yml")) as f:
+            manifest = yaml.safe_load(f)
+        os.remove(os.path.join(artifact_dir, "controller", "controller.pgc"))
+
+        errors = []
+        results, _hub = validate_mod._validate_components(artifact_dir, manifest, errors)
+        assert results["controller"] is False
+        assert any("controller.pgc not found" in e for e in errors)
+
+    def test_skips_pgc_when_has_dumps_false(self, artifact_dir):
+        with open(os.path.join(artifact_dir, "manifest.yml")) as f:
+            manifest = yaml.safe_load(f)
+        manifest["database"]["has_dumps"] = False
+        for comp in ["controller", "hub", "gateway", "eda"]:
+            os.remove(os.path.join(artifact_dir, comp, f"{comp}.pgc"))
+
+        errors = []
+        results, _hub = validate_mod._validate_components(artifact_dir, manifest, errors)
+        assert all(results.values())
+        assert not any(".pgc not found" in e for e in errors)
+
+    def test_missing_has_dumps_requires_pgc(self, artifact_dir):
+        with open(os.path.join(artifact_dir, "manifest.yml")) as f:
+            manifest = yaml.safe_load(f)
+        manifest["database"].pop("has_dumps", None)
+        os.remove(os.path.join(artifact_dir, "eda", "eda.pgc"))
+
+        errors = []
+        validate_mod._validate_components(artifact_dir, manifest, errors)
+        assert any("eda.pgc not found" in e for e in errors)

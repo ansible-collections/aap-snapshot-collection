@@ -40,6 +40,7 @@ components:
 database:
   type: "{{ artifact_postgresql_db_type | default('managed') }}"
   postgresql_version: "{{ _postgresql_version | default('15') }}"
+  has_dumps: {{ (artifact_export_postgresql | default(true)) | bool | lower }}
 
 checksums:
   algorithm: sha256

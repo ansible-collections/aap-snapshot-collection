@@ -38,4 +38,46 @@
         fail_msg: >-
           Artifact file not found: {{ _preflight_resolved_artifact }}.
           Pass the artifact path with: -e artifact_file=/path/to/artifact.tar
+
+    - name: Peek artifact manifest for database dump presence
+      ansible.builtin.command:
+        argv:
+          - tar
+          - -xOf
+          - "{{ _preflight_resolved_artifact }}"
+          - artifact/manifest.yml
+      register: _preflight_manifest_peek
+      changed_when: false
+      failed_when: false
+
+    - name: Parse peeked artifact manifest
+      ansible.builtin.set_fact:
+        _preflight_peeked_manifest: "{{ _preflight_manifest_peek.stdout | from_yaml }}"
+      when:
+        - _preflight_manifest_peek.rc == 0
+        - _preflight_manifest_peek.stdout | default('') | length > 0
+      delegate_to: localhost
+      delegate_facts: true
+
+    - name: Record whether artifact includes PostgreSQL dumps
+      ansible.builtin.set_fact:
+        _preflight_artifact_has_dumps: "{{ _preflight_peeked_manifest.database.has_dumps | default(true) | bool }}"
+        _preflight_artifact_has_hub_content: >-
+          {{ (
+               _preflight_peeked_manifest.components | default([])
+               | selectattr('name', 'equalto', 'hub')
+               | map(attribute='has_content_data')
+               | list | first | default(false)
+             ) | bool }}
+      when: _preflight_peeked_manifest is defined
+      delegate_to: localhost
+      delegate_facts: true
+
+    - name: Default dump presence when manifest peek is unavailable
+      ansible.builtin.set_fact:
+        _preflight_artifact_has_dumps: true
+        _preflight_artifact_has_hub_content: false
+      when: _preflight_peeked_manifest is not defined
+      delegate_to: localhost
+      delegate_facts: true
 ...

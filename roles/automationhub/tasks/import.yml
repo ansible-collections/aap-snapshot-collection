@@ -5,6 +5,7 @@
     tasks_from: get_db_credentials.yml
   vars:
     component_name: "{{ automationhub_component_name }}"
+  when: hostvars['localhost']['_artifact_do_postgresql_import'] | default(_artifact_do_postgresql_import | default(true)) | bool
 
 - name: Restore database for hub
   ansible.builtin.include_role:
@@ -12,6 +13,7 @@
     tasks_from: db_import.yml
   vars:
     component_name: "{{ automationhub_component_name }}"
+  when: hostvars['localhost']['_artifact_do_postgresql_import'] | default(_artifact_do_postgresql_import | default(true)) | bool
 
 - name: Update secrets for hub
   ansible.builtin.include_role:

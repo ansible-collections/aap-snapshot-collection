@@ -34,6 +34,7 @@ Control artifact creation and packaging.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `export_hub_content` | `true` | Include Pulp content data (`/var/lib/pulp/`) in artifact |
+| `artifact_export_postgresql` | `true` | Include PostgreSQL dumps (`.pgc`) in the artifact. Set `false` to export versions, secrets, configs, and hub content only |
 | `postgresql_db_type` | `managed` | Database topology: `managed` (co-located) or `external` |
 
 ### Hub Content Export
@@ -58,6 +59,7 @@ Control artifact restoration to the target platform.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `artifact_file` | (required) | Path to the artifact archive to import. Validated at preflight before any destructive operations |
+| `artifact_import_postgresql` | `true` | Restore PostgreSQL dumps on import. Set `false` to skip DB restore while still applying secrets (and hub content if present). Automatically skipped when the artifact's `database.has_dumps` is `false` |
 | `target_aap_version` | (optional) | Target AAP version for compatibility validation |
 | `keep_temp_on_failure` | `true` | Keep temporary OCP migration resources (PVC, pod) on failure for debugging. Set `false` to auto-cleanup |
 | `postgresql_restore_admin_user` | `postgres` | PostgreSQL superuser for database restore operations |

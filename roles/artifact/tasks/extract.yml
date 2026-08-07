@@ -23,4 +23,10 @@
   ansible.builtin.include_vars:
     file: "{{ artifact_dir }}/artifact/manifest.yml"
     name: artifact_manifest
+
+- name: Determine whether to restore PostgreSQL dumps
+  ansible.builtin.set_fact:
+    _artifact_do_postgresql_import: >-
+      {{ (artifact_import_postgresql | default(true) | bool)
+         and (artifact_manifest.database.has_dumps | default(true) | bool) }}
 ...

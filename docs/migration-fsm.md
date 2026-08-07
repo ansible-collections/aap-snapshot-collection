@@ -79,6 +79,9 @@ ansible-playbook ansible.aap_snapshot.artifact_export \
 
 - **Hub content**: set `export_hub_content: false` to skip Pulp content data
   (saves significant time and disk for large hub deployments)
+- **PostgreSQL dumps**: set `artifact_export_postgresql: false` to skip all
+  database dumps while still exporting versions, secrets, configs, and hub
+  content
 - **Component selection**: only components present in inventory are exported;
   omit a group to skip that component
 

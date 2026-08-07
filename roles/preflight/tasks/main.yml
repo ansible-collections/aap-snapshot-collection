@@ -12,6 +12,10 @@
     - _snapshot_operation | default('') == 'import'
     - aap_platform == 'operator'
     - inventory_hostname == 'localhost'
+    - >-
+      ((artifact_import_postgresql | default(true) | bool)
+       and (hostvars['localhost']['_preflight_artifact_has_dumps'] | default(true) | bool))
+      or (hostvars['localhost']['_preflight_artifact_has_hub_content'] | default(false) | bool)
 
 - name: Check OCP target requirements
   ansible.builtin.include_tasks: check_ocp_target.yml
@@ -36,6 +40,15 @@
 
 - name: Check database connectivity
   ansible.builtin.include_tasks: check_databases.yml
+  when: >-
+    (
+      _snapshot_operation | default('') == 'import'
+      and (artifact_import_postgresql | default(true) | bool)
+      and (hostvars['localhost']['_preflight_artifact_has_dumps'] | default(true) | bool)
+    ) or (
+      _snapshot_operation | default('') != 'import'
+      and (artifact_export_postgresql | default(true) | bool)
+    )
 
 - name: Check gateway status API
   ansible.builtin.include_tasks: check_gateway_status.yml

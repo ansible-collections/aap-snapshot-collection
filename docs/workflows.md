@@ -30,9 +30,14 @@ see [artifact-format.md](artifact-format.md).
   1. **Get version** - discovers the installed component version
   2. **Get secrets** - extracts Django SECRET_KEY and related credentials
   3. **Database export** - runs `pg_dump --format=custom` to create `.pgc` file
+     (when `artifact_export_postgresql: true`, the default)
   4. **Custom configs** - controller on RPM only: copies configuration files
   5. **Hub content** - hub only (when `export_hub_content: true`): creates
      tarball of Pulp content directory
+
+Set `artifact_export_postgresql: false` to skip all database dumps while still
+exporting versions, secrets, configs, and hub content. The manifest records
+`database.has_dumps: false` so import auto-skips restore.
 
 **Platform differences:**
 - **RPM:** Uses `aap_component_info` module to discover settings by importing
@@ -98,16 +103,22 @@ When `aap_platform: containerized`:
 - Creates a temporary PostgreSQL deployment with the PVC mounted
 - Transfers the artifact to the temporary pod
 
+Skipped when neither database restore nor hub content restore is needed
+(secrets-only import).
+
 ### Phase 5: Import Databases and Secrets
 
 For each component listed in the artifact manifest:
 
 1. **Extract DB credentials** from the target platform (OCP Secret or
-   containerized config)
+   containerized config) — skipped when database restore is skipped
 2. **Restore database** using `pg_restore --clean --if-exists` with the
    admin user. Uses `block/always` to guarantee `CREATEDB` privilege is
-   revoked after restore regardless of success/failure
-3. **Update secrets** on the target:
+   revoked after restore regardless of success/failure. Skipped when
+   `artifact_import_postgresql: false` or the artifact has
+   `database.has_dumps: false`
+3. **Update secrets** on the target (always runs when the component is
+   imported):
    - OCP: patches Kubernetes Secrets with artifact values
    - Containerized: creates/updates podman secrets
 

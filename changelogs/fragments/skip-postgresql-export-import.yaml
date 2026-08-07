@@ -1,0 +1,3 @@
+---
+minor_changes:
+  - Add ``artifact_export_postgresql`` and ``artifact_import_postgresql`` to skip PostgreSQL dumps on export and restores on import. Manifest records ``database.has_dumps`` so dump-less artifacts auto-skip restore.

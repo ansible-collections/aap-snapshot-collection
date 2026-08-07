@@ -74,6 +74,7 @@
           Source platform: {{ artifact_manifest.source_topology }}
           Target platform: {{ aap_platform }}
           AAP version: {{ artifact_manifest.aap_version }}.{{ artifact_manifest.aap_version_patch | default('0') }}
+          PostgreSQL restore: {{ 'performed' if (_artifact_do_postgresql_import | default(true) | bool) else 'skipped' }}
           Components migrated:
           {% for comp in artifact_manifest.components | selectattr('name', 'in', _artifact_import_components | default(artifact_manifest.components | map(attribute='name') | list)) %}
             - {{ comp.name }} (v{{ comp.version }}, database: {{ comp.database_name }})
@@ -93,6 +94,9 @@
           === Next Steps ===
           - Verify admin credentials and login to the gateway UI
           - Check instance group assignments - restored resources may need reassignment
+          {% if not (_artifact_do_postgresql_import | default(true) | bool) %}
+          - PostgreSQL restore was skipped - databases on the target were left unchanged
+          {% endif %}
           {% if 'eda' in _artifact_import_components | default([]) %}
           - EDA: update automation controller URL in credentials if hostnames changed
           {% endif %}

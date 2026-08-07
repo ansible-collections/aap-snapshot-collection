@@ -147,11 +147,16 @@ def _build_report(manifest, component_results, hub_content_ok, checksum_ok, secr
         "  Components:",
     ]
 
+    has_dumps = manifest.get("database", {}).get("has_dumps", True)
+
     for comp in manifest.get("components", []):
         name = comp.get("name", "?")
         version = comp.get("version", "?")
         db_name = comp.get("database_name", "?")
-        pgc_status = "OK" if component_results.get(name, False) else "MISSING"
+        if not has_dumps:
+            pgc_status = "SKIPPED"
+        else:
+            pgc_status = "OK" if component_results.get(name, False) else "MISSING"
         entry = f"    - {name:<16} v{version:<12} {db_name}  [pgc: {pgc_status}]"
 
         if comp.get("has_content_data", False):
@@ -161,10 +166,11 @@ def _build_report(manifest, component_results, hub_content_ok, checksum_ok, secr
         lines.append(entry)
 
     db_info = manifest.get("database", {})
+    dumps_label = "included" if has_dumps else "omitted"
     lines.extend(
         [
             "-" * 63,
-            f"  Database:          {db_info.get('type', '?')} (PostgreSQL {db_info.get('postgresql_version', '?')})",
+            f"  Database:          {db_info.get('type', '?')} (PostgreSQL {db_info.get('postgresql_version', '?')}, dumps: {dumps_label})",
             f"  Checksums:         {'PASS' if checksum_ok else 'FAIL'}",
             f"  Secrets:           {'present' if secrets_ok else 'MISSING'}",
             "=" * 63,
@@ -180,6 +186,40 @@ def _build_report(manifest, component_results, hub_content_ok, checksum_ok, secr
             lines.append(f"    - {err}")
 
     return "\n".join(lines)
+
+
+def _validate_components(artifact_dir, manifest, errors):
+    """Validate per-component dump files and optional hub content.
+
+    When ``database.has_dumps`` is false, ``.pgc`` files are not required.
+    Missing ``has_dumps`` is treated as true for backward compatibility.
+    """
+    component_results = {}
+    hub_content_ok = False
+    has_dumps = manifest.get("database", {}).get("has_dumps", True)
+
+    for comp in manifest.get("components", []):
+        name = comp.get("name", "")
+        pgc_path = os.path.join(artifact_dir, name, f"{name}.pgc")
+
+        if not os.path.realpath(pgc_path).startswith(os.path.realpath(artifact_dir)):
+            errors.append(f"Component name '{name}' would escape artifact directory")
+            component_results[name] = False
+            continue
+
+        pgc_exists = os.path.isfile(pgc_path)
+        component_results[name] = pgc_exists if has_dumps else True
+
+        if has_dumps and not pgc_exists:
+            errors.append(f"Component '{name}' listed in manifest but {name}.pgc not found")
+
+        if name == "hub" and comp.get("has_content_data", False):
+            content_path = os.path.join(artifact_dir, "hub", "hub_content.tar")
+            hub_content_ok = os.path.isfile(content_path)
+            if not hub_content_ok:
+                errors.append("Hub content data flagged in manifest but hub_content.tar not found")
+
+    return component_results, hub_content_ok
 
 
 def main():
@@ -201,8 +241,6 @@ def main():
 
     errors = []
     manifest = {}
-    component_results = {}
-    hub_content_ok = False
     checksum_ok = False
     secrets_ok = False
 
@@ -250,26 +288,7 @@ def main():
         else:
             checksum_ok = True
 
-    for comp in manifest.get("components", []):
-        name = comp.get("name", "")
-        pgc_path = os.path.join(artifact_dir, name, f"{name}.pgc")
-
-        if not os.path.realpath(pgc_path).startswith(os.path.realpath(artifact_dir)):
-            errors.append(f"Component name '{name}' would escape artifact directory")
-            component_results[name] = False
-            continue
-
-        pgc_exists = os.path.isfile(pgc_path)
-        component_results[name] = pgc_exists
-
-        if not pgc_exists:
-            errors.append(f"Component '{name}' listed in manifest but {name}.pgc not found")
-
-        if name == "hub" and comp.get("has_content_data", False):
-            content_path = os.path.join(artifact_dir, "hub", "hub_content.tar")
-            hub_content_ok = os.path.isfile(content_path)
-            if not hub_content_ok:
-                errors.append("Hub content data flagged in manifest but hub_content.tar not found")
+    component_results, hub_content_ok = _validate_components(artifact_dir, manifest, errors)
 
     report = _build_report(manifest, component_results, hub_content_ok, checksum_ok, secrets_ok, errors)
 
