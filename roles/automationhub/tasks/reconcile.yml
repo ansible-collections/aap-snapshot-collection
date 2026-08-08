@@ -188,7 +188,7 @@
         command: >-
           curl -sf
           -H {{ ('Authorization: Bearer ' ~ _automationhub_operator_token) | quote }}
-          {{ _automationhub_gw_api_url }}{{ _automationhub_repair_curl_task }}
+          {{ (_automationhub_gw_api_url ~ _automationhub_repair_curl_task) | quote }}
       register: _automationhub_repair_curl_poll
       changed_when: false
       no_log: "{{ not (disable_no_log | default(false) | bool) }}"
@@ -225,16 +225,31 @@
           Run manually: POST {{ _automationhub_gw_api_url }}/api/galaxy/pulp/api/v3/repair/
           {%- endif -%}
 
-    - name: Fail if fallback Pulp repair did not complete
+    - name: Fail if fallback Pulp repair did not complete (OCP)
       ansible.builtin.fail:
         msg: >-
+          {%- if _automationhub_repair_curl_poll is defined
+                 and (_automationhub_repair_curl_poll.rc | default(1)) == 0 -%}
           Pulp repair task {{ (_automationhub_repair_curl_poll.stdout | from_json).state }}
           via fallback. Error: {{ (_automationhub_repair_curl_poll.stdout | from_json).error
                                   | default({}) | to_nice_json }}
+          {%- else -%}
+          Pulp content repair fallback failed — could not poll repair task from hub pod.
+          Run manually: POST {{ _automationhub_gw_api_url }}/api/galaxy/pulp/api/v3/repair/
+          {%- endif -%}
       when:
-        - _automationhub_repair_curl_poll is defined
-        - (_automationhub_repair_curl_poll.rc | default(1)) == 0
-        - (_automationhub_repair_curl_poll.stdout | from_json).state != 'completed'
+        - aap_platform == 'operator'
+        - not (_automationhub_repair_curl_poll is defined
+               and (_automationhub_repair_curl_poll.rc | default(1)) == 0
+               and (_automationhub_repair_curl_poll.stdout | from_json).state == 'completed')
+
+    - name: Fail if containerized Pulp repair could not be confirmed
+      ansible.builtin.fail:
+        msg: >-
+          Pulp repair task did not complete successfully and no fallback
+          mechanism exists for containerized deployments.
+          Run manually: POST {{ _automationhub_gw_api_url | default('') }}/api/galaxy/pulp/api/v3/repair/
+      when: aap_platform != 'operator'
 
 - name: Reset hub admin password to match K8s secret
   ansible.builtin.include_role:

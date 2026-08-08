@@ -183,7 +183,14 @@ against the new environment.
    restored database's artifact records against the fresh file-storage volume
    (the original PVC was deleted during import) and re-download remote-backed
    content
-2. **Reset admin password** (OCP) - reads the `hub-admin-password` K8s Secret
+2. **Poll repair task to completion** - polls the Pulp async task returned by
+   the repair API until it reaches a terminal state (`completed`, `failed`, or
+   `canceled`). Reports corrupted and repaired artifact counts on success. Fails
+   the play if the task does not complete successfully. If the primary API call
+   fails on OCP, a fallback path retries via `curl` from the hub pod. The
+   polling timeout is configurable via `automationhub_pulp_repair_retries` and
+   `automationhub_pulp_repair_delay` (default: 120 retries x 30s = 60 minutes)
+3. **Reset admin password** (OCP) - reads the `hub-admin-password` K8s Secret
    and runs `pulpcore-manager reset-admin-password` to sync the database
    password
 
