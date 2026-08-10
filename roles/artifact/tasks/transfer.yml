@@ -1,0 +1,49 @@
+---
+# Transfers one component's DB dump from the control node (where the
+# artifact was already extracted) to its own node. Skips components
+# absent from the artifact.
+- name: Transfer {{ _transfer_component_name }} dump if this host needs it
+  when:
+    - groups.get(_transfer_group_name, []) | length > 0
+    - inventory_hostname == groups[_transfer_group_name][0]
+  block:
+    - name: Check if {{ _transfer_component_name }} dump exists in extracted artifact
+      ansible.builtin.stat:
+        path: "{{ _preflight_resolved_artifact | dirname }}/artifact/{{ _transfer_component_name }}/{{ _transfer_component_name }}.pgc"
+      delegate_to: localhost
+      register: _artifact_transfer_source_stat
+
+    - name: Transfer {{ _transfer_component_name }} database dump
+      when: _artifact_transfer_source_stat.stat.exists
+      block:
+        - name: Ensure destination directory exists for {{ _transfer_component_name }} dump
+          ansible.builtin.file:
+            path: "{{ preflight_containerized_staging_dir }}/artifact/{{ _transfer_component_name }}"
+            state: directory
+            mode: '0700'
+            owner: "{{ ansible_user_id }}"
+
+        # _preflight_resolved_artifact's dirname is where the control node
+        # extracted the artifact in the earlier localhost play.
+        - name: Transfer {{ _transfer_component_name }} database dump from control node
+          ansible.posix.synchronize:
+            mode: push
+            src: "{{ _preflight_resolved_artifact | dirname }}/artifact/{{ _transfer_component_name }}/{{ _transfer_component_name }}.pgc"
+            dest: "{{ preflight_containerized_staging_dir }}/artifact/{{ _transfer_component_name }}/{{ _transfer_component_name }}.pgc"
+            rsync_opts:
+              - "--chmod=F600"
+              - "--no-perms"
+              - "--no-owner"
+              - "--no-group"
+          delegate_to: localhost
+
+        - name: Set ownership on transferred {{ _transfer_component_name }} dump
+          ansible.builtin.file:
+            path: "{{ preflight_containerized_staging_dir }}/artifact/{{ _transfer_component_name }}/{{ _transfer_component_name }}.pgc"
+            owner: "{{ ansible_user_id }}"
+            mode: '0600'
+
+        - name: Set artifact_dir for downstream operations tasks on this host
+          ansible.builtin.set_fact:
+            artifact_dir: "{{ preflight_containerized_staging_dir }}"
+...

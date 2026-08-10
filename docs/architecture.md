@@ -172,3 +172,6 @@ since all operations use the Kubernetes API.
 Components are optional - the collection only processes components present
 in the inventory. An AAP deployment with only controller and gateway will
 only export/import those two components.
+
+For containerized import, each component's DB dump is transferred directly
+from the control node to its own node.

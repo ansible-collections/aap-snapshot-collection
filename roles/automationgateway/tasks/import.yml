@@ -6,12 +6,19 @@
   vars:
     component_name: "{{ automationgateway_component_name }}"
 
+- name: Check for containerized gateway database dump
+  ansible.builtin.stat:
+    path: "{{ preflight_containerized_staging_dir }}/artifact/{{ automationgateway_component_name }}/{{ automationgateway_component_name }}.pgc"
+  register: _automationgateway_dump_stat
+  when: aap_platform == 'containerized'
+
 - name: Restore database for gateway
   ansible.builtin.include_role:
     name: ansible.aap_snapshot.operations
     tasks_from: db_import.yml
   vars:
     component_name: "{{ automationgateway_component_name }}"
+  when: aap_platform != 'containerized' or (_automationgateway_dump_stat.stat.exists | default(false))
 
 - name: Update secrets for gateway
   ansible.builtin.include_role:

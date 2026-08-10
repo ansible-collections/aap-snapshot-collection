@@ -3,17 +3,33 @@
   ansible.builtin.unarchive:
     src: "{{ artifact_dir }}/{{ artifact_filename }}"
     dest: "{{ artifact_dir }}"
+    remote_src: true
+
+- name: Verify extracted artifact content checksums
+  ansible.builtin.include_tasks: verify_content.yml
 
 - name: Validate extracted artifact
   ansible.builtin.include_tasks: validate.yml
 
-- name: Load artifact secrets
-  ansible.builtin.include_vars:
-    file: "{{ artifact_dir }}/artifact/secrets.yml"
-    name: artifact_secrets
+# include_vars only reads from the Ansible controller; slurp reads from
+# whichever host this task targets, so it works for local and remote staging.
+- name: Slurp artifact secrets
+  ansible.builtin.slurp:
+    src: "{{ artifact_dir }}/artifact/secrets.yml"
+  register: _artifact_secrets_raw
+  no_log: "{{ __artifact_no_log }}"
 
-- name: Load artifact manifest
-  ansible.builtin.include_vars:
-    file: "{{ artifact_dir }}/artifact/manifest.yml"
-    name: artifact_manifest
+- name: Set artifact secrets fact
+  ansible.builtin.set_fact:
+    artifact_secrets: "{{ _artifact_secrets_raw.content | b64decode | from_yaml }}"
+  no_log: "{{ __artifact_no_log }}"
+
+- name: Slurp artifact manifest
+  ansible.builtin.slurp:
+    src: "{{ artifact_dir }}/artifact/manifest.yml"
+  register: _artifact_manifest_raw
+
+- name: Set artifact manifest fact
+  ansible.builtin.set_fact:
+    artifact_manifest: "{{ _artifact_manifest_raw.content | b64decode | from_yaml }}"
 ...
