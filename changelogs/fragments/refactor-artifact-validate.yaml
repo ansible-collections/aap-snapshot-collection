@@ -1,0 +1,4 @@
+---
+minor_changes:
+  - Move validate_artifact role content into the artifact role as artifact/validate.yml.
+...

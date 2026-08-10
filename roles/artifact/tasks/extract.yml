@@ -5,14 +5,7 @@
     dest: "{{ artifact_dir }}"
 
 - name: Validate extracted artifact
-  ansible.aap_snapshot.validate_migration_artifact:
-    artifact_dir: "{{ artifact_dir }}/artifact"
-    target_aap_version: "{{ target_aap_version | default(omit) }}"
-  register: _artifact_validation
-
-- name: Print validation report
-  ansible.builtin.debug:
-    msg: "{{ _artifact_validation.report }}"
+  ansible.builtin.include_tasks: validate.yml
 
 - name: Load artifact secrets
   ansible.builtin.include_vars:

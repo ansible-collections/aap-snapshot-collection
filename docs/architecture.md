@@ -57,10 +57,9 @@ inline. Common service start/stop playbooks are in the `common/` subdirectory.
 
 | Role | Purpose | Called By |
 |------|---------|----------|
-| `artifact` | Artifact lifecycle: init directories, build from exports, package tarball, extract, verify checksums | Entry point playbooks |
+| `artifact` | Artifact lifecycle: init directories, build from exports, package tarball, extract, verify checksums, validate structure/schema | Entry point playbooks |
 | `common` | Normalize inventory groups to universal names (`controller_groups`, etc.) | Entry point playbooks |
 | `preflight` | Validate environment and platform before migration | Entry point playbooks |
-| `validate_artifact` | Validate artifact structure, schema, required files, checksums | `artifact` role, verify playbook |
 
 ### Component Info Roles
 

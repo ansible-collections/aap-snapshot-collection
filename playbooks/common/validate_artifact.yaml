@@ -12,12 +12,13 @@
 
     - name: Run artifact validation
       ansible.builtin.include_role:
-        name: ansible.aap_snapshot.validate_artifact
+        name: ansible.aap_snapshot.artifact
+        tasks_from: validate.yml
       vars:
-        validate_artifact_dir: "{{ __artifact_dest_dir }}/{{ __artifact_build_dir | basename }}"
+        artifact_dir: "{{ __artifact_dest_dir }}"
 
     - name: Clean up extracted artifact
       ansible.builtin.file:
-        path: "{{ __artifact_dest_dir }}/{{ __artifact_build_dir | basename }}"
+        path: "{{ __artifact_dest_dir }}/{{ __artifact_dir_base }}"
         state: absent
 ...

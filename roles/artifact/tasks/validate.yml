@@ -1,0 +1,12 @@
+---
+- name: Validate migration artifact
+  ansible.aap_snapshot.validate_migration_artifact:
+    artifact_dir: "{{ artifact_dir }}/{{ __artifact_dir_base }}"
+    supported_schema_versions: "{{ __artifact_supported_schema_versions }}"
+    target_aap_version: "{{ target_aap_version | default(omit) }}"
+  register: _artifact_validation
+
+- name: Print validation report
+  ansible.builtin.debug:
+    msg: "{{ _artifact_validation.report }}"
+...
