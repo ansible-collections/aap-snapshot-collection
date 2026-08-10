@@ -62,7 +62,7 @@
   vars:
     component_name: "{{ automationcontroller_component_name }}"
     _manage_label: "controller deprovision instance {{ item }}"
-    _manage_command: '{{ _operations_current_component.manage_cmd }} deprovision_instance --hostname={{ item }}'
+    _manage_command: '{{ _operations_current_component.manage_cmd }} deprovision_instance --hostname={{ item | quote }}'
     _manage_pod_name: '{{ _ocp_utils_controller_pod_name | default("") }}'
     _manage_container_name: '{{ _ocp_utils_controller_container_name | default(_operations_current_component.container_name) }}'
   loop: '{{ _automationcontroller_orphaned_instances }}'
