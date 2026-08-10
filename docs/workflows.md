@@ -169,10 +169,12 @@ against the new environment.
 ### Controller Reconciliation
 
 1. **Find orphaned instances** - queries the Django ORM for Instance objects
-   with heartbeats older than 600 seconds (instances from the source cluster
-   that will never heartbeat again)
+   with heartbeats older than 600 seconds or zero/null capacity (instances from
+   the source cluster that will never heartbeat again). Runs on both OCP and
+   containerized targets
 2. **Deprovision orphaned instances** - runs `awx-manage deprovision_instance`
-   for each orphaned instance to prevent web UI errors from stale entries
+   for each orphaned instance to prevent web UI errors from stale entries.
+   Reports the count and hostnames of deprovisioned instances
 3. **Reset admin password** (OCP) - reads the `controller-admin-password` K8s
    Secret and runs `awx-manage update_password` to sync the database password
 

@@ -1,0 +1,6 @@
+---
+bugfixes:
+  - automationcontroller - Enable orphaned instance detection and deprovisioning
+    on containerized deployments. Previously this reconciliation step only ran
+    on OCP targets, leaving stale source instance records in the controller
+    database after containerized imports.

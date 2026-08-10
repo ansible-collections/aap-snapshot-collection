@@ -46,14 +46,14 @@
       {{ _operations_current_component.manage_cmd }}
       shell {{ _operations_manage_shell_args | default('') }}
       -c "{{ _orphan_script | regex_replace('\n', '') | trim }}"
-    _manage_pod_name: '{{ _ocp_utils_controller_pod_name }}'
+    _manage_pod_name: '{{ _ocp_utils_controller_pod_name | default("") }}'
     _manage_container_name: '{{ _ocp_utils_controller_container_name | default(_operations_current_component.container_name) }}'
-  when: _ocp_utils_controller_pod_name is defined
+  when: _ocp_utils_controller_pod_name is defined or aap_platform != 'operator'
 
 - name: Parse orphaned instance list
   ansible.builtin.set_fact:
     _automationcontroller_orphaned_instances: '{{ (_ocp_utils_manage_result.stdout_lines | default([]) | select | last | default("[]")) | from_json }}'
-  when: _ocp_utils_controller_pod_name is defined
+  when: _ocp_utils_controller_pod_name is defined or aap_platform != 'operator'
 
 - name: Deprovision orphaned instances
   ansible.builtin.include_role:
@@ -63,14 +63,30 @@
     component_name: "{{ automationcontroller_component_name }}"
     _manage_label: "controller deprovision instance {{ item }}"
     _manage_command: '{{ _operations_current_component.manage_cmd }} deprovision_instance --hostname={{ item }}'
-    _manage_pod_name: '{{ _ocp_utils_controller_pod_name }}'
+    _manage_pod_name: '{{ _ocp_utils_controller_pod_name | default("") }}'
     _manage_container_name: '{{ _ocp_utils_controller_container_name | default(_operations_current_component.container_name) }}'
   loop: '{{ _automationcontroller_orphaned_instances }}'
   loop_control:
     label: "{{ item }}"
   when:
-    - _ocp_utils_controller_pod_name is defined
+    - _ocp_utils_controller_pod_name is defined or aap_platform != 'operator'
     - _automationcontroller_orphaned_instances | length > 0
+
+- name: Report deprovisioned controller instances
+  ansible.builtin.debug:
+    msg: >-
+      Deprovisioned {{ _automationcontroller_orphaned_instances | length }}
+      orphaned controller instance(s): {{ _automationcontroller_orphaned_instances | join(', ') }}
+  when:
+    - _automationcontroller_orphaned_instances is defined
+    - _automationcontroller_orphaned_instances | length > 0
+
+- name: Report controller instance status
+  ansible.builtin.debug:
+    msg: "No orphaned controller instances found."
+  when:
+    - _automationcontroller_orphaned_instances is defined
+    - _automationcontroller_orphaned_instances | length == 0
 
 - name: Reset controller admin password to match K8s secret
   ansible.builtin.include_role:
