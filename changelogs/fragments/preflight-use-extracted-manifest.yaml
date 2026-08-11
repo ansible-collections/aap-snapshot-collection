@@ -1,0 +1,3 @@
+---
+bugfixes:
+  - Use the extracted artifact manifest as the source of truth for import preflight dump and hub-content checks instead of peeking the tar archive before extract.

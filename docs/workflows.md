@@ -80,7 +80,15 @@ exporting versions, secrets, configs, and hub content. The manifest records
 - Runs on `localhost`
 - Unpacks the tar archive
 - Validates artifact structure and checksums
-- Loads `manifest.yml` and `secrets.yml` into variables
+- Loads `manifest.yml` and `secrets.yml` into variables (manifest is the
+  source of truth for `database.has_dumps` and hub content presence)
+
+### Phase 2b: Post-extract preflight
+
+- Uses the loaded manifest (not a tar peek) to decide dump/hub-aware checks
+- Skips database connectivity checks when PostgreSQL restore will not run
+- OCP: validates temp PVC size only when database restore or hub content
+  restore is needed
 
 ### Phase 3: Quiesce Target (OCP)
 

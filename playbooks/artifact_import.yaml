@@ -35,6 +35,20 @@
         name: ansible.aap_snapshot.artifact
         tasks_from: extract.yml
 
+- name: Preflight after artifact extract
+  hosts: all
+  gather_facts: false
+  any_errors_fatal: true
+  max_fail_percentage: 0
+  environment: "{{ ocp_utils_ocp_environment | default({}) }}"
+  vars:
+    _snapshot_operation: import
+  tasks:
+    - name: Running post-extract import preflight
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.preflight
+        tasks_from: check_import_after_extract.yml
+
 - name: Consume artifact (OCP)
   hosts: localhost
   gather_facts: false
