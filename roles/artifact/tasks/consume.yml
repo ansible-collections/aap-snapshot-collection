@@ -180,7 +180,7 @@
 
     - name: Check if hub content data is available in artifact
       ansible.builtin.set_fact:
-        artifact_hub_has_content_data: >-
+        _artifact_hub_has_content_data: >-
           {{ artifact_manifest.components
              | selectattr('name', 'equalto', 'hub')
              | map(attribute='has_content_data')
@@ -191,7 +191,7 @@
       ansible.builtin.set_fact:
         _artifact_need_temp_resources: >-
           {{ (_artifact_do_postgresql_import | default(true) | bool)
-             or (artifact_hub_has_content_data | default(false) | bool) }}
+             or (_artifact_hub_has_content_data | default(false) | bool) }}
 
     - name: Warn about components in artifact but not on target
       ansible.builtin.debug:
@@ -293,7 +293,7 @@
         tasks_from: import_hub_content.yml
       when:
         - "'hub' in _artifact_import_components"
-        - artifact_hub_has_content_data | default(false)
+        - _artifact_hub_has_content_data | default(false)
 
     # --- Resume AAP ---
     - name: Scale operators back up
