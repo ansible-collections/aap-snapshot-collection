@@ -13,6 +13,7 @@ These apply to both export and import workflows.
 | `aap_platform` | (required) | Source/target platform: `rpm`, `containerized`, or `operator` |
 | `artifact_dir` | `$PWD` | Directory where the artifact is created (export) or read from (import) |
 | `artifact_file` | (required for import/verify) | Path to the artifact archive |
+| `artifact_skip_postgres` | `false` | When `true`, skip PostgreSQL dumps on export or restores on import (set independently per playbook run). Dump-less artifacts auto-skip restore via `database.has_dumps`. Import warns when dumps are present but this flag discards them |
 | `disable_no_log` | `false` | Set `true` to show sensitive values in output for debugging |
 
 ## Export Variables
@@ -34,7 +35,6 @@ Control artifact creation and packaging.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `export_hub_content` | `true` | Include Pulp content data (`/var/lib/pulp/`) in artifact |
-| `artifact_export_postgresql` | `true` | Include PostgreSQL dumps (`.pgc`) in the artifact. Set `false` to export versions, secrets, configs, and hub content only |
 | `postgresql_db_type` | `managed` | Database topology: `managed` (co-located) or `external` |
 
 ### Hub Content Export
@@ -59,7 +59,6 @@ Control artifact restoration to the target platform.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `artifact_file` | (required) | Path to the artifact archive to import. Validated at preflight before any destructive operations |
-| `artifact_import_postgresql` | `true` | Restore PostgreSQL dumps on import. Set `false` to skip DB restore while still applying secrets (and hub content if present). Automatically skipped when the artifact's `database.has_dumps` is `false` |
 | `target_aap_version` | (optional) | Target AAP version for compatibility validation |
 | `keep_temp_on_failure` | `true` | Keep temporary OCP migration resources (PVC, pod) on failure for debugging. Set `false` to auto-cleanup |
 | `postgresql_restore_admin_user` | `postgres` | PostgreSQL superuser for database restore operations |

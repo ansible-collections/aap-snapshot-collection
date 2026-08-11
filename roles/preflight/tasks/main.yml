@@ -31,7 +31,7 @@
   ansible.builtin.include_tasks: check_databases.yml
   when:
     - _snapshot_operation | default('') != 'import'
-    - artifact_export_postgresql | default(true) | bool
+    - not (artifact_skip_postgres | default(false) | bool)
 
 - name: Check gateway status API
   ansible.builtin.include_tasks: check_gateway_status.yml

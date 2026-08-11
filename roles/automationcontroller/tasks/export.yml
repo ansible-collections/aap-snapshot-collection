@@ -20,7 +20,7 @@
   vars:
     component_name: "{{ automationcontroller_component_name }}"
     postgresql_export_dest: "{{ __artifact_build_dir }}"
-  when: artifact_export_postgresql | default(true) | bool
+  when: not (artifact_skip_postgres | default(false) | bool)
 
 - name: Export controller custom configs
   ansible.builtin.include_tasks: export_custom_configs.yml

@@ -30,12 +30,12 @@ see [artifact-format.md](artifact-format.md).
   1. **Get version** - discovers the installed component version
   2. **Get secrets** - extracts Django SECRET_KEY and related credentials
   3. **Database export** - runs `pg_dump --format=custom` to create `.pgc` file
-     (when `artifact_export_postgresql: true`, the default)
+     (when `artifact_skip_postgres` is unset/`false`, the default)
   4. **Custom configs** - controller on RPM only: copies configuration files
   5. **Hub content** - hub only (when `export_hub_content: true`): creates
      tarball of Pulp content directory
 
-Set `artifact_export_postgresql: false` to skip all database dumps while still
+Set `artifact_skip_postgres: true` to skip all database dumps while still
 exporting versions, secrets, configs, and hub content. The manifest records
 `database.has_dumps: false` so import auto-skips restore.
 
@@ -123,8 +123,9 @@ For each component listed in the artifact manifest:
 2. **Restore database** using `pg_restore --clean --if-exists` with the
    admin user. Uses `block/always` to guarantee `CREATEDB` privilege is
    revoked after restore regardless of success/failure. Skipped when
-   `artifact_import_postgresql: false` or the artifact has
-   `database.has_dumps: false`
+   `artifact_skip_postgres: true` or the artifact has
+   `database.has_dumps: false`. Import warns when dumps are present but
+   `artifact_skip_postgres: true` explicitly discards them
 3. **Update secrets** on the target (always runs when the component is
    imported):
    - OCP: patches Kubernetes Secrets with artifact values

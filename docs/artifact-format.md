@@ -59,7 +59,7 @@ Array of exported components. Each entry:
 |-------|------|-------------|
 | `type` | string | `managed` (co-located) or `external` (remote database) |
 | `postgresql_version` | string | PostgreSQL major version (e.g. `"15"`) |
-| `has_dumps` | boolean | Whether component `.pgc` dumps are included. Absent in older artifacts; treat missing as `true`. When `false` (export with `artifact_export_postgresql: false`), `.pgc` files are omitted |
+| `has_dumps` | boolean | Whether component `.pgc` dumps are included. Absent in older artifacts; treat missing as `true`. When `false` (export with `artifact_skip_postgres: true`), `.pgc` files are omitted |
 
 ### checksums
 
@@ -132,10 +132,11 @@ During import, secrets are restored to the target platform's secret store
 ### Database Dumps
 
 Each component directory contains a PostgreSQL custom-format dump (`.pgc`)
-created with `pg_dump --format=custom` when `artifact_export_postgresql` is
-`true` (the default). These are restored with `pg_restore` during import using
-`--clean --if-exists` flags to handle existing schemas. When
-`database.has_dumps` is `false`, `.pgc` files are omitted from the artifact.
+created with `pg_dump --format=custom` when `artifact_skip_postgres` is
+unset or `false` (the default). These are restored with `pg_restore` during
+import using `--clean --if-exists` flags to handle existing schemas. When
+export sets `artifact_skip_postgres: true`, `database.has_dumps` is `false`
+and `.pgc` files are omitted from the artifact.
 
 Default database names:
 
