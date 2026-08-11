@@ -265,9 +265,7 @@
       ansible.builtin.include_role:
         name: ansible.aap_snapshot.ocp_utils
         tasks_from: delete_hub_file_storage_pvc.yml
-      when:
-        - "'hub' in _artifact_import_components"
-        - (_artifact_do_postgresql_import | default(true) | bool) or (artifact_hub_has_content_data | default(false) | bool)
+      when: "'hub' in _artifact_import_components"
 
     - name: Import gateway
       ansible.builtin.include_role:
