@@ -204,21 +204,24 @@
         - _automationhub_repair_curl_task is defined
 
     - name: Report Pulp repair fallback result
+      vars:
+        _result: "{{ (_automationhub_repair_curl_poll.stdout | default('{}')) | from_json }}"
+        _progress: "{{ _result.progress_reports | default([]) }}"
+        _corrupted: >-
+          {{ _progress | selectattr('code', 'defined')
+             | selectattr('code', 'equalto', 'repair.corrupted')
+             | map(attribute='done') | first | default(0) }}
+        _repaired: >-
+          {{ _progress | selectattr('code', 'defined')
+             | selectattr('code', 'equalto', 'repair.repaired')
+             | map(attribute='done') | first | default(0) }}
       ansible.builtin.debug:
         msg: >-
           {%- if _automationhub_repair_curl_poll is defined
                  and (_automationhub_repair_curl_poll.rc | default(1)) == 0 -%}
-          {%- set result = _automationhub_repair_curl_poll.stdout | from_json -%}
-          Pulp repair task {{ result.state }} (via fallback curl from hub pod).
-          {%- if result.state == 'completed' -%}
-          {{ ' Corrupted: ' ~ (result.progress_reports | default([])
-              | selectattr('code', 'defined')
-              | selectattr('code', 'equalto', 'repair.corrupted')
-              | map(attribute='done') | first | default(0))
-             ~ ', repaired: ' ~ (result.progress_reports | default([])
-              | selectattr('code', 'defined')
-              | selectattr('code', 'equalto', 'repair.repaired')
-              | map(attribute='done') | first | default(0)) }}
+          Pulp repair task {{ _result.state }} (via fallback curl from hub pod).
+          {%- if _result.state == 'completed' -%}
+          {{ ' Corrupted artifacts found: ' ~ _corrupted ~ ', repaired: ' ~ _repaired }}
           {%- endif -%}
           {%- else -%}
           WARNING: Pulp content repair could not be completed.
