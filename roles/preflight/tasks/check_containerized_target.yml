@@ -6,6 +6,10 @@
   containers.podman.podman_container_info:
     name: "{{ preflight_containerized_temp_container }}"
   register: __preflight_temp_container
+  when: inventory_hostname in (groups.get('controller_groups', [])
+          + groups.get('eda_groups', [])
+          + groups.get('gateway_groups', [])
+          + groups.get('hub_groups', []))
 
 - name: Warn if temp restore container exists from previous run
   ansible.builtin.debug:
@@ -14,7 +18,9 @@
       exists from a previous import run. It will be reused to avoid
       re-transferring staged artifacts. To force a clean import, remove it first:
         podman rm -f {{ preflight_containerized_temp_container }}
-  when: __preflight_temp_container.containers | length > 0
+  when:
+    - __preflight_temp_container is not skipped
+    - __preflight_temp_container.containers | length > 0
 
 - name: Check for stale staged artifact files
   ansible.builtin.stat:
