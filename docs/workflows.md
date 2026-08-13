@@ -174,7 +174,8 @@ against the new environment.
    containerized targets
 2. **Deprovision orphaned instances** - runs `awx-manage deprovision_instance`
    for each orphaned instance to prevent web UI errors from stale entries.
-   Reports the count and hostnames of deprovisioned instances
+   Reports the count and hostnames of deprovisioned instances. Runs on both
+   OCP and containerized targets
 3. **Reset admin password** (OCP) - reads the `controller-admin-password` K8s
    Secret and runs `awx-manage update_password` to sync the database password
 
