@@ -2,6 +2,48 @@
 - name: Consume artifact (containerized)
   when: aap_platform == 'containerized'
   block:
+    # Must run before Stop below - credential discovery execs into each
+    # component's still-running container.
+    - name: Get DB credentials for controller
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.operations
+        tasks_from: get_db_credentials.yml
+      vars:
+        component_name: controller
+      when:
+        - groups.get('controller_groups', []) | length > 0
+        - inventory_hostname == groups['controller_groups'][0]
+
+    - name: Get DB credentials for hub
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.operations
+        tasks_from: get_db_credentials.yml
+      vars:
+        component_name: hub
+      when:
+        - groups.get('hub_groups', []) | length > 0
+        - inventory_hostname == groups['hub_groups'][0]
+
+    - name: Get DB credentials for gateway
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.operations
+        tasks_from: get_db_credentials.yml
+      vars:
+        component_name: gateway
+      when:
+        - groups.get('gateway_groups', []) | length > 0
+        - inventory_hostname == groups['gateway_groups'][0]
+
+    - name: Get DB credentials for eda
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.operations
+        tasks_from: get_db_credentials.yml
+      vars:
+        component_name: eda
+      when:
+        - groups.get('eda_groups', []) | length > 0
+        - inventory_hostname == groups['eda_groups'][0]
+
     # --- Stop services ---
     - name: Stop monitoring
       ansible.builtin.include_role:
