@@ -57,4 +57,10 @@
     - >
       __preflight_postgresql_container.containers | length == 0 or
       not (__preflight_postgresql_container.containers[0].State.Running | default(false) | bool)
+
+# This role default doesn't survive into the later Consume play, which
+# never re-includes preflight - pin it as a fact.
+- name: Persist containerized staging directory for later plays
+  ansible.builtin.set_fact:
+    preflight_containerized_staging_dir: "{{ preflight_containerized_staging_dir }}"
 ...

@@ -1,0 +1,7 @@
+---
+bugfixes:
+  - preflight - persist preflight_containerized_staging_dir as a fact
+    instead of relying on the preflight role's default surviving into the
+    later "Consume artifact (containerized)" play, where the preflight
+    role is never re-included. Fixes "'preflight_containerized_staging_dir'
+    is undefined" on containerized import's artifact transfer step.
