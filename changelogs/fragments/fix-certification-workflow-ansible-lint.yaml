@@ -1,0 +1,6 @@
+---
+bugfixes:
+  - >-
+    Update ``partner-certification-checker`` to v4.0.0 to fix
+    ``ansible-lint`` import error caused by incompatibility between
+    ``ansible-lint==24.12.2`` and ``ansible-core>=2.21`` (https://github.com/ansible-collections/partner-certification-checker/issues/93).

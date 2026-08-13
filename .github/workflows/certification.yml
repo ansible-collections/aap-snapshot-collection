@@ -10,4 +10,4 @@ permissions:
 
 jobs:
   certification:
-    uses: ansible-collections/partner-certification-checker/.github/workflows/certification-reusable.yml@31ef407dd12d185388fe0c278eba9fc8bbec2e15 # v3.0.1
+    uses: ansible-collections/partner-certification-checker/.github/workflows/certification-reusable.yml@f182febf0568baf1151f66549401167fd10b25d2 # v4.0.0
