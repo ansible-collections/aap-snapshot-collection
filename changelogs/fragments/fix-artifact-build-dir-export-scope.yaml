@@ -1,0 +1,7 @@
+---
+bugfixes:
+  - artifact - broadcast the resolved build directory to component hosts
+    during export instead of relying on each host independently re-deriving
+    the artifact role's default through several levels of nested role
+    includes. Fixes "'__artifact_build_dir' is undefined" failures on
+    containerized export of multi-host deployments.
