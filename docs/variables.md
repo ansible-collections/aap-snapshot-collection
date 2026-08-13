@@ -146,6 +146,8 @@ Post-import reconciliation settings.
 | `gateway_admin_password` | (required) | Admin password for Pulp repair API call |
 | `gateway_hostname` | (required) | Gateway hostname for Pulp repair API endpoint |
 | `validate_certs` | `false` | Whether to validate TLS certificates for API calls |
+| `automationhub_pulp_repair_retries` | `120` | Number of polling attempts for the Pulp repair async task |
+| `automationhub_pulp_repair_delay` | `30` | Seconds between polling attempts (total timeout = retries x delay) |
 
 ### EDA Reconciliation
 
