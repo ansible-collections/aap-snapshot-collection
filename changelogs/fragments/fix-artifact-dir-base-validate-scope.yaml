@@ -1,0 +1,7 @@
+---
+bugfixes:
+  - artifact - persist __artifact_dir_base alongside the other artifact
+    path facts after packaging. common/validate_artifact.yaml's cleanup
+    task needs it in the post-package validate play, but it was missing
+    from the existing fact persistence, causing "'__artifact_dir_base' is
+    undefined" on the "Clean up extracted artifact" task after export.

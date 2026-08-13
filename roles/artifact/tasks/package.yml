@@ -65,5 +65,6 @@
     __artifact_dest_dir: '{{ __artifact_dest_dir }}'
     __artifact_filename: '{{ __artifact_filename }}'
     __artifact_build_dir: '{{ __artifact_build_dir }}'
+    __artifact_dir_base: '{{ __artifact_dir_base }}'
   run_once: true
 ...
