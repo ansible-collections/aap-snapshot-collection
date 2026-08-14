@@ -21,4 +21,10 @@ postgresql_restore_timeout: 3600
 postgresql_temp_container_name: "aap-snapshot-{{ postgresql_component_name }}"
 postgresql_temp_container_volumes: []
 postgresql_discover_container_name: "postgresql"
+
+# Image used for the temporary postgres client container on containerized
+# targets. Matches the image the OCP path's own temporary migration pod
+# defaults to (ocp_utils_temp_postgres_image). Override this directly if
+# your target's PostgreSQL server version differs.
+postgresql_temp_container_image: "registry.redhat.io/rhel9/postgresql-15:latest"
 ...

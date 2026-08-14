@@ -1,0 +1,31 @@
+---
+bugfixes:
+  - postgresql - run pg_dump/pg_restore inside a throwaway postgres client
+    container on containerized targets instead of assuming psql/pg_restore
+    exist as real host binaries. Containerized hosts only ship the
+    containerized installer's own podman-wrapped CLI aliases, which are
+    re-rendered with a volume mount for one specific file only immediately
+    before the installer's own native restore runs - our staged artifact
+    was never mounted into them, so database restore always failed with
+    "No such file or directory" even though the file existed on the host.
+    The client container's image defaults to the same image the OCP
+    import path's temporary migration pod uses
+    (postgresql_temp_container_image), and is user-overridable.
+  - postgresql - restore into the existing database on containerized
+    targets (pg_restore --clean --if-exists --no-owner -d <db>) instead
+    of dropping and recreating it (--create), matching the OCP import
+    path. DROP DATABASE requires exclusive whole-database access and has
+    no force option, so restore could fail outright with "database is
+    being accessed by other users" if a stopped component's worker
+    subprocess hadn't fully disconnected yet. Also fixes containerized DB
+    name discovery (get_db_credentials.yml never set _operations_db_name,
+    silently falling back to the component name instead of the real
+    database name) so the existing database can be targeted directly.
+  - postgresql - tolerate pg_restore's own non-fatal errors on
+    containerized targets, matching the OCP import path. pg_restore
+    --clean always raises (and itself only warns on) "cannot drop
+    inherited constraint" errors when restoring partitioned tables (e.g.
+    controller's time-partitioned job/event tables) - a well-known
+    pg_dump/pg_restore limitation with declarative partitioning, not an
+    actual restore failure. Only treat FATAL errors (connection/auth
+    failures) as fatal, not per-statement restore errors.

@@ -12,20 +12,49 @@
         role_attr_flags: CREATEDB
       no_log: "{{ __postgresql_no_log }}"
 
+    # Containerized hosts don't reliably have a real pg_restore binary -
+    # run it inside our own throwaway client container instead.
+    - name: Create temp postgres client container for restore
+      ansible.builtin.include_tasks: create_temp_container.yml
+      vars:
+        postgresql_temp_container_volumes:
+          - "{{ postgresql_restore_source }}:{{ postgresql_restore_source }}:ro,Z"
+
+    # Restore into the existing database (--no-owner, no --create),
+    # matching the OCP path - avoids DROP DATABASE's exclusive-access
+    # requirement, which has no force option and is racy against
+    # lingering connections (worker shutdown timing, autovacuum).
     - name: "Restore database"
-      community.postgresql.postgresql_db:
-        login_host: '{{ postgresql_restore_host }}'
-        login_password: '{{ postgresql_restore_password }}'
-        login_port: '{{ postgresql_restore_port }}'
-        login_user: '{{ postgresql_restore_user }}'
-        name: template1
-        state: restore
-        target: '{{ postgresql_restore_source }}'
-        target_opts: '--create --clean --if-exists'
+      containers.podman.podman_container_exec:
+        name: "{{ postgresql_temp_container_name }}"
+        user: "{{ ansible_effective_user_id }}"
+        argv:
+          - pg_restore
+          - --clean
+          - --if-exists
+          - --no-owner
+          - -h
+          - "{{ postgresql_restore_host }}"
+          - -p
+          - "{{ postgresql_restore_port | string }}"
+          - -U
+          - "{{ postgresql_restore_user }}"
+          - -d
+          - "{{ postgresql_restore_dbname }}"
+          - "{{ postgresql_restore_source }}"
+        env:
+          PGPASSWORD: "{{ postgresql_restore_password }}"
+      # pg_restore --clean itself only warns on "cannot drop inherited
+      # constraint" for partitioned tables - match OCP's leniency.
+      register: _postgresql_restore_result
+      failed_when: _postgresql_restore_result.rc != 0 and 'FATAL' in (_postgresql_restore_result.stderr | default(''))
       no_log: "{{ __postgresql_no_log }}"
       async: '{{ postgresql_restore_timeout }}'
       poll: 30
   always:
+    - name: Remove temp postgres client container
+      ansible.builtin.include_tasks: remove_temp_container.yml
+
     - name: "Revoke CREATEDB from restore user"
       community.postgresql.postgresql_user:
         login_host: '{{ postgresql_restore_host }}'

@@ -1,4 +1,7 @@
 ---
+# keep-id maps the calling user's uid/gid into the container, so
+# podman_container_exec's user: param can read/write the connection
+# user's files without changing their permissions.
 - name: Create temp postgres container
   containers.podman.podman_container:
     name: "{{ postgresql_temp_container_name }}"
@@ -6,5 +9,6 @@
     state: started
     command: sleep infinity
     network: host
+    userns: keep-id
     volume: "{{ postgresql_temp_container_volumes }}"
 ...

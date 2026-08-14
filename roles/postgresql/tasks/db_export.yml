@@ -1,8 +1,8 @@
 ---
-- name: DB Export (RPM and containerized)
-  when: aap_platform in ['rpm', 'containerized']
-  become: "{{ (aap_platform == 'rpm') | ternary(true, false) }}"
-  become_user: "{{ (aap_platform == 'rpm') | ternary(postgresql_django_manage_user, omit) }}"
+- name: DB Export (RPM)
+  when: aap_platform == 'rpm'
+  become: true
+  become_user: "{{ postgresql_django_manage_user }}"
   block:
 
     - name: Ensure export_dir folder exists
@@ -47,6 +47,99 @@
         target_opts: "--clean --create"
         state: dump
       environment: "{{ postgresql_pg_dump_env | default({}) }}"
+
+    - name: Get file checksum
+      ansible.builtin.stat:
+        path: "{{ postgresql_export_dir }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+        checksum_algorithm: "{{ postgresql_checksum_algo | default('sha256') }}"
+      register: _postgresql_db_file_stat
+
+    - name: Create DB checksum variable
+      ansible.builtin.set_fact:
+        _postgresql_db_checksum: |-
+          {{ _postgresql_db_file_stat.stat.checksum }}  {{ postgresql_component_name }}/{{ _postgresql_db_file_stat.stat.path | ansible.builtin.basename }}
+          {{ _postgresql_db_checksum | default() }}
+
+    - name: Print DB checksum
+      ansible.builtin.debug:
+        msg: "{{ _postgresql_db_checksum }}"
+
+    - name: Download the export tarball
+      ansible.builtin.fetch:
+        src: "{{ postgresql_export_dir }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+        dest: "{{ postgresql_export_dest }}/{{ postgresql_component_name }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+        flat: true
+      notify: Remove the export directory
+
+- name: DB Export (containerized)
+  when: aap_platform == 'containerized'
+  block:
+
+    - name: Ensure export_dir folder exists
+      ansible.builtin.file:
+        path: "{{ postgresql_export_dir }}"
+        state: directory
+        mode: "0750"
+
+    - name: Get postgres auth credentials
+      ansible.builtin.include_tasks: db_auth.yml
+
+    - name: Get PostgreSQL server version
+      community.postgresql.postgresql_query:
+        login_db: "{{ postgresql_auth_settings.default.NAME }}"
+        login_host: "{{ postgresql_auth_settings.default.HOST }}"
+        login_port: "{{ postgresql_auth_settings.default.PORT }}"
+        login_user: "{{ postgresql_auth_settings.default.USER }}"
+        login_password: "{{ postgresql_auth_settings.default.PASSWORD | default(omit) }}"
+        query: "SHOW server_version"
+      environment: "{{ postgresql_pg_dump_env | default({}) }}"
+      no_log: "{{ __postgresql_no_log }}"
+      register: _postgresql_version_result
+      when: _postgresql_version is not defined
+
+    - name: Set PostgreSQL version fact
+      ansible.builtin.set_fact:
+        _postgresql_version: "{{ _postgresql_version_result.query_result[0].server_version.split('.')[0] }}"
+      delegate_to: localhost
+      delegate_facts: true
+      when:
+        - _postgresql_version_result is not skipped
+        - _postgresql_version_result.query_result | length > 0
+
+    # Same rationale as db_import.yml - don't rely on a real pg_dump
+    # binary being on the host.
+    - name: Create temp postgres client container for export
+      ansible.builtin.include_tasks: create_temp_container.yml
+      vars:
+        postgresql_temp_container_volumes:
+          - "{{ postgresql_export_dir }}:{{ postgresql_export_dir }}:Z"
+
+    - name: Perform a PostgreSQL dump.
+      containers.podman.podman_container_exec:
+        name: "{{ postgresql_temp_container_name }}"
+        user: "{{ ansible_effective_user_id }}"
+        argv:
+          - pg_dump
+          - --clean
+          - --create
+          - -Fc
+          - -h
+          - "{{ postgresql_auth_settings.default.HOST }}"
+          - -p
+          - "{{ postgresql_auth_settings.default.PORT | string }}"
+          - -U
+          - "{{ postgresql_auth_settings.default.USER }}"
+          - -d
+          - "{{ postgresql_auth_settings.default.NAME }}"
+          - -f
+          - "{{ postgresql_export_dir }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+        env: "{{ postgresql_pg_dump_env | default({}) | combine({'PGPASSWORD': postgresql_auth_settings.default.PASSWORD | default('')}) }}"
+      register: _postgresql_dump_result
+      failed_when: _postgresql_dump_result.rc != 0
+      no_log: "{{ __postgresql_no_log }}"
+
+    - name: Remove temp postgres client container
+      ansible.builtin.include_tasks: remove_temp_container.yml
 
     - name: Get file checksum
       ansible.builtin.stat:
