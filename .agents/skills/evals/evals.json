@@ -1,0 +1,134 @@
+{
+  "skill_name": "aap-snapshot-collection",
+  "project_context": "AAP Snapshot Collection (ansible.aap_snapshot) project",
+  "skills": {
+    "review": "aap-snapshot-collection-review/SKILL.md",
+    "conventions": "aap-ansible-conventions/SKILL.md",
+    "structure": "aap-snapshot-collection-structure/SKILL.md",
+    "authoring": "aap-snapshot-collection-authoring/SKILL.md"
+  },
+  "evals": [
+    {
+      "id": "pr-96-db-name-username-differ",
+      "title": "PR #96: DB name and DB username can differ; enhance code to take this into account",
+      "type": "review",
+      "prompt": "Review PR #96 'DB name and DB username can differ; enhance code to take this into account'. This PR adds login_db to a PostgreSQL query in roles/postgresql/tasks/db_export.yml so the version-check query works when the DB name differs from the DB username. Review it following the project review format.",
+      "diff": "diffs/pr-96-db-name-username-differ.patch",
+      "expected_output": "A structured review confirming the fix is correct and scoped to the RPM/containerized version-check query, and (as an Incidental Finding, since it's pre-existing and outside the diff) noting that the dump task and the OCP-path query in the same file could have the same class of connection-parameter issue, and that the dump task on line 39-49 is missing no_log despite passing login_password.",
+      "assertions": [
+        {
+          "text": "Review confirms the login_db fix addresses the DB name vs username mismatch",
+          "severity": "critical",
+          "type": "pattern",
+          "patterns": [
+            "login_db",
+            "DB name",
+            "database name"
+          ],
+          "description": "Reviewer should recognize the fix correctly targets the version-check query"
+        },
+        {
+          "text": "Review notes the missing no_log on the 'Perform a PostgreSQL dump.' task as an incidental/pre-existing finding",
+          "severity": "important",
+          "type": "pattern",
+          "patterns": [
+            "no_log",
+            "Perform a PostgreSQL dump"
+          ],
+          "description": "The RPM/containerized dump task (lines 39-49) passes login_password with no no_log, while the OCP dump task has it — a real, pre-existing asymmetry in the same file the PR touches"
+        },
+        {
+          "text": "Review follows the standard format template",
+          "severity": "format",
+          "type": "pattern",
+          "patterns": [
+            "Summary of Required Actions",
+            "Must Fix"
+          ],
+          "description": "Review follows the project's standard review structure"
+        }
+      ],
+      "reference_files": {
+        "roles/postgresql/tasks/db_export.yml": "sha256:4d7442ea4668fb36"
+      }
+    },
+    {
+      "id": "authoring-fifth-component",
+      "title": "Authoring: add a 5th AAP component following the delegator-role pattern",
+      "type": "authoring",
+      "prompt": "This collection currently exports/imports 4 AAP components: controller, eda, gateway, hub. Sketch what's needed to add a 5th component called 'lightspeed' — specifically, write the new roles/automationlightspeed/tasks/export.yml, roles/automationlightspeed/tasks/import.yml, and roles/automationlightspeed/vars/main.yml, plus the new entry to add to _operations_component_config in roles/operations/vars/main.yml. Use roles/automationcontroller as the structural reference.",
+      "expected_output": "New task files that delegate to the operations role via include_role + component_name, a vars/main.yml setting automationlightspeed_component_name: lightspeed, and a plausible _operations_component_config entry — not a reimplementation of export/import logic inline in the new delegator role.",
+      "assertions": [
+        {
+          "text": "New export.yml/import.yml delegate to the operations role rather than reimplementing logic",
+          "severity": "critical",
+          "type": "pattern",
+          "target": "authored",
+          "match": "present",
+          "patterns": [
+            "ansible.aap_snapshot.operations",
+            "include_role"
+          ],
+          "description": "Component roles are thin delegators — real logic belongs in the operations engine"
+        },
+        {
+          "text": "component_name is passed via vars into the include_role call",
+          "severity": "critical",
+          "type": "pattern",
+          "target": "authored",
+          "match": "present",
+          "patterns": [
+            "component_name"
+          ],
+          "description": "component_name is the universal parameter that selects the config block in _operations_component_config"
+        },
+        {
+          "text": "vars/main.yml sets a single fixed component_name fact",
+          "severity": "important",
+          "type": "pattern",
+          "target": "authored",
+          "match": "present",
+          "patterns": [
+            "automationlightspeed_component_name"
+          ],
+          "description": "Matches the existing automationcontroller_component_name/automationeda_component_name pattern"
+        }
+      ],
+      "reference_files": {
+        "roles/automationcontroller/tasks/export.yml": "sha256:9e1f7a38197fad24"
+      }
+    },
+    {
+      "id": "review-postgresql-db-export-nolog-gap",
+      "title": "Review: hypothetical MR touching roles/postgresql/tasks/db_export.yml",
+      "type": "review",
+      "prompt": "A teammate is proposing a change to roles/postgresql/tasks/db_export.yml that adds a new 'Get database size' community.postgresql.postgresql_query task right after the existing 'Get PostgreSQL server version' task, using the same login_host/login_port/login_user/login_password parameters. They did not add no_log to the new task. Review this proposed change following the project review format, using the actual file at roles/postgresql/tasks/db_export.yml for context.",
+      "expected_output": "A critical finding that the new task passes login_password without no_log, referencing the canonical no_log expression from the conventions skill, and ideally noting the existing 'Perform a PostgreSQL dump.' task in the same file has the identical gap.",
+      "assertions": [
+        {
+          "text": "Review flags the missing no_log on the new query task as Critical",
+          "severity": "critical",
+          "type": "pattern",
+          "patterns": [
+            "no_log",
+            "Critical"
+          ],
+          "description": "A task passing login_password with no no_log is a Critical security finding per the review skill"
+        },
+        {
+          "text": "Review references the canonical computed no_log expression",
+          "severity": "important",
+          "type": "pattern",
+          "patterns": [
+            "disable_no_log",
+            "__postgresql_no_log"
+          ],
+          "description": "Fix should point at the project's canonical no_log pattern, not a hardcoded no_log: true"
+        }
+      ],
+      "reference_files": {
+        "roles/postgresql/tasks/db_export.yml": "sha256:4d7442ea4668fb36"
+      }
+    }
+  ]
+}
