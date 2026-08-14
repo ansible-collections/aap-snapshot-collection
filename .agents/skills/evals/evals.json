@@ -35,7 +35,7 @@
             "no_log",
             "Perform a PostgreSQL dump"
           ],
-          "description": "The dump task passes login_password with no no_log — a real, pre-existing gap in the same file the PR touches"
+          "description": "The RPM/containerized dump task (lines 39-49) passes login_password with no no_log, while the OCP dump task has it — a real, pre-existing asymmetry in the same file the PR touches"
         },
         {
           "text": "Review follows the standard format template",
