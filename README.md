@@ -131,6 +131,7 @@ ansible-playbook ansible.aap_snapshot.artifact_verify \
 | `ocp_namespace` | OCP | `aap` | OpenShift namespace |
 | `aap_instance_name` | OCP | `aap` | AAP CR instance name |
 | `artifact_export_hub_content` | No | `true` | Include Pulp content data in artifact |
+| `artifact_skip_postgres` | No | `false` | Skip PostgreSQL dumps on export and restores on import (auto-skip restore if artifact has no dumps) |
 | `artifact_postgresql_db_type` | No | `managed` | Database topology: `managed` or `external` |
 
 See the [variables reference](https://github.com/ansible-collections/aap-snapshot-collection/blob/main/docs/variables.md) for the complete list.

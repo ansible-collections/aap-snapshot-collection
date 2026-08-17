@@ -1,0 +1,31 @@
+---
+# Post-extract import checks that depend on the loaded artifact manifest
+# (source of truth). Called after roles/artifact/tasks/extract.yml.
+
+- name: Assert artifact manifest is loaded
+  ansible.builtin.assert:
+    that: hostvars['localhost']['artifact_manifest'] is defined
+    fail_msg: >-
+      artifact_manifest is not loaded on localhost. Extract and validate the
+      artifact before running post-extract import preflight.
+  run_once: true
+
+- name: Check temp PVC size is sufficient for artifact
+  ansible.builtin.include_tasks: check_temp_pvc_size.yml
+  when:
+    - aap_platform == 'operator'
+    - inventory_hostname == 'localhost'
+    - >-
+      (hostvars['localhost']['_artifact_do_postgresql_import'] | default(true) | bool)
+      or (
+        (
+          hostvars['localhost']['artifact_manifest'].components | default([])
+          | selectattr('name', 'equalto', 'hub')
+          | map(attribute='has_content_data')
+          | list | first | default(false)
+        ) | bool
+      )
+
+- name: Check database connectivity
+  ansible.builtin.include_tasks: check_databases.yml
+  when: hostvars['localhost']['_artifact_do_postgresql_import'] | default(true) | bool

@@ -2,7 +2,7 @@
 - name: Restore hub content to file-storage PVC
   when:
     - aap_platform == 'operator'
-    - artifact_hub_has_content_data | default(false)
+    - _artifact_hub_has_content_data | default(false)
   block:
     - name: Discover hub file-storage PVC name
       kubernetes.core.k8s_info:

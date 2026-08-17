@@ -13,6 +13,7 @@ These apply to both export and import workflows.
 | `aap_platform` | (required) | Source/target platform: `rpm`, `containerized`, or `operator` |
 | `artifact_dir` | `$PWD` | Directory where the artifact is created (export) or read from (import) |
 | `artifact_file` | (required for import/verify) | Path to the artifact archive |
+| `artifact_skip_postgres` | `false` | When `true`, skip PostgreSQL dumps on export or restores on import (set independently per playbook run). Dump-less artifacts auto-skip restore via `database.has_dumps`. Import warns when dumps are present but this flag discards them |
 | `disable_no_log` | `false` | Set `true` to show sensitive values in output for debugging |
 
 ## Export Variables

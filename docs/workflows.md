@@ -30,9 +30,14 @@ see [artifact-format.md](artifact-format.md).
   1. **Get version** - discovers the installed component version
   2. **Get secrets** - extracts Django SECRET_KEY and related credentials
   3. **Database export** - runs `pg_dump --format=custom` to create `.pgc` file
+     (when `artifact_skip_postgres` is unset/`false`, the default)
   4. **Custom configs** - controller on RPM only: copies configuration files
   5. **Hub content** - hub only (when `export_hub_content: true`): creates
      tarball of Pulp content directory
+
+Set `artifact_skip_postgres: true` to skip all database dumps while still
+exporting versions, secrets, configs, and hub content. The manifest records
+`database.has_dumps: false` so import auto-skips restore.
 
 **Platform differences:**
 - **RPM:** Uses `aap_component_info` module to discover settings by importing
@@ -75,7 +80,15 @@ see [artifact-format.md](artifact-format.md).
 - Runs on `localhost`
 - Unpacks the tar archive
 - Validates artifact structure and checksums
-- Loads `manifest.yml` and `secrets.yml` into variables
+- Loads `manifest.yml` and `secrets.yml` into variables (manifest is the
+  source of truth for `database.has_dumps` and hub content presence)
+
+### Phase 2b: Post-extract preflight
+
+- Uses the loaded manifest (not a tar peek) to decide dump/hub-aware checks
+- Skips database connectivity checks when PostgreSQL restore will not run
+- OCP: validates temp PVC size only when database restore or hub content
+  restore is needed
 
 ### Phase 3: Quiesce Target (OCP)
 
@@ -98,16 +111,23 @@ When `aap_platform: containerized`:
 - Creates a temporary PostgreSQL deployment with the PVC mounted
 - Transfers the artifact to the temporary pod
 
+Skipped when neither database restore nor hub content restore is needed
+(secrets-only import).
+
 ### Phase 5: Import Databases and Secrets
 
 For each component listed in the artifact manifest:
 
 1. **Extract DB credentials** from the target platform (OCP Secret or
-   containerized config)
+   containerized config) — skipped when database restore is skipped
 2. **Restore database** using `pg_restore --clean --if-exists` with the
    admin user. Uses `block/always` to guarantee `CREATEDB` privilege is
-   revoked after restore regardless of success/failure
-3. **Update secrets** on the target:
+   revoked after restore regardless of success/failure. Skipped when
+   `artifact_skip_postgres: true` or the artifact has
+   `database.has_dumps: false`. Import warns when dumps are present but
+   `artifact_skip_postgres: true` explicitly discards them
+3. **Update secrets** on the target (always runs when the component is
+   imported):
    - OCP: patches Kubernetes Secrets with artifact values
    - Containerized: creates/updates podman secrets
 

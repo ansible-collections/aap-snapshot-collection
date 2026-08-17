@@ -20,6 +20,7 @@
   vars:
     component_name: "{{ automationhub_component_name }}"
     postgresql_export_dest: "{{ __artifact_build_dir }}"
+  when: not (artifact_skip_postgres | default(false) | bool)
 
 - name: Export hub content data
   ansible.builtin.include_tasks: export_hub_content.yml

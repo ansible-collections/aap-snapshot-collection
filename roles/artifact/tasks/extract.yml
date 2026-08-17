@@ -23,4 +23,20 @@
   ansible.builtin.include_vars:
     file: "{{ artifact_dir }}/artifact/manifest.yml"
     name: artifact_manifest
-...
+
+- name: Determine whether to restore PostgreSQL dumps
+  ansible.builtin.set_fact:
+    _artifact_do_postgresql_import: >-
+      {{ (not (artifact_skip_postgres | default(false) | bool))
+         and (artifact_manifest.database.has_dumps | default(true) | bool) }}
+
+- name: Warn when explicitly discarding PostgreSQL dumps present in the artifact
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: artifact_skip_postgres=true was set, but this artifact contains
+      PostgreSQL dumps (database.has_dumps: true). The target database(s) will
+      be left untouched - dumps in the artifact will NOT be restored. If this
+      is unintentional, re-run without artifact_skip_postgres=true.
+  when:
+    - artifact_skip_postgres | default(false) | bool
+    - artifact_manifest.database.has_dumps | default(true) | bool

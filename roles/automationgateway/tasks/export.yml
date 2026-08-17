@@ -20,4 +20,5 @@
   vars:
     component_name: "{{ automationgateway_component_name }}"
     postgresql_export_dest: "{{ __artifact_build_dir }}"
+  when: not (artifact_skip_postgres | default(false) | bool)
 ...

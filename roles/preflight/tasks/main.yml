@@ -6,13 +6,6 @@
   ansible.builtin.include_tasks: check_import_vars.yml
   when: _snapshot_operation | default('') == 'import'
 
-- name: Check temp PVC size is sufficient for artifact
-  ansible.builtin.include_tasks: check_temp_pvc_size.yml
-  when:
-    - _snapshot_operation | default('') == 'import'
-    - aap_platform == 'operator'
-    - inventory_hostname == 'localhost'
-
 - name: Check OCP target requirements
   ansible.builtin.include_tasks: check_ocp_target.yml
   when:
@@ -36,6 +29,9 @@
 
 - name: Check database connectivity
   ansible.builtin.include_tasks: check_databases.yml
+  when:
+    - _snapshot_operation | default('') != 'import'
+    - not (artifact_skip_postgres | default(false) | bool)
 
 - name: Check gateway status API
   ansible.builtin.include_tasks: check_gateway_status.yml
@@ -71,4 +67,3 @@
   when:
     - groups.get('hub_groups', []) | length > 0
     - inventory_hostname in groups.get('hub_groups', [])
-...

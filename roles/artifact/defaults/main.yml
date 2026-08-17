@@ -17,6 +17,8 @@ artifact_dir: '{{ lookup("env", "PWD") }}'
 
 ### export control
 artifact_export_hub_content: true
+# Shared export/import flag (set independently per playbook run)
+artifact_skip_postgres: false
 artifact_postgresql_db_type: 'managed'
 
 ### build variables

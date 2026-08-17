@@ -180,12 +180,18 @@
 
     - name: Check if hub content data is available in artifact
       ansible.builtin.set_fact:
-        artifact_hub_has_content_data: >-
+        _artifact_hub_has_content_data: >-
           {{ artifact_manifest.components
              | selectattr('name', 'equalto', 'hub')
              | map(attribute='has_content_data')
              | first | default(false) | bool }}
       # first catches missing hub component, default catches older artifacts without has_content_data
+
+    - name: Determine whether temporary migration resources are needed
+      ansible.builtin.set_fact:
+        _artifact_need_temp_resources: >-
+          {{ (_artifact_do_postgresql_import | default(true) | bool)
+             or (_artifact_hub_has_content_data | default(false) | bool) }}
 
     - name: Warn about components in artifact but not on target
       ansible.builtin.debug:
@@ -217,6 +223,7 @@
       ansible.builtin.include_role:
         name: ansible.aap_snapshot.ocp_utils
         tasks_from: create_temp_resources.yml
+      when: _artifact_need_temp_resources | bool
 
     - name: Transfer artifact to temporary pod
       ansible.builtin.include_role:
@@ -224,6 +231,7 @@
         tasks_from: transfer_artifact.yml
       vars:
         artifact_path: "{{ _preflight_resolved_artifact | default(artifact_file) }}"
+      when: _artifact_need_temp_resources | bool
 
     # --- Idle AAP for import ---
     - name: Set AAP to idle
@@ -285,7 +293,7 @@
         tasks_from: import_hub_content.yml
       when:
         - "'hub' in _artifact_import_components"
-        - artifact_hub_has_content_data | default(false)
+        - _artifact_hub_has_content_data | default(false)
 
     # --- Resume AAP ---
     - name: Scale operators back up
@@ -437,5 +445,7 @@
       ansible.builtin.include_role:
         name: ansible.aap_snapshot.ocp_utils
         tasks_from: cleanup_temp_resources.yml
-      when: (_artifact_import_succeeded | default(false) | bool) or not (keep_temp_on_failure | default(true) | bool)
+      when:
+        - _artifact_need_temp_resources | default(false) | bool
+        - (_artifact_import_succeeded | default(false) | bool) or not (keep_temp_on_failure | default(true) | bool)
 ...
