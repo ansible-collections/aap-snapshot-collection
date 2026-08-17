@@ -152,6 +152,59 @@
         - groups.get('eda_groups', []) | length > 0
         - inventory_hostname == groups['eda_groups'][0]
 
+  # Unlike OCP below, containerized had no recovery path - a mid-import
+  # failure left services stopped. any_errors_fatal pulls every host into
+  # rescue together, so this restarts every component's services
+  # regardless of which host/step failed (a no-op if already running).
+  rescue:
+    - name: Start EDA (recovery)
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.automationeda
+        tasks_from: start_service.yml
+      when:
+        - groups.get('eda_groups', []) | length > 0
+        - inventory_hostname in groups.get('eda_groups', [])
+
+    - name: Start hub (recovery)
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.automationhub
+        tasks_from: start_service.yml
+      when:
+        - groups.get('hub_groups', []) | length > 0
+        - inventory_hostname in groups.get('hub_groups', [])
+
+    - name: Start controller (recovery)
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.automationcontroller
+        tasks_from: start_service.yml
+      when:
+        - groups.get('controller_groups', []) | length > 0
+        - inventory_hostname in groups.get('controller_groups', [])
+
+    - name: Start gateway (recovery)
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.automationgateway
+        tasks_from: start_service.yml
+      when:
+        - groups.get('gateway_groups', []) | length > 0
+        - inventory_hostname in groups.get('gateway_groups', [])
+
+    - name: Start monitoring (recovery)
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.pcp
+        tasks_from: start_service.yml
+      when: inventory_hostname in (groups.get('controller_groups', [])
+              + groups.get('eda_groups', [])
+              + groups.get('gateway_groups', [])
+              + groups.get('hub_groups', []))
+
+    - name: Report import failure
+      ansible.builtin.fail:
+        msg: >-
+          Import failed. Services have been restarted to their
+          pre-import state. Failed task: {{ ansible_failed_task.name | default('unknown') }}.
+          Error: {{ ansible_failed_result.msg | default(ansible_failed_result | to_nice_json) }}
+
 - name: Consume artifact (OCP)
   when: aap_platform == 'operator'
   block:
