@@ -1,0 +1,8 @@
+---
+bugfixes:
+  - preflight - scope the stale temp restore container check to component
+    hosts (controller/eda/gateway/hub groups) instead of running it on
+    every inventory host. It requires podman, which non-component hosts
+    (an external database host, the node running the playbook, etc.) may
+    not have, causing containerized import preflight to fail outright with
+    ``Failed to find required executable "podman"``.
