@@ -1,0 +1,7 @@
+---
+bugfixes:
+  - artifact - add a rescue block to the containerized import path so a
+    mid-import failure restarts every component's services back to their
+    pre-import running state instead of leaving them stopped. The OCP
+    import path already had equivalent block/rescue coverage; the
+    containerized path had none.

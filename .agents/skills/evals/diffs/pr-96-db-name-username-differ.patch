@@ -1,0 +1,21 @@
+diff --git a/changelogs/fragments/fix-differing-names.yaml b/changelogs/fragments/fix-differing-names.yaml
+new file mode 100644
+index 0000000..2197ab4
+--- /dev/null
++++ b/changelogs/fragments/fix-differing-names.yaml
+@@ -0,0 +1,3 @@
++---
++bugfixes:
++  - Add support for db name different than db username.
+diff --git a/roles/postgresql/tasks/db_export.yml b/roles/postgresql/tasks/db_export.yml
+index 7ef86f7..fc30a45 100644
+--- a/roles/postgresql/tasks/db_export.yml
++++ b/roles/postgresql/tasks/db_export.yml
+@@ -16,6 +16,7 @@
+
+     - name: Get PostgreSQL server version
+       community.postgresql.postgresql_query:
++        login_db: "{{ postgresql_auth_settings.default.NAME }}"
+         login_host: "{{ postgresql_auth_settings.default.HOST }}"
+         login_port: "{{ postgresql_auth_settings.default.PORT }}"
+         login_user: "{{ postgresql_auth_settings.default.USER }}"

@@ -8,7 +8,6 @@
   block:
     - name: Gather service facts
       ansible.builtin.service_facts:
-      become: true
 
     - name: Verify gateway service is running
       ansible.builtin.assert:
