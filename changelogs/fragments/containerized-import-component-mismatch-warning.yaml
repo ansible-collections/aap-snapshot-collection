@@ -1,0 +1,6 @@
+---
+minor_changes:
+  - artifact - warn when a component present in the artifact has no matching
+    inventory group on a containerized import target, or when a target
+    inventory group has no matching component in the artifact, mirroring the
+    existing OCP behavior.
