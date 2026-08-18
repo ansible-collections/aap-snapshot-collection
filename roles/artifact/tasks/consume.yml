@@ -2,6 +2,40 @@
 - name: Consume artifact (containerized)
   when: aap_platform == 'containerized'
   block:
+    # Unlike OCP, containerized has no cluster to discover components from.
+    - name: Determine target components from inventory groups
+      ansible.builtin.set_fact:
+        _artifact_containerized_target_components: >-
+          {{ (['controller'] if groups.get('controller_groups', []) | length > 0 else [])
+             + (['hub'] if groups.get('hub_groups', []) | length > 0 else [])
+             + (['eda'] if groups.get('eda_groups', []) | length > 0 else [])
+             + (['gateway'] if groups.get('gateway_groups', []) | length > 0 else []) }}
+      run_once: true
+
+    - name: Warn about components in artifact but not on target
+      ansible.builtin.debug:
+        msg: >-
+          Component '{{ item }}' is in the artifact but no '{{ item }}_groups'
+          hosts are present in the target inventory - skipping.
+      loop: >-
+        {{ artifact_manifest.components | map(attribute='name') | list
+           | difference(_artifact_containerized_target_components) }}
+      loop_control:
+        label: "{{ item }}"
+      run_once: true
+
+    - name: Warn about components on target but not in artifact
+      ansible.builtin.debug:
+        msg: >-
+          Component '{{ item }}' has hosts in the target inventory but is
+          not present in the artifact - skipping.
+      loop: >-
+        {{ _artifact_containerized_target_components
+           | difference(artifact_manifest.components | map(attribute='name') | list) }}
+      loop_control:
+        label: "{{ item }}"
+      run_once: true
+
     # Must run before Stop below - credential discovery execs into each
     # component's still-running container.
     - name: Get DB credentials for controller

@@ -54,4 +54,21 @@
     state: directory
     mode: '0750'
   when: groups.get('eda_groups', []) | length > 0
+
+# Component export tasks reference __artifact_build_dir on their own
+# remote hosts several include_role levels deep - broadcast it as a fact
+# rather than relying on each host re-deriving the role default.
+- name: Broadcast artifact build directory to component hosts
+  ansible.builtin.set_fact:
+    __artifact_build_dir: "{{ __artifact_build_dir }}"
+  delegate_to: "{{ item }}"
+  delegate_facts: true
+  loop: >-
+    {{ (groups.get('controller_groups', [])
+        + groups.get('eda_groups', [])
+        + groups.get('gateway_groups', [])
+        + groups.get('hub_groups', []))
+       | unique }}
+  loop_control:
+    label: "{{ item }}"
 ...
