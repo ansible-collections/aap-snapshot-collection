@@ -15,6 +15,10 @@ artifact_collection_version: >-
 artifact_filename: '{{ __artifact_filename }}'
 artifact_dir: '{{ lookup("env", "PWD") }}'
 
+### validate variables
+__artifact_supported_schema_versions:
+  - "1.0"
+
 ### export control
 artifact_export_hub_content: true
 artifact_postgresql_db_type: 'managed'
@@ -22,6 +26,7 @@ artifact_postgresql_db_type: 'managed'
 ### build variables
 artifact_build_dir: '{{ lookup("env", "PWD") }}/artifact'
 __artifact_build_dir: '{{ artifact_build_dir.rstrip("/") }}'
+__artifact_dir_base: '{{ __artifact_build_dir | basename }}'
 artifact_checksum_algo: 'sha256'
 artifact_dest_dir: '{{ lookup("env", "PWD") }}'
 __artifact_dest_dir: '{{ artifact_dest_dir.rstrip("/") }}'

@@ -1,0 +1,4 @@
+---
+minor_changes:
+  - Add artifact delivery to containerized targets during import, verifying checksum and content integrity from orchestrator to the target environment.
+...

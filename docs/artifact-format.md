@@ -177,9 +177,8 @@ validation phase of both export and import workflows.
 ## Versioning
 
 The `schema_version` field identifies the artifact format version. The
-`validate_artifact` role maintains a list of supported schema versions in
-`validate_supported_schema_versions` (default: `["1.0"]`). Artifacts with
-unrecognized schema versions are rejected during validation.
+`artifact` role maintains an internal list of supported schema versions.
+Artifacts with unrecognized schema versions are rejected during validation.
 
 The `aap_version` and `aap_version_patch` fields record the source platform
 version. These can be used to enforce version compatibility policies during

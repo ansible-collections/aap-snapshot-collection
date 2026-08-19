@@ -156,10 +156,3 @@ Post-import reconciliation settings.
 |----------|---------|-------------|
 | `eda_container_name` | `automation-eda-api` | EDA container name for manage commands |
 | `eda_manage_cmd` | `aap-eda-manage` | Django manage command for EDA |
-
-## Artifact Validation
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `validate_artifact_dir` | `""` | Directory containing the extracted artifact to validate |
-| `validate_supported_schema_versions` | `["1.0"]` | List of accepted artifact schema versions |

@@ -6,12 +6,19 @@
   vars:
     component_name: "{{ automationeda_component_name }}"
 
+- name: Check for containerized eda database dump
+  ansible.builtin.stat:
+    path: "{{ preflight_containerized_staging_dir }}/artifact/{{ automationeda_component_name }}/{{ automationeda_component_name }}.pgc"
+  register: _automationeda_dump_stat
+  when: aap_platform == 'containerized'
+
 - name: Restore database for eda
   ansible.builtin.include_role:
     name: ansible.aap_snapshot.operations
     tasks_from: db_import.yml
   vars:
     component_name: "{{ automationeda_component_name }}"
+  when: aap_platform != 'containerized' or (_automationeda_dump_stat.stat.exists | default(false))
 
 - name: Update secrets for eda
   ansible.builtin.include_role:

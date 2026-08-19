@@ -1,0 +1,39 @@
+---
+# Stage the artifact on the containerized target. Each component's dump is
+# pushed directly from the control node (already extracted there by the
+# "Validate and extract artifact" play). OCP stages the artifact into a
+# temp pod/PVC instead (see roles/ocp_utils/tasks/transfer_artifact.yml).
+- name: Stage artifact on containerized target
+  when: aap_platform == 'containerized'
+  block:
+    - name: Set artifact secrets and manifest facts from control node
+      ansible.builtin.set_fact:
+        artifact_secrets: "{{ hostvars['localhost']['artifact_secrets'] }}"
+        artifact_manifest: "{{ hostvars['localhost']['artifact_manifest'] }}"
+      no_log: "{{ __artifact_no_log }}"
+
+    - name: Ensure containerized artifact staging directory exists
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0700'
+        owner: "{{ ansible_user_id }}"
+      loop:
+        - "{{ preflight_containerized_staging_dir }}"
+        - "{{ preflight_containerized_staging_dir }}/artifact"
+      loop_control:
+        label: "{{ item }}"
+
+    - name: Transfer each component's database dump to its own node
+      ansible.builtin.include_tasks: transfer.yml
+      loop:
+        - { name: controller, group: controller_groups }
+        - { name: hub, group: hub_groups }
+        - { name: eda, group: eda_groups }
+        - { name: gateway, group: gateway_groups }
+      loop_control:
+        label: "{{ item.name }}"
+      vars:
+        _transfer_component_name: "{{ item.name }}"
+        _transfer_group_name: "{{ item.group }}"
+...

@@ -21,13 +21,9 @@
         src: '{{ artifact_dir }}/{{ artifact_filename }}'
 
     - name: Validate artifact contents
-      ansible.aap_snapshot.validate_migration_artifact:
-        artifact_dir: '{{ artifact_dir }}/artifact'
-      register: _validation
-
-    - name: Print validation report
-      ansible.builtin.debug:
-        msg: '{{ _validation.report }}'
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.artifact
+        tasks_from: validate.yml
 
     - name: Remove temporary unpacked artifact package
       ansible.builtin.file:

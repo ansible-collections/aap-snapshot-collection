@@ -6,12 +6,19 @@
   vars:
     component_name: "{{ automationhub_component_name }}"
 
+- name: Check for containerized hub database dump
+  ansible.builtin.stat:
+    path: "{{ preflight_containerized_staging_dir }}/artifact/{{ automationhub_component_name }}/{{ automationhub_component_name }}.pgc"
+  register: _automationhub_dump_stat
+  when: aap_platform == 'containerized'
+
 - name: Restore database for hub
   ansible.builtin.include_role:
     name: ansible.aap_snapshot.operations
     tasks_from: db_import.yml
   vars:
     component_name: "{{ automationhub_component_name }}"
+  when: aap_platform != 'containerized' or (_automationhub_dump_stat.stat.exists | default(false))
 
 - name: Update secrets for hub
   ansible.builtin.include_role:
