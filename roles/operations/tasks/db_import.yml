@@ -9,11 +9,5 @@
     tasks_from: db_import.yml
   vars:
     postgresql_component_name: "{{ component_name }}"
-    postgresql_restore_host: "{{ _operations_db_host }}"
-    postgresql_restore_port: "{{ _operations_db_port }}"
-    postgresql_restore_user: "{{ _operations_db_user }}"
-    postgresql_restore_password: "{{ _operations_db_password }}"
-    postgresql_restore_admin_password: "{{ _operations_db_admin_password }}"
-    postgresql_restore_dbname: "{{ _operations_db_name | default(component_name) }}"
     postgresql_restore_source: "{{ __operations_artifact_extract_dir }}/{{ component_name }}/{{ component_name }}.pgc"
 ...

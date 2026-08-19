@@ -13,7 +13,6 @@ postgresql_export_dest: "{{ lookup('env', 'PWD') }}/db_export"
 postgresql_export_extension: "pgc"
 
 # Import variables
-postgresql_restore_admin_user: "postgres"
 postgresql_restore_timeout: 3600
 
 # Temp container variables (used to run pg_dump/pg_restore without requiring
