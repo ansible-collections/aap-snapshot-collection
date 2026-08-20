@@ -2,16 +2,6 @@
 - name: Containerized database import
   when: aap_platform == 'containerized'
   block:
-    - name: "Grant CREATEDB to restore user"
-      community.postgresql.postgresql_user:
-        login_host: '{{ postgresql_restore_host }}'
-        login_password: '{{ postgresql_restore_admin_password }}'
-        login_port: '{{ postgresql_restore_port }}'
-        login_user: '{{ postgresql_restore_admin_user }}'
-        name: '{{ postgresql_restore_user }}'
-        role_attr_flags: CREATEDB
-      no_log: "{{ __postgresql_no_log }}"
-
     # Containerized hosts don't reliably have a real pg_restore binary -
     # run it inside our own throwaway client container instead.
     - name: Create temp postgres client container for restore
@@ -24,6 +14,8 @@
     # matching the OCP path - avoids DROP DATABASE's exclusive-access
     # requirement, which has no force option and is racy against
     # lingering connections (worker shutdown timing, autovacuum).
+    # Uses discovered credentials from postgresql_auth_settings (set by
+    # get_db_credentials.yml before services were stopped).
     - name: "Restore database"
       containers.podman.podman_container_exec:
         name: "{{ postgresql_temp_container_name }}"
@@ -34,16 +26,16 @@
           - --if-exists
           - --no-owner
           - -h
-          - "{{ postgresql_restore_host }}"
+          - "{{ postgresql_auth_settings.default.HOST }}"
           - -p
-          - "{{ postgresql_restore_port | string }}"
+          - "{{ postgresql_auth_settings.default.PORT | string }}"
           - -U
-          - "{{ postgresql_restore_user }}"
+          - "{{ postgresql_auth_settings.default.USER }}"
           - -d
-          - "{{ postgresql_restore_dbname }}"
+          - "{{ postgresql_auth_settings.default.NAME }}"
           - "{{ postgresql_restore_source }}"
         env:
-          PGPASSWORD: "{{ postgresql_restore_password }}"
+          PGPASSWORD: "{{ postgresql_auth_settings.default.PASSWORD }}"
       # pg_restore --clean itself only warns on "cannot drop inherited
       # constraint" for partitioned tables - match OCP's leniency.
       register: _postgresql_restore_result
@@ -54,16 +46,6 @@
   always:
     - name: Remove temp postgres client container
       ansible.builtin.include_tasks: remove_temp_container.yml
-
-    - name: "Revoke CREATEDB from restore user"
-      community.postgresql.postgresql_user:
-        login_host: '{{ postgresql_restore_host }}'
-        login_password: '{{ postgresql_restore_admin_password }}'
-        login_port: '{{ postgresql_restore_port }}'
-        login_user: '{{ postgresql_restore_admin_user }}'
-        name: '{{ postgresql_restore_user }}'
-        role_attr_flags: NOCREATEDB
-      no_log: "{{ __postgresql_no_log }}"
 
 - name: OCP database import
   when: aap_platform == 'operator'
