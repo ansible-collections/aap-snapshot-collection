@@ -1,54 +1,57 @@
 ---
-- name: Check if AAP CR exists
-  ansible.builtin.include_role:
-    name: ansible.aap_snapshot.ocp_utils
-    tasks_from: check_aap_cr.yml
+- name: Check AAP CR health
+  environment: "{{ preflight_ocp_environment }}"
+  block:
+    - name: Check if AAP CR exists
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.ocp_utils
+        tasks_from: check_aap_cr.yml
 
-- name: Require AAP CR to exist for import
-  ansible.builtin.fail:
-    msg: >-
-      No AnsibleAutomationPlatform CR found in namespace '{{ preflight_ocp_namespace }}'.
-      Create the AAP CR before running import. This allows you to configure
-      the deployment topology, storage classes, and resource limits for the
-      target environment.
-  when:
-    - not (_ocp_utils_aap_cr_exists | default(false) | bool)
-    - _snapshot_operation | default('') == 'import'
+    - name: Require AAP CR to exist for import
+      ansible.builtin.fail:
+        msg: >-
+          No AnsibleAutomationPlatform CR found in namespace '{{ preflight_ocp_namespace }}'.
+          Create the AAP CR before running import. This allows you to configure
+          the deployment topology, storage classes, and resource limits for the
+          target environment.
+      when:
+        - not (_ocp_utils_aap_cr_exists | default(false) | bool)
+        - _snapshot_operation | default('') == 'import'
 
-- name: Assert AAP is not already idled from a previous failed run
-  ansible.builtin.assert:
-    that:
-      - not (_ocp_utils_aap_cr_check.resources[0].spec.idle_aap | default(false) | bool)
-    fail_msg: >-
-      AnsibleAutomationPlatform CR '{{ preflight_aap_instance_name }}' in namespace
-      '{{ preflight_ocp_namespace }}' has idle_aap: true - likely from a previous
-      failed import. Restore the cluster before retrying:
-        oc patch aap/{{ preflight_aap_instance_name }} -n {{ preflight_ocp_namespace }}
-          --type merge -p '{"spec":{"idle_aap": false}}'
-      Then wait for pods to come back:
-        oc get pods -n {{ preflight_ocp_namespace }} -w
-  when:
-    - _ocp_utils_aap_cr_exists | default(false) | bool
-    - _snapshot_operation | default('') == 'import'
+    - name: Assert AAP is not already idled from a previous failed run
+      ansible.builtin.assert:
+        that:
+          - not (_ocp_utils_aap_cr_check.resources[0].spec.idle_aap | default(false) | bool)
+        fail_msg: >-
+          AnsibleAutomationPlatform CR '{{ preflight_aap_instance_name }}' in namespace
+          '{{ preflight_ocp_namespace }}' has idle_aap: true - likely from a previous
+          failed import. Restore the cluster before retrying:
+            oc patch aap/{{ preflight_aap_instance_name }} -n {{ preflight_ocp_namespace }}
+              --type merge -p '{"spec":{"idle_aap": false}}'
+          Then wait for pods to come back:
+            oc get pods -n {{ preflight_ocp_namespace }} -w
+      when:
+        - _ocp_utils_aap_cr_exists | default(false) | bool
+        - _snapshot_operation | default('') == 'import'
 
-- name: Verify AAP CR conditions are healthy
-  ansible.builtin.assert:
-    that:
-      - (_ocp_utils_aap_cr_check.resources[0].status | default({})).conditions | default([])
-        | selectattr('type', 'equalto', 'Failure')
-        | selectattr('status', 'equalto', 'True')
-        | list | length == 0
-    fail_msg: >-
-      AAP CR has failure conditions:
-      {{ (_ocp_utils_aap_cr_check.resources[0].status | default({})).conditions | default([])
-         | selectattr('type', 'equalto', 'Failure')
-         | selectattr('status', 'equalto', 'True')
-         | map(attribute='message') | list | join(', ') }}
-  when: _ocp_utils_aap_cr_exists | default(false) | bool
+    - name: Verify AAP CR conditions are healthy
+      ansible.builtin.assert:
+        that:
+          - (_ocp_utils_aap_cr_check.resources[0].status | default({})).conditions | default([])
+            | selectattr('type', 'equalto', 'Failure')
+            | selectattr('status', 'equalto', 'True')
+            | list | length == 0
+        fail_msg: >-
+          AAP CR has failure conditions:
+          {{ (_ocp_utils_aap_cr_check.resources[0].status | default({})).conditions | default([])
+             | selectattr('type', 'equalto', 'Failure')
+             | selectattr('status', 'equalto', 'True')
+             | map(attribute='message') | list | join(', ') }}
+      when: _ocp_utils_aap_cr_exists | default(false) | bool
 
-- name: Discover OCP component pods
-  ansible.builtin.include_role:
-    name: ansible.aap_snapshot.ocp_utils
-    tasks_from: discover_components.yml
-  when: _ocp_utils_aap_cr_exists | default(false) | bool
+    - name: Discover OCP component pods
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.ocp_utils
+        tasks_from: discover_components.yml
+      when: _ocp_utils_aap_cr_exists | default(false) | bool
 ...

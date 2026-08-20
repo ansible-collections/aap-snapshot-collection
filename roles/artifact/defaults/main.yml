@@ -33,4 +33,18 @@ __artifact_dest_dir: '{{ artifact_dest_dir.rstrip("/") }}'
 artifact_prefix: 'aap-snapshot'
 artifact_extension: 'tar'
 __artifact_filename: '{{ artifact_prefix }}-{{ _operations_aap_version }}-{{ artifact_date }}.{{ artifact_extension }}'
+
+# Kubeconfig resolution for this role's own OCP tasks (consume.yml), which
+# cannot rely on ocp_utils_ocp_environment being loaded yet. Mirrors
+# roles/ocp_utils/defaults/main.yml.
+__artifact_resolved_kubeconfig: >-
+  {{ kubeconfig
+     | default(lookup('env', 'K8S_AUTH_KUBECONFIG'), true)
+     | default(lookup('env', 'KUBECONFIG'), true)
+     | default('', true) }}
+
+artifact_ocp_environment: >-
+  {{ {'K8S_AUTH_KUBECONFIG': __artifact_resolved_kubeconfig}
+     if (__artifact_resolved_kubeconfig | length > 0)
+     else {} }}
 ...

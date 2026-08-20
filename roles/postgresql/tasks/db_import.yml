@@ -49,6 +49,7 @@
 
 - name: OCP database import
   when: aap_platform == 'operator'
+  environment: "{{ postgresql_ocp_environment }}"
   block:
     - name: Find PostgreSQL pod
       ansible.builtin.include_role:

@@ -10,4 +10,19 @@ operations_gateway_admin_user: "admin"
 operations_validate_certs: false
 
 _operations_manage_shell_args: "--no-imports"
+
+# Kubeconfig resolution for this role's own OCP tasks (update_secret.yml,
+# get_secret.yml, get_version.yml, reset_admin_password.yml,
+# detect_django_version_ocp.yml), which cannot rely on ocp_utils_ocp_environment
+# being loaded yet. Mirrors roles/ocp_utils/defaults/main.yml.
+__operations_resolved_kubeconfig: >-
+  {{ kubeconfig
+     | default(lookup('env', 'K8S_AUTH_KUBECONFIG'), true)
+     | default(lookup('env', 'KUBECONFIG'), true)
+     | default('', true) }}
+
+operations_ocp_environment: >-
+  {{ {'K8S_AUTH_KUBECONFIG': __operations_resolved_kubeconfig}
+     if (__operations_resolved_kubeconfig | length > 0)
+     else {} }}
 ...

@@ -3,4 +3,18 @@ automationeda_ocp_namespace: "{{ ocp_namespace | default('aap') }}"
 automationeda_aap_instance_name: "{{ aap_instance_name | default('aap') }}"
 automationeda_aap_cr_kind: "AnsibleAutomationPlatform"
 automationeda_aap_cr_api_version: "aap.ansible.com/v1alpha1"
+
+# Kubeconfig resolution for this role's own OCP tasks (reconcile.yml), which
+# cannot rely on ocp_utils_ocp_environment being loaded yet. Mirrors
+# roles/ocp_utils/defaults/main.yml.
+__automationeda_resolved_kubeconfig: >-
+  {{ kubeconfig
+     | default(lookup('env', 'K8S_AUTH_KUBECONFIG'), true)
+     | default(lookup('env', 'KUBECONFIG'), true)
+     | default('', true) }}
+
+automationeda_ocp_environment: >-
+  {{ {'K8S_AUTH_KUBECONFIG': __automationeda_resolved_kubeconfig}
+     if (__automationeda_resolved_kubeconfig | length > 0)
+     else {} }}
 ...

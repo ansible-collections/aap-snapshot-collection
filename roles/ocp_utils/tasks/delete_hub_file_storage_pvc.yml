@@ -6,6 +6,7 @@
     label_selectors:
       - "app.kubernetes.io/component=automationhub"
       - "app.kubernetes.io/part-of={{ _hub_cr_name }}"
+  environment: "{{ ocp_utils_ocp_environment }}"
   register: _ocp_utils_hub_pvcs
 
 - name: Delete hub file-storage PVC
@@ -22,4 +23,5 @@
        | list }}
   loop_control:
     label: "{{ item.metadata.name }}"
+  environment: "{{ ocp_utils_ocp_environment }}"
 ...

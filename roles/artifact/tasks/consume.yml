@@ -283,6 +283,7 @@
 
 - name: Consume artifact (OCP)
   when: aap_platform == 'operator'
+  environment: "{{ artifact_ocp_environment }}"
   block:
     # --- Pre-import checks ---
     - name: Validate target version matches artifact

@@ -5,6 +5,7 @@
     kind: "{{ ocp_utils_aap_cr_kind }}"
     name: "{{ ocp_utils_aap_instance_name }}"
     namespace: "{{ ocp_utils_ocp_namespace }}"
+  environment: "{{ ocp_utils_ocp_environment }}"
   register: _ocp_utils_aap_status
   until: >-
     _ocp_utils_aap_status.resources | length > 0

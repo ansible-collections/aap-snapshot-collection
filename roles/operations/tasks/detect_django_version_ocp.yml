@@ -7,6 +7,7 @@
     command: >-
       {{ _operations_detect_manage_cmd }} shell --no-imports -c
       "import django; print(django.VERSION[0])"
+  environment: "{{ operations_ocp_environment }}"
   register: _operations_django_version_result
   changed_when: false
   failed_when: false

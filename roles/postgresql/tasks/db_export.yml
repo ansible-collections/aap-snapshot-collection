@@ -166,6 +166,7 @@
 
 - name: DB Export (OCP)
   when: aap_platform == 'operator'
+  environment: "{{ postgresql_ocp_environment }}"
   block:
     - name: Get postgres auth credentials
       ansible.builtin.include_tasks: db_auth.yml

@@ -38,6 +38,7 @@
     api_version: automationhub.ansible.com/v1beta1
     namespace: "{{ automationhub_ocp_namespace }}"
     name: "{{ _hub_cr_name }}"
+  environment: "{{ automationhub_ocp_environment }}"
   register: _automationhub_cr_status
   until: >-
     _automationhub_cr_status.resources | length > 0
@@ -59,6 +60,7 @@
     command: >-
       curl -sf -o /dev/null
       http://localhost:8000/api/galaxy/pulp/api/v3/status/
+  environment: "{{ automationhub_ocp_environment }}"
   register: _automationhub_envoy_check
   changed_when: false
   until: _automationhub_envoy_check.rc == 0
@@ -73,6 +75,7 @@
     kind: Secret
     namespace: "{{ automationhub_ocp_namespace }}"
     name: "{{ aap_instance_name | default('aap') }}-gateway-oauth2-token-secret"
+  environment: "{{ automationhub_ocp_environment }}"
   register: _automationhub_gw_oauth2_secret
   no_log: "{{ not (disable_no_log | default(false) | bool) }}"
   when: aap_platform == 'operator'
@@ -164,6 +167,7 @@
           -H {{ ('Authorization: Bearer ' ~ _automationhub_operator_token) | quote }}
           -d '{"verify_checksums": true}'
           {{ _automationhub_gw_api_url }}/api/galaxy/pulp/api/v3/repair/
+      environment: "{{ automationhub_ocp_environment }}"
       register: _automationhub_repair_curl
       failed_when: false
       changed_when: false
@@ -189,6 +193,7 @@
           curl -sf
           -H {{ ('Authorization: Bearer ' ~ _automationhub_operator_token) | quote }}
           {{ (_automationhub_gw_api_url ~ _automationhub_repair_curl_task) | quote }}
+      environment: "{{ automationhub_ocp_environment }}"
       register: _automationhub_repair_curl_poll
       changed_when: false
       no_log: "{{ not (disable_no_log | default(false) | bool) }}"

@@ -4,6 +4,7 @@
     kind: "{{ ocp_utils_aap_cr_kind }}"
     api_version: "{{ ocp_utils_aap_cr_api_version }}"
     namespace: "{{ ocp_utils_ocp_namespace }}"
+  environment: "{{ ocp_utils_ocp_environment }}"
   register: _ocp_utils_aap_cr_check
 
 - name: Set AAP CR existence fact

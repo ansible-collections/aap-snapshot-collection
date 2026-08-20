@@ -29,6 +29,7 @@
 
 - name: "Gather version (OCP)"
   when: aap_platform == 'operator'
+  environment: "{{ operations_ocp_environment }}"
   block:
     - name: "Get version via pod"
       kubernetes.core.k8s_exec:
