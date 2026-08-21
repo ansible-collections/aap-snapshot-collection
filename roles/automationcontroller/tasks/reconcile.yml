@@ -109,7 +109,7 @@
 
 - name: List EEs pointing to source Hub
   ansible.builtin.uri:
-    url: "https://{{ ocp_utils_gateway_hostname }}/api/v2/execution_environments/?image__startswith={{ _automationcontroller_ee_source_hub }}/&page_size=200"
+    url: "https://{{ ocp_utils_gateway_hostname }}/api/controller/v2/execution_environments/?image__startswith={{ _automationcontroller_ee_source_hub }}/&page_size=200"
     url_username: "admin"
     url_password: "{{ ocp_utils_gateway_admin_password }}"
     force_basic_auth: true
@@ -126,7 +126,7 @@
 
 - name: Rewrite EE image URLs to destination Hub
   ansible.builtin.uri:
-    url: "https://{{ ocp_utils_gateway_hostname }}/api/v2/execution_environments/{{ item.id }}/"
+    url: "https://{{ ocp_utils_gateway_hostname }}/api/controller/v2/execution_environments/{{ item.id }}/"
     method: PATCH
     url_username: "admin"
     url_password: "{{ ocp_utils_gateway_admin_password }}"
