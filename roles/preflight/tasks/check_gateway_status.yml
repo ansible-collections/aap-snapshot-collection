@@ -69,6 +69,7 @@
   when:
     - aap_platform == 'operator'
     - _ocp_utils_gateway_pod_name is defined
+  environment: "{{ preflight_ocp_environment }}"
   block:
     - name: Query gateway status endpoint via pod
       kubernetes.core.k8s_exec:

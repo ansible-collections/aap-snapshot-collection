@@ -6,6 +6,7 @@
     label_selectors: "{{ _discover_selectors }}"
     field_selectors:
       - "status.phase=Running"
+  environment: "{{ ocp_utils_ocp_environment }}"
   register: _ocp_utils_discovered_pod
   until: >-
     _ocp_utils_discovered_pod.resources | length > 0

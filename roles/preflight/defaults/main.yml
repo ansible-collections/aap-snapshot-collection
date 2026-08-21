@@ -21,4 +21,18 @@ preflight_known_rwx_storage_classes:
 preflight_containerized_staging_dir: "{{ ansible_user_dir | default('~') }}/aap/backups/migration"
 preflight_containerized_temp_container: "aap-snapshot-restore"
 preflight_containerized_postgresql_container: "postgresql"
+
+# Kubeconfig resolution for this role's own OCP checks (check_ocp_target.yml),
+# which run before ocp_utils is loaded elsewhere in the play and so can't rely
+# on ocp_utils_ocp_environment yet. Mirrors roles/ocp_utils/defaults/main.yml.
+__preflight_resolved_kubeconfig: >-
+  {{ kubeconfig
+     | default(lookup('env', 'K8S_AUTH_KUBECONFIG'), true)
+     | default(lookup('env', 'KUBECONFIG'), true)
+     | default('', true) }}
+
+preflight_ocp_environment: >-
+  {{ {'K8S_AUTH_KUBECONFIG': __preflight_resolved_kubeconfig}
+     if (__preflight_resolved_kubeconfig | length > 0)
+     else {} }}
 ...

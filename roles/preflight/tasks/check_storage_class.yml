@@ -18,6 +18,7 @@
   when:
     - _preflight_artifact_has_hub | bool
     - aap_platform == 'operator'
+  environment: "{{ preflight_ocp_environment }}"
   block:
     - name: Check if hub_file_storage_class is explicitly set
       ansible.builtin.set_fact:

@@ -12,6 +12,7 @@
     api_version: "{{ automationeda_aap_cr_api_version }}"
     namespace: "{{ automationeda_ocp_namespace }}"
     name: "{{ automationeda_aap_instance_name }}"
+  environment: "{{ automationeda_ocp_environment }}"
   register: _automationeda_cr_eda_wait
   until: >-
     _automationeda_cr_eda_wait.resources | length > 0

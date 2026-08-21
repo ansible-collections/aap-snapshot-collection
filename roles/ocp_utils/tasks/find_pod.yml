@@ -7,6 +7,7 @@
       - "{{ _ocp_pod_label_key | default('app.kubernetes.io/name') }}={{ _ocp_pod_label }}"
     field_selectors:
       - "status.phase=Running"
+  environment: "{{ ocp_utils_ocp_environment }}"
   register: _ocp_utils_found_pods
   until: _ocp_utils_found_pods.resources | length > 0
   retries: "{{ _ocp_pod_retries | default(10) }}"

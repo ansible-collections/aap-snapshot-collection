@@ -5,6 +5,7 @@
     pod: "{{ _manage_pod_name }}"
     container: "{{ _manage_container_name | default(omit) }}"
     command: "{{ _manage_command }}"
+  environment: "{{ ocp_utils_ocp_environment }}"
   failed_when: _ocp_utils_manage_result_ocp.rc | default(1) != 0
   register: _ocp_utils_manage_result_ocp
   when: aap_platform == 'operator'

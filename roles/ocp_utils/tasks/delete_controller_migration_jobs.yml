@@ -8,6 +8,7 @@
       - "app.kubernetes.io/component=automationcontroller"
       - "app.kubernetes.io/managed-by=automationcontroller-operator"
       - "app.kubernetes.io/part-of={{ _controller_cr_name }}"
+  environment: "{{ ocp_utils_ocp_environment }}"
   register: _ocp_utils_controller_jobs
 
 - name: Delete controller migration jobs
@@ -25,4 +26,5 @@
        | list }}
   loop_control:
     label: "{{ item.metadata.name }}"
+  environment: "{{ ocp_utils_ocp_environment }}"
 ...

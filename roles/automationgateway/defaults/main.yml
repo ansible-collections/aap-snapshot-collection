@@ -3,4 +3,18 @@ automationgateway_ocp_namespace: "{{ ocp_namespace | default('aap') }}"
 
 automationgateway_admin_user: "admin"
 automationgateway_resource_server_secret_name: "aap-resource-server"
+
+# Kubeconfig resolution for this role's own OCP tasks (reconcile.yml), which
+# cannot rely on ocp_utils_ocp_environment being loaded yet. Mirrors
+# roles/ocp_utils/defaults/main.yml.
+__automationgateway_resolved_kubeconfig: >-
+  {{ kubeconfig
+     | default(lookup('env', 'K8S_AUTH_KUBECONFIG'), true)
+     | default(lookup('env', 'KUBECONFIG'), true)
+     | default('', true) }}
+
+automationgateway_ocp_environment: >-
+  {{ {'K8S_AUTH_KUBECONFIG': __automationgateway_resolved_kubeconfig}
+     if (__automationgateway_resolved_kubeconfig | length > 0)
+     else {} }}
 ...

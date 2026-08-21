@@ -14,6 +14,7 @@
         resources:
           requests:
             storage: "{{ ocp_utils_temp_pvc_size }}"
+  environment: "{{ ocp_utils_ocp_environment }}"
 
 - name: Create temporary deployment for migration
   kubernetes.core.k8s:
@@ -50,6 +51,7 @@
       - name: migration-data
         persistentVolumeClaim:
           claimName: "{{ ocp_utils_temp_pvc_name }}"
+  environment: "{{ ocp_utils_ocp_environment }}"
 
 - name: Wait for temporary pod to be ready
   kubernetes.core.k8s_info:
@@ -59,6 +61,7 @@
       - "app={{ ocp_utils_temp_deployment_name }}"
     field_selectors:
       - "status.phase=Running"
+  environment: "{{ ocp_utils_ocp_environment }}"
   register: _ocp_utils_temp_pods
   until: _ocp_utils_temp_pods.resources | length > 0
   retries: "{{ ocp_utils_scale_wait_retries }}"

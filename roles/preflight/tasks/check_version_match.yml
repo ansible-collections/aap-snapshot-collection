@@ -5,6 +5,7 @@
 
 - name: Get installed operator version (OCP)
   when: aap_platform == 'operator'
+  environment: "{{ preflight_ocp_environment }}"
   block:
     - name: Get AAP operator CSV version
       kubernetes.core.k8s_info:

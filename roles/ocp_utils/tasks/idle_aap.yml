@@ -12,9 +12,11 @@
         idle_aap: "{{ ocp_idle_aap | bool }}"
         database:
           idle_disabled: "{{ ocp_idle_aap | bool }}"
+  environment: "{{ ocp_utils_ocp_environment }}"
 
 - name: Wait for AAP to idle
   when: ocp_idle_aap | bool
+  environment: "{{ ocp_utils_ocp_environment }}"
   block:
     - name: Wait for component deployments to scale to zero
       kubernetes.core.k8s_info:
@@ -34,6 +36,7 @@
 
 - name: Cascade idle_deployment to child CRs
   when: not (ocp_idle_aap | bool)
+  environment: "{{ ocp_utils_ocp_environment }}"
   block:
     - name: Discover child component CRs
       kubernetes.core.k8s_info:
@@ -71,6 +74,7 @@
 
 - name: Wait for AAP pods to start
   when: not (ocp_idle_aap | bool)
+  environment: "{{ ocp_utils_ocp_environment }}"
   block:
     - name: Wait for gateway pod to be running
       kubernetes.core.k8s_info:

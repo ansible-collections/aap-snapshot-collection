@@ -22,6 +22,7 @@
        | list }}
   loop_control:
     label: "{{ item.secret_name }}"
+  environment: "{{ ocp_utils_ocp_environment }}"
   no_log: "{{ __ocp_utils_no_log }}"
 
 - name: Build hub spec
@@ -46,12 +47,14 @@
         controller: "{{ {} if 'controller' in _ocp_utils_aap_cr_components else omit }}"
         hub: "{{ _ocp_utils_hub_spec | default({}) if 'hub' in _ocp_utils_aap_cr_components else omit }}"
         eda: "{{ {} if 'eda' in _ocp_utils_aap_cr_components else omit }}"
+  environment: "{{ ocp_utils_ocp_environment }}"
 
 - name: Wait for AAP postgres StatefulSet to be ready
   kubernetes.core.k8s_info:
     kind: StatefulSet
     name: "{{ ocp_utils_postgres_statefulset }}"
     namespace: "{{ ocp_utils_ocp_namespace }}"
+  environment: "{{ ocp_utils_ocp_environment }}"
   register: _ocp_utils_pg_sts
   until: >-
     _ocp_utils_pg_sts.resources | length > 0
@@ -64,6 +67,7 @@
     kind: Secret
     name: "{{ __ocp_utils_component_postgres_secrets[item] }}"
     namespace: "{{ ocp_utils_ocp_namespace }}"
+  environment: "{{ ocp_utils_ocp_environment }}"
   register: _ocp_utils_secret_check
   until: _ocp_utils_secret_check.resources | length > 0
   retries: 60

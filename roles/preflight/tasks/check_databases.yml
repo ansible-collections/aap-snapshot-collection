@@ -108,6 +108,7 @@
   when:
     - aap_platform == 'operator'
     - _ocp_utils_aap_cr_exists | default(false) | bool
+  environment: "{{ preflight_ocp_environment }}"
   block:
     - name: Verify gateway database via pod
       kubernetes.core.k8s_exec:
