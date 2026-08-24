@@ -1,0 +1,5 @@
+---
+bugfixes:
+  - automationhub reconcile - skip Pulp content repair on containerized targets;
+    Pulp repair requires a functioning gateway URL which may not be available at
+    import time on containerized deployments.
