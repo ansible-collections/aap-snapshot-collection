@@ -1,0 +1,3 @@
+---
+bugfixes:
+  - automationcontroller - Use the ``/api/controller/`` prefix when rewriting execution environment image URLs through the OCP gateway route, which previously 404'd against the bare ``/api/v2/`` path.
