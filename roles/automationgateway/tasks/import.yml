@@ -20,10 +20,13 @@
     component_name: "{{ automationgateway_component_name }}"
   when: aap_platform != 'containerized' or (_automationgateway_dump_stat.stat.exists | default(false))
 
+# Containerized: handled per-host from consume.yml instead, since this task only
+# runs on the group's first host but every node's local podman secret needs it.
 - name: Update secrets for gateway
   ansible.builtin.include_role:
     name: ansible.aap_snapshot.operations
     tasks_from: update_secret.yml
   vars:
     component_name: "{{ automationgateway_component_name }}"
+  when: aap_platform == 'operator'
 ...

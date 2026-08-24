@@ -11,6 +11,11 @@ operations_validate_certs: false
 
 _operations_manage_shell_args: "--no-imports"
 
+# Selects roles/operations/tasks/recreate_containers_{backend}.yml on containerized
+# secret rotation. Only "systemd" exists today; a "quadlet" backend can be added
+# later without changing update_secret.yml.
+_operations_container_backend: "systemd"
+
 # Kubeconfig resolution for this role's own OCP tasks (update_secret.yml,
 # get_secret.yml, get_version.yml, reset_admin_password.yml,
 # detect_django_version_ocp.yml), which cannot rely on ocp_utils_ocp_environment
