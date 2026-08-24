@@ -1,0 +1,8 @@
+bugfixes:
+  - >-
+    automationcontroller reconcile - skip orphaned instance deprovisioning on
+    containerized targets; the containerized installer's own init tasks handle
+    this via throwaway containers with proper secret mounting, and the
+    collection's exec-into-running-container approach fails when the
+    controller_resource_server podman secret is updated during import
+    (https://github.com/ansible-collections/aap-snapshot-collection/issues/119).

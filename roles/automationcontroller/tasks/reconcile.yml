@@ -48,12 +48,12 @@
       -c "{{ _orphan_script | regex_replace('\n', '') | trim }}"
     _manage_pod_name: '{{ _ocp_utils_controller_pod_name | default("") }}'
     _manage_container_name: '{{ _ocp_utils_controller_container_name | default(_operations_current_component.container_name) }}'
-  when: _ocp_utils_controller_pod_name is defined or aap_platform != 'operator'
+  when: aap_platform == 'operator' and _ocp_utils_controller_pod_name is defined
 
 - name: Parse orphaned instance list
   ansible.builtin.set_fact:
     _automationcontroller_orphaned_instances: '{{ (_ocp_utils_manage_result.stdout_lines | default([]) | select | last | default("[]")) | from_json }}'
-  when: _ocp_utils_controller_pod_name is defined or aap_platform != 'operator'
+  when: aap_platform == 'operator' and _ocp_utils_controller_pod_name is defined
 
 - name: Deprovision orphaned instances
   ansible.builtin.include_role:
@@ -69,7 +69,8 @@
   loop_control:
     label: "{{ item }}"
   when:
-    - _ocp_utils_controller_pod_name is defined or aap_platform != 'operator'
+    - aap_platform == 'operator'
+    - _ocp_utils_controller_pod_name is defined
     - _automationcontroller_orphaned_instances | length > 0
 
 - name: Report deprovisioned controller instances
@@ -78,6 +79,7 @@
       Deprovisioned {{ _automationcontroller_orphaned_instances | length }}
       orphaned controller instance(s): {{ _automationcontroller_orphaned_instances | join(', ') }}
   when:
+    - aap_platform == 'operator'
     - _automationcontroller_orphaned_instances is defined
     - _automationcontroller_orphaned_instances | length > 0
 
@@ -85,6 +87,7 @@
   ansible.builtin.debug:
     msg: "No orphaned controller instances found."
   when:
+    - aap_platform == 'operator'
     - _automationcontroller_orphaned_instances is defined
     - _automationcontroller_orphaned_instances | length == 0
 
