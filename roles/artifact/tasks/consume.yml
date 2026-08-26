@@ -153,6 +153,47 @@
         - groups.get('eda_groups', []) | length > 0
         - inventory_hostname == groups['eda_groups'][0]
 
+    # --- Update secrets (every node - each has its own local podman secret store) ---
+    - name: Update controller secret
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.operations
+        tasks_from: update_secret.yml
+      vars:
+        component_name: controller
+      when:
+        - groups.get('controller_groups', []) | length > 0
+        - inventory_hostname in groups.get('controller_groups', [])
+
+    - name: Update hub secret
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.operations
+        tasks_from: update_secret.yml
+      vars:
+        component_name: hub
+      when:
+        - groups.get('hub_groups', []) | length > 0
+        - inventory_hostname in groups.get('hub_groups', [])
+
+    - name: Update gateway secret
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.operations
+        tasks_from: update_secret.yml
+      vars:
+        component_name: gateway
+      when:
+        - groups.get('gateway_groups', []) | length > 0
+        - inventory_hostname in groups.get('gateway_groups', [])
+
+    - name: Update EDA secret
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.operations
+        tasks_from: update_secret.yml
+      vars:
+        component_name: eda
+      when:
+        - groups.get('eda_groups', []) | length > 0
+        - inventory_hostname in groups.get('eda_groups', [])
+
     # --- Start services ---
     - name: Start EDA
       ansible.builtin.include_role:
