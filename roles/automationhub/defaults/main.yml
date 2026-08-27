@@ -9,7 +9,7 @@ automationhub_content_tar_name: "hub_content.tar"
 automationhub_content_staging_dir: "/tmp"
 automationhub_export_hub_content: true
 
-# Pulp repair task polling configuration.
+# Pulp repair task polling configuration (OCP only).
 # Total maximum wait = retries * delay (default: 120 * 30 = 3600s = 60 minutes).
 automationhub_pulp_repair_retries: 120
 automationhub_pulp_repair_delay: 30
