@@ -1,0 +1,14 @@
+---
+bugfixes:
+  - operations - discover a component's static service units (e.g. EDA's
+    ``automation-eda-scheduler``/``daphne``/``web``/``api``) via
+    ``ansible.builtin.find`` alongside its dynamically-discovered worker
+    units, instead of looping the hardcoded ``static_services`` list
+    directly against ``ansible.builtin.systemd``. A static service name
+    that doesn't exist as a real systemd unit on a given AAP
+    version/topology (e.g. ``automation-eda-scheduler`` on this collection's
+    tested environment) previously hard-failed both the stop and the
+    rescue/recovery start paths, aborting the entire import before any
+    component's data was touched. Missing units are now silently absent
+    from the discovered list instead of causing a fatal
+    "Could not find the requested service" error.
