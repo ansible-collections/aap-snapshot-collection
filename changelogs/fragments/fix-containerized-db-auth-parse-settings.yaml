@@ -1,0 +1,14 @@
+---
+bugfixes:
+  - postgresql - parse the DB settings dumped from a component's Django
+    shell (or, for hub, dynaconf's CLI) into a real dict on containerized
+    targets instead of assigning the raw command stdout directly to
+    ``postgresql_auth_settings``. The dumped value is a Python ``repr()``
+    string (single-quoted, bare ``True``/``False``), not JSON, and was
+    never parsed - every downstream ``.default.NAME/.HOST/.USER/...``
+    reference then failed with "object of type 'str' has no attribute
+    'default'", blocking DB export and import on every containerized
+    target. Confirmed fixed for both the shared Django
+    ``print(settings.DATABASES)`` command (controller/eda/gateway) and
+    hub's separate dynaconf-based command via a full containerized
+    export/import round trip.
