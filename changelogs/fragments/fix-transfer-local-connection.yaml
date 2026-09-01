@@ -1,0 +1,7 @@
+---
+bugfixes:
+  - artifact - fix artifact transfer task to support local connections
+    (ansible_connection=local). When the control node is the same as the
+    managed node, the synchronize module attempts SSH to localhost and
+    prompts for a password. Split the transfer task into two paths using
+    copy module for local connections and synchronize for remote connections.
