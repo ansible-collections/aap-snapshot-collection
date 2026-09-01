@@ -1,0 +1,6 @@
+---
+bugfixes:
+  - pcp - skip monitoring service start/stop operations when the pcp service
+    is not installed. The rescue block in artifact import now tolerates
+    containerized targets without pcp by checking LoadState before attempting
+    systemd operations.
