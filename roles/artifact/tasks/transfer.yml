@@ -25,7 +25,7 @@
 
         # _preflight_resolved_artifact's dirname is where the control node
         # extracted the artifact in the earlier localhost play.
-        - name: Transfer {{ _transfer_component_name }} database dump from control node
+        - name: Transfer {{ _transfer_component_name }} database dump from control node (remote)
           ansible.posix.synchronize:
             mode: push
             src: "{{ _preflight_resolved_artifact | dirname }}/artifact/{{ _transfer_component_name }}/{{ _transfer_component_name }}.pgc"
@@ -36,6 +36,16 @@
               - "--no-owner"
               - "--no-group"
           delegate_to: localhost
+          when: ansible_connection != 'local'
+
+        - name: Transfer {{ _transfer_component_name }} database dump from control node (local)
+          ansible.builtin.copy:
+            src: "{{ _preflight_resolved_artifact | dirname }}/artifact/{{ _transfer_component_name }}/{{ _transfer_component_name }}.pgc"
+            dest: "{{ preflight_containerized_staging_dir }}/artifact/{{ _transfer_component_name }}/{{ _transfer_component_name }}.pgc"
+            mode: '0600'
+            owner: "{{ ansible_user_id }}"
+          delegate_to: localhost
+          when: ansible_connection == 'local'
 
         - name: Set ownership on transferred {{ _transfer_component_name }} dump
           ansible.builtin.file:
