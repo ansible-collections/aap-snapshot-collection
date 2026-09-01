@@ -38,11 +38,14 @@
       ansible.builtin.set_fact:
         _preflight_in_scope_gateway_services: >-
           {{
-            (
-              ((groups.get('controller_groups', []) | length > 0) | ternary(['controller'], []))
-              + ((groups.get('hub_groups', []) | length > 0) | ternary(['hub'], []))
-              + ((groups.get('eda_groups', []) | length > 0) | ternary(['eda'], []))
-            ) | intersect(preflight_in_scope_gateway_services)
+            groups
+            | dict2items
+            | selectattr('key', 'match', '.*_groups$')
+            | rejectattr('key', 'equalto', 'gateway_groups')
+            | selectattr('value')
+            | map(attribute='key')
+            | map('regex_replace', '_groups$', '')
+            | list
           }}
 
     - name: Warn if gateway reports an out-of-scope backend as unhealthy

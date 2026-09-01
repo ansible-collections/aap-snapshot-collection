@@ -15,6 +15,11 @@ preflight_gateway_manage_cmd: "aap-gateway-manage"
 # itself. Scope the health gate to those so preflight isn't blocked by an
 # unhealthy out-of-scope service (e.g. redis, lightspeed) that this collection
 # never touches.
+#
+# On RPM/containerized targets, the in-scope list is instead derived directly
+# from non-empty inventory groups (see check_gateway_status.yml), so this var
+# is only consulted on operator (OCP) targets, where component discovery uses
+# per-component CR-name facts rather than a uniform group structure.
 preflight_in_scope_gateway_services:
   - controller
   - hub
