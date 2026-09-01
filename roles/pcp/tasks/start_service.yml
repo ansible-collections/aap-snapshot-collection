@@ -1,8 +1,19 @@
 ---
+- name: Check if monitoring service exists
+  ansible.builtin.systemd:
+    name: pcp
+    scope: user
+  register: _pcp_service_status
+  failed_when: false
+  when: aap_platform == 'containerized'
+
 - name: Start monitoring service
   ansible.builtin.systemd:
     name: pcp
     state: started
     scope: user
-  when: aap_platform == 'containerized'
+  when:
+    - aap_platform == 'containerized'
+    - _pcp_service_status.status is defined
+    - _pcp_service_status.status.LoadState != 'not-found'
 ...
