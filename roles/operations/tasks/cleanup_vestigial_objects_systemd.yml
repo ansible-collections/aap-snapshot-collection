@@ -1,0 +1,146 @@
+---
+# Podman secrets of type=mount are copied into a container at creation time and
+# are not refreshed by a plain systemd restart, so the stale container object
+# must be removed here. The installer's own systemd unit still owns actually
+# recreating the container - the next "start" against the (now-gone) container
+# name triggers its normal ExecStart, which creates a fresh one mounting the
+# just-rotated secret.
+#
+# For gateway, an ephemeral init container is also run after removal to delete
+# vestigial API objects (HTTPPort, ServiceNode, ServiceCluster) from the
+# restored database before the installer re-run takes ownership of the services.
+- name: Gather user home directory
+  ansible.builtin.setup:
+    filter:
+      - 'ansible_user_dir'
+  when: _operations_current_component.has_worker_discovery | bool
+
+- name: Discover worker container names
+  ansible.builtin.find:
+    paths: "{{ ansible_user_dir }}/.config/systemd/user"
+    patterns: "{{ _operations_current_component.worker_service_pattern }}"
+    file_type: any
+  register: _operations_worker_units
+  when: _operations_current_component.has_worker_discovery | bool
+
+# Capture image, user, and settings path from the stopped gateway container
+# before removing it - needed to run the vestigial object cleanup init container.
+- name: Get gateway container info for vestigial object cleanup
+  containers.podman.podman_container_info:
+    name: "{{ _operations_current_component.container_name }}"
+  register: _operations_gateway_container_info
+  when: component_name == 'gateway'
+
+- name: Set gateway image, user, and settings path for init container
+  ansible.builtin.set_fact:
+    _operations_gateway_image: "{{ _operations_gateway_container_info.containers[0].ImageName }}"
+    _operations_gateway_user: "{{ _operations_gateway_container_info.containers[0].Config.User }}"
+    _operations_gateway_settings_src: >-
+      {{ _operations_gateway_container_info.containers[0].Mounts
+         | selectattr('Destination', 'equalto', '/etc/ansible-automation-platform/gateway/settings.py')
+         | map(attribute='Source') | first }}
+  when:
+    - component_name == 'gateway'
+    - _operations_gateway_container_info.containers | default([]) | length > 0
+
+- name: Remove stopped containers so the next start recreates them from the rotated secret
+  containers.podman.podman_container:
+    name: "{{ item }}"
+    state: absent
+  loop: >-
+    {{ (_operations_current_component.has_worker_discovery | bool)
+       | ternary(
+           (_operations_worker_units.files | default([])
+             | map(attribute='path') | map('basename')
+             | map('regex_replace', '\.service$', '')
+             | list) + _operations_current_component.static_services,
+           _operations_current_component.services
+         ) }}
+  loop_control:
+    label: "{{ item }}"
+
+- name: Detect Django version via gateway init container
+  containers.podman.podman_container:
+    name: automation-gateway-version-check
+    image: "{{ _operations_gateway_image }}"
+    state: started
+    detach: false
+    rm: true
+    log_driver: journald
+    user: "{{ _operations_gateway_user }}"
+    userns: keep-id
+    network: host
+    mount:
+      - "type=tmpfs,destination=/var/cache/ansible-automation-platform/gateway,U=true"
+    secrets:
+      - "gateway_secret_key,type=mount,target=/etc/ansible-automation-platform/gateway/SECRET_KEY"
+      - "gateway_admin_password,type=env,target=DJANGO_SUPERUSER_PASSWORD"
+      - "gateway_redis_url,type=env,target=REDIS_URL"
+      - "gateway_db_password,type=env,target=DATABASE_PASSWORD"
+    volume:
+      - "{{ _operations_gateway_settings_src }}:/etc/ansible-automation-platform/gateway/settings.py:ro,z"
+    env:
+      DJANGO_SETTINGS_MODULE: aap_gateway_api.settings
+    command:
+      - aap-gateway-manage
+      - shell
+      - -c
+      - "import django; print(django.VERSION[0])"
+  register: _operations_gw_django_version_result
+  changed_when: false
+  failed_when: false
+  when:
+    - component_name == 'gateway'
+    - _operations_gateway_image is defined
+    - _operations_gateway_settings_src is defined
+
+- name: Set manage shell args for Django 5.x compatibility
+  ansible.builtin.set_fact:
+    _operations_manage_shell_args: >-
+      {{ '--no-imports'
+         if (_operations_gw_django_version_result.stdout | default('4') | trim | int) >= 5
+         else '' }}
+  when:
+    - component_name == 'gateway'
+    - _operations_gw_django_version_result is not skipped
+
+- name: Delete vestigial gateway objects via init container
+  vars:
+    _gateway_cleanup_script: >-
+      from aap_gateway_api.models import HTTPPort, ServiceNode, ServiceCluster;
+      from aap_gateway_api.models.migrate_data import MigrateServiceDataHasRan;
+      HTTPPort.objects.all().delete();
+      ServiceNode.objects.all().delete();
+      ServiceCluster.objects.all().delete();
+      MigrateServiceDataHasRan.mark_migration_not_completed()
+  containers.podman.podman_container:
+    name: automation-gateway-init
+    image: "{{ _operations_gateway_image }}"
+    state: started
+    detach: false
+    rm: true
+    log_driver: journald
+    user: "{{ _operations_gateway_user }}"
+    userns: keep-id
+    network: host
+    mount:
+      - "type=tmpfs,destination=/var/cache/ansible-automation-platform/gateway,U=true"
+    secrets:
+      - "gateway_secret_key,type=mount,target=/etc/ansible-automation-platform/gateway/SECRET_KEY"
+      - "gateway_admin_password,type=env,target=DJANGO_SUPERUSER_PASSWORD"
+      - "gateway_redis_url,type=env,target=REDIS_URL"
+      - "gateway_db_password,type=env,target=DATABASE_PASSWORD"
+    volume:
+      - "{{ _operations_gateway_settings_src }}:/etc/ansible-automation-platform/gateway/settings.py:ro,z"
+    env:
+      DJANGO_SETTINGS_MODULE: aap_gateway_api.settings
+    command: >-
+      {{ ['aap-gateway-manage', 'shell']
+         + ([_operations_manage_shell_args] if (_operations_manage_shell_args | default('') | length > 0) else [])
+         + ['-c', _gateway_cleanup_script] }}
+  when:
+    - component_name == 'gateway'
+    - _operations_gateway_image is defined
+    - _operations_gateway_settings_src is defined
+  no_log: "{{ not (disable_no_log | default(false) | bool) }}"
+...

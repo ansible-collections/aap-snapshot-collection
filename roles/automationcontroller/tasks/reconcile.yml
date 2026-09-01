@@ -123,6 +123,7 @@
   until: _automationcontroller_ee_list is not failed
   no_log: "{{ not (disable_no_log | default(false) | bool) }}"
   when:
+    - aap_platform == 'operator'
     - (_automationcontroller_ee_source_hub | default('')) | length > 0
     - (_automationcontroller_ee_dest_hub | default('')) | length > 0
     - _automationcontroller_ee_source_hub != _automationcontroller_ee_dest_hub
@@ -144,6 +145,7 @@
     label: "{{ item.name }}"
   no_log: "{{ not (disable_no_log | default(false) | bool) }}"
   when:
+    - aap_platform == 'operator'
     - (_automationcontroller_ee_source_hub | default('')) | length > 0
     - (_automationcontroller_ee_dest_hub | default('')) | length > 0
     - _automationcontroller_ee_source_hub != _automationcontroller_ee_dest_hub
@@ -153,6 +155,7 @@
   ansible.builtin.debug:
     msg: "Rewrote {{ _automationcontroller_ee_list.json.results | default([]) | length }} EE image(s) from {{ _automationcontroller_ee_source_hub }} to {{ _automationcontroller_ee_dest_hub }}"
   when:
+    - aap_platform == 'operator'
     - (_automationcontroller_ee_source_hub | default('')) | length > 0
     - (_automationcontroller_ee_dest_hub | default('')) | length > 0
     - _automationcontroller_ee_source_hub != _automationcontroller_ee_dest_hub
