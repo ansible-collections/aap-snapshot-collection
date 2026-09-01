@@ -43,6 +43,14 @@
       no_log: "{{ __postgresql_no_log }}"
       async: '{{ postgresql_restore_timeout }}'
       poll: 30
+  rescue:
+    # Re-raise so the outer block in consume.yml triggers service recovery
+    # instead of continuing into secret rotation and container removal.
+    - name: Re-raise database restore failure
+      ansible.builtin.fail:
+        msg: >-
+          Database restore failed for {{ postgresql_component_name }}: {{
+          ansible_failed_result.msg | default(ansible_failed_result | to_nice_json) }}
   always:
     - name: Remove temp postgres client container
       ansible.builtin.include_tasks: remove_temp_container.yml

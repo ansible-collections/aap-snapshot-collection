@@ -30,6 +30,7 @@
     _manage_command: "{{ _operations_current_component.manage_cmd }} migrate"
     _manage_pod_name: "{{ _ocp_utils_gateway_pod_name | default('') }}"
     _manage_container_name: "{{ _ocp_utils_gateway_container_name | default(_operations_current_component.container_name) }}"
+  when: aap_platform == 'operator'
 
 - name: Reset gateway admin password to match K8s secret
   ansible.builtin.include_role:
@@ -56,21 +57,6 @@
     _manage_container_name: "{{ _ocp_utils_gateway_container_name | default(_operations_current_component.container_name) }}"
   when: aap_platform == 'operator'
 
-- name: Delete vestigial gateway objects (containerized)
-  ansible.builtin.include_role:
-    name: ansible.aap_snapshot.ocp_utils
-    tasks_from: run_manage_command.yml
-  vars:
-    component_name: "{{ automationgateway_component_name }}"
-    _manage_label: "gateway delete vestigial objects"
-    _manage_command: >-
-      {{ _operations_current_component.manage_cmd }}
-      shell {{ _operations_manage_shell_args | default('') }}
-      -c "{{ _automationgateway_cleanup_containerized_script }}"
-    _manage_pod_name: "{{ _ocp_utils_gateway_pod_name | default('') }}"
-    _manage_container_name: "{{ _ocp_utils_gateway_container_name | default(_operations_current_component.container_name) }}"
-  when: aap_platform == 'containerized'
-
 - name: Remove resource server secret (OCP)
   kubernetes.core.k8s:
     kind: Secret
@@ -80,22 +66,4 @@
   environment: "{{ automationgateway_ocp_environment }}"
   when: aap_platform == 'operator'
 
-- name: Find resource server podman secrets (containerized)
-  containers.podman.podman_secret_info:
-  register: _automationgateway_podman_secrets
-  when: aap_platform == 'containerized'
-
-- name: Remove resource server podman secrets (containerized)
-  containers.podman.podman_secret:
-    name: "{{ item.Name }}"
-    state: absent
-  loop: >-
-    {{ _automationgateway_podman_secrets.secrets
-       | default([])
-       | map(attribute='Spec')
-       | selectattr('Name', 'match', '.*resource_server.*')
-       | list }}
-  loop_control:
-    label: "{{ item.Name }}"
-  when: aap_platform == 'containerized'
 ...

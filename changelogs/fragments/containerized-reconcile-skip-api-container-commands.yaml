@@ -1,0 +1,7 @@
+---
+bugfixes:
+  - Skip gateway schema migrations, vestigial object cleanup, and resource server
+    podman secret removal during containerized import reconcile - these require
+    running containers and are handled by the subsequent installer re-run.
+  - Skip EE image URL rewrite during containerized import reconcile - the gateway
+    API is not available at this point and the installer re-run owns service startup.
