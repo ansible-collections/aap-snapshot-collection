@@ -34,12 +34,24 @@
           Gateway status API returned HTTP {{ _preflight_gateway_status.status | default('unreachable') }}.
           The gateway may not be fully initialized.
 
+    - name: Determine in-scope gateway services actually deployed (RPM/containerized)
+      ansible.builtin.set_fact:
+        _preflight_in_scope_gateway_services: >-
+          {{
+            (
+              ((groups.get('controller_groups', []) | length > 0) | ternary(['controller'], []))
+              + ((groups.get('hub_groups', []) | length > 0) | ternary(['hub'], []))
+              + ((groups.get('eda_groups', []) | length > 0) | ternary(['eda'], []))
+            ) | intersect(preflight_in_scope_gateway_services)
+          }}
+
     - name: Warn if gateway reports an out-of-scope backend as unhealthy
       ansible.builtin.debug:
         msg: >-
           Gateway reports overall status '{{ _preflight_gateway_status.json.status }}',
           but this is only a concern for services this collection actually
-          exports/imports ({{ preflight_in_scope_gateway_services | join(', ') }}).
+          exports/imports and that are deployed on this target
+          ({{ _preflight_in_scope_gateway_services | join(', ') }}).
           Full service details: {{ _preflight_gateway_status.json.services | default([]) | to_nice_json }}
       when:
         - _preflight_gateway_status.status == 200
@@ -51,7 +63,7 @@
           - item.status == 'good'
         fail_msg: >-
           Service '{{ item.service_name }}' reports status '{{ item.status }}'
-      loop: "{{ _preflight_gateway_status.json.services | default([]) | selectattr('service_name', 'in', preflight_in_scope_gateway_services) }}"
+      loop: "{{ _preflight_gateway_status.json.services | default([]) | selectattr('service_name', 'in', _preflight_in_scope_gateway_services) }}"
       loop_control:
         label: "{{ item.service_name }}"
       when: _preflight_gateway_status.status == 200
@@ -98,12 +110,25 @@
         - _preflight_gateway_status_ocp.rc == 0
         - _preflight_gateway_status_ocp.stdout | length > 0
 
+    - name: Determine in-scope gateway services actually deployed (OCP)
+      ansible.builtin.set_fact:
+        _preflight_in_scope_gateway_services: >-
+          {{
+            (
+              ((_controller_cr_name is defined) | ternary(['controller'], []))
+              + ((_hub_cr_name is defined) | ternary(['hub'], []))
+              + ((_eda_cr_name is defined) | ternary(['eda'], []))
+            ) | intersect(preflight_in_scope_gateway_services)
+          }}
+      when: _preflight_gateway_status_json is defined
+
     - name: Warn if gateway reports an out-of-scope backend as unhealthy (OCP)
       ansible.builtin.debug:
         msg: >-
           Gateway reports overall status '{{ _preflight_gateway_status_json.status }}',
           but this is only a concern for services this collection actually
-          exports/imports ({{ preflight_in_scope_gateway_services | join(', ') }}).
+          exports/imports and that are deployed on this target
+          ({{ _preflight_in_scope_gateway_services | join(', ') }}).
           Full service details: {{ _preflight_gateway_status_json.services | default([]) | to_nice_json }}
       when:
         - _preflight_gateway_status_json is defined
@@ -115,7 +140,7 @@
           - item.status == 'good'
         fail_msg: >-
           Service '{{ item.service_name }}' reports status '{{ item.status }}'
-      loop: "{{ _preflight_gateway_status_json.services | default([]) | selectattr('service_name', 'in', preflight_in_scope_gateway_services) }}"
+      loop: "{{ _preflight_gateway_status_json.services | default([]) | selectattr('service_name', 'in', _preflight_in_scope_gateway_services) }}"
       loop_control:
         label: "{{ item.service_name }}"
       when: _preflight_gateway_status_json is defined

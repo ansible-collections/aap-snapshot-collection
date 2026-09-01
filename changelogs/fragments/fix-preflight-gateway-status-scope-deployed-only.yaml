@@ -1,0 +1,12 @@
+---
+bugfixes:
+  - preflight - further scope the gateway status health gate
+    (``check_gateway_status.yml``) to only the in-scope backends
+    (controller, hub, eda) that are actually deployed on the target,
+    instead of the static ``preflight_in_scope_gateway_services`` list.
+    Hub and eda can be disabled on a given AAP instance; previously the
+    health gate still demanded a 'good' status for them even when they
+    were intentionally absent, which could hard-fail preflight on an
+    otherwise healthy target. The in-scope list is now computed per run
+    from inventory group membership (RPM/containerized) or discovered
+    component CRs (OCP).
