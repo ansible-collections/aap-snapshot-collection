@@ -1,0 +1,13 @@
+---
+bugfixes:
+  - preflight - scope the gateway status health gate
+    (``check_gateway_status.yml``) to only the backends this collection
+    actually exports/imports (controller, hub, eda) instead of hard-failing
+    export/import whenever the gateway's own ``/api/gateway/v1/status/``
+    reports *any* backend as unhealthy - including redis, lightspeed, and
+    metrics, none of which this collection touches. A transient or
+    environment-specific issue in one of those out-of-scope services (e.g.
+    a broken redis sidecar) previously blocked the entire preflight with no
+    way to proceed, even though every in-scope component was healthy. The
+    overall gateway status is now surfaced as a warning instead of a hard
+    failure when only out-of-scope services are affected.
