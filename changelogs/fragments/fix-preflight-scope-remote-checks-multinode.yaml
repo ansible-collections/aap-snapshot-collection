@@ -1,0 +1,11 @@
+---
+bugfixes:
+  - "preflight - scope the containerized \"check component services\" fact-gather
+    and the \"check for stale staged artifact files\" stat to hosts in the
+    controller/eda/gateway/hub inventory groups. The Preflight play runs
+    against all inventory hosts with any_errors_fatal enabled, so on a
+    multi-node inventory these previously-unguarded remote tasks fanned out
+    to hosts this collection never operates on (hop_nodes, execution_nodes,
+    the local installer entry, external_database) and aborted the entire
+    export/import run if any of them was unreachable or lacked the expected
+    interpreter."
