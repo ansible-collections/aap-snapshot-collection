@@ -1,0 +1,8 @@
+---
+minor_changes:
+  - "automationhub - fail fast with a clear error during containerized
+    import if Hub is configured with a non-FileSystem Pulp storage backend
+    (Azure Blob or AWS S3). Containerized hub content import only restores
+    files onto local FileSystem storage today; importing onto an object-storage-backed
+    hub would previously restore the database silently and leave every migrated
+    collection undownloadable with no warning."

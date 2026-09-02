@@ -12,6 +12,25 @@
              + (['gateway'] if groups.get('gateway_groups', []) | length > 0 else []) }}
       run_once: true
 
+    - name: Check if hub content data is available in artifact
+      ansible.builtin.set_fact:
+        artifact_hub_has_content_data: >-
+          {{ artifact_manifest.components
+             | selectattr('name', 'equalto', 'hub')
+             | map(attribute='has_content_data')
+             | first | default(false) | bool }}
+      # first catches missing hub component, default catches older artifacts without has_content_data
+
+    # Must run before Stop below - a hub restore requires local FileSystem
+    # storage, and that must be confirmed before any component is stopped.
+    - name: Verify Hub storage backend supports containerized content import
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.automationhub
+        tasks_from: check_storage_backend.yml
+      when:
+        - artifact_hub_has_content_data | bool
+        - inventory_hostname in groups.get('hub_groups', [])
+
     - name: Warn about components in artifact but not on target
       ansible.builtin.debug:
         msg: >-
