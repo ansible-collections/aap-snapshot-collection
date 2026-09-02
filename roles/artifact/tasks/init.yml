@@ -14,13 +14,13 @@
 
 - name: Stat artifact_build_dir parent
   ansible.builtin.stat:
-    path: '{{ artifact_build_dir | dirname }}'
+    path: '{{ __artifact_build_dir | dirname }}'
   register: _artifact_build_dir_parent_stat
 
 - name: Validate artifact_build_dir parent exists and is a directory
   ansible.builtin.fail:
     msg: >-
-      Parent directory of artifact_build_dir '{{ artifact_build_dir | dirname }}' does not exist
+      Parent directory of artifact_build_dir '{{ __artifact_build_dir | dirname }}' does not exist
       or is not a directory. Pass an absolute path whose parent exists,
       e.g. -e artifact_build_dir=/tmp/artifact-build
   when: not _artifact_build_dir_parent_stat.stat.exists or not _artifact_build_dir_parent_stat.stat.isdir
