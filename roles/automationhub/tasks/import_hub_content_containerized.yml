@@ -1,0 +1,59 @@
+---
+# Containerized equivalent of import_hub_content.yml (OCP). Extracts the
+# hub content tarball - staged to this host by
+# artifact/tasks/transfer_hub_content.yml - into this host's own Pulp
+# FileSystem media directory. Runs on every hub host: each node has its
+# own independent storage, unlike OCP's single shared PVC, so every node
+# needs its own copy restored to serve downloads correctly.
+#
+# By the time this runs, roles/automationhub/tasks/check_storage_backend.yml
+# has already confirmed (or failed the run) that this hub is FileSystem-backed
+# - no storage-type check is repeated here.
+- name: Restore hub content (containerized)
+  when:
+    - aap_platform == 'containerized'
+    - automationhub_import_hub_content | default(true) | bool
+    - artifact_hub_has_content_data | default(false) | bool
+    - inventory_hostname in groups.get('hub_groups', [])
+  block:
+    - name: Check if hub content tarball was staged on this host
+      ansible.builtin.stat:
+        path: "{{ preflight_containerized_staging_dir }}/artifact/hub/{{ automationhub_content_tar_name }}"
+      register: _automationhub_staged_content_stat
+
+    - name: Extract hub content tarball on this host
+      when: _automationhub_staged_content_stat.stat.exists
+      block:
+        - name: Get hub container details
+          containers.podman.podman_container_info:
+            name: automation-hub-api
+          register: _automationhub_content_container
+
+        - name: Resolve hub data path from container mounts
+          ansible.builtin.set_fact:
+            _automationhub_content_data_path: >-
+              {{ _automationhub_content_container.containers[0].Mounts
+                 | selectattr('Destination', 'equalto', '/var/lib/pulp')
+                 | map(attribute='Source') | first }}
+
+        # remote_src (not become) - extracting as ansible_user leaves files
+        # owned by the same rootless UID the hub container maps to. Adding
+        # become here would write root-owned blobs the pulp process inside
+        # the container can't read.
+        - name: Extract hub content tarball into Pulp media directory
+          ansible.builtin.unarchive:
+            src: "{{ preflight_containerized_staging_dir }}/artifact/hub/{{ automationhub_content_tar_name }}"
+            dest: "{{ _automationhub_content_data_path }}/media/"
+            remote_src: true
+
+        - name: Record that hub content was restored
+          ansible.builtin.set_fact:
+            _automationhub_content_restored: true
+          delegate_to: localhost
+          delegate_facts: true
+
+        - name: Remove staged hub content tarball
+          ansible.builtin.file:
+            path: "{{ preflight_containerized_staging_dir }}/artifact/hub/{{ automationhub_content_tar_name }}"
+            state: absent
+...
