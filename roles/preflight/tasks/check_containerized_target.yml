@@ -26,6 +26,13 @@
   ansible.builtin.stat:
     path: "{{ preflight_containerized_staging_dir }}"
   register: __preflight_staging_dir
+  # Same in-scope guard as the stale-temp-container check above: this remote
+  # stat must not fan out to out-of-scope hosts under the Preflight play's
+  # `hosts: all` on multi-node topologies.
+  when: inventory_hostname in (groups.get('controller_groups', [])
+          + groups.get('eda_groups', [])
+          + groups.get('gateway_groups', [])
+          + groups.get('hub_groups', []))
 
 - name: Warn if staged artifact files exist from previous run
   ansible.builtin.debug:
@@ -34,7 +41,7 @@
       from a previous import run. These will be reused to avoid re-transferring
       the artifact. To force a clean import, remove them first:
         rm -rf {{ preflight_containerized_staging_dir }}
-  when: __preflight_staging_dir.stat.exists
+  when: __preflight_staging_dir.stat.exists | default(false)
 
 - name: Check PostgreSQL container status
   containers.podman.podman_container_info:
