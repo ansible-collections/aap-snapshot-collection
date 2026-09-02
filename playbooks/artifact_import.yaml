@@ -111,6 +111,11 @@
           {% if _hub and not (_hub[0].has_content_data | default(false)) %}
           - Hub content was not migrated - run content sync manually
           {% endif %}
+          {% elif aap_platform == 'containerized' %}
+          {% set _hub = artifact_manifest.components | selectattr('name', 'equalto', 'hub') | list %}
+          {% if _hub and (_hub[0].has_content_data | default(false)) and not (_automationhub_content_restored | default(false)) %}
+          - Hub content was present in the artifact but was not restored - collections will not be downloadable until content is restored
+          {% endif %}
           {% endif %}
           - Review custom TLS certificates and reapply if needed
       when: artifact_manifest is defined
