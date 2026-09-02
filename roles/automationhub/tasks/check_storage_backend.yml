@@ -17,11 +17,13 @@
       pulpcore-manager shell -c
       "import json; from django.conf import settings; s = getattr(settings, 'STORAGES', None); s = s.to_dict() if hasattr(s, 'to_dict') else s; print(json.dumps({'STORAGES': s, 'DEFAULT_FILE_STORAGE': getattr(settings, 'DEFAULT_FILE_STORAGE', None)}))"
   changed_when: false
+  no_log: "{{ not (disable_no_log | default(false) | bool) }}"
   register: _automationhub_storage_dump
 
 - name: Parse Hub storage backend settings
   ansible.builtin.set_fact:
     _automationhub_storage_settings: "{{ (_automationhub_storage_dump.stdout | trim) | from_json }}"
+  no_log: "{{ not (disable_no_log | default(false) | bool) }}"
 
 - name: Resolve Hub's configured storage backend class
   ansible.builtin.set_fact:

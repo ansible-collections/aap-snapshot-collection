@@ -19,7 +19,7 @@
              | selectattr('name', 'equalto', 'hub')
              | map(attribute='has_content_data')
              | first | default(false) | bool }}
-      # first catches missing hub component, default catches older artifacts without has_content_data
+      # default(false) catches both: empty list (hub absent) and missing has_content_data attribute (older artifacts)
 
     # Must run before Stop below - a hub restore requires local FileSystem
     # storage, and that must be confirmed before any component is stopped.
