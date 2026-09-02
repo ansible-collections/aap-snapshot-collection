@@ -36,6 +36,39 @@
                  | selectattr('Destination', 'equalto', '/var/lib/pulp')
                  | map(attribute='Source') | first }}
 
+        # Disk-headroom check, done here (not in preflight/check_containerized_target.yml)
+        # because the artifact hasn't been extracted yet when that file runs -
+        # artifact_manifest and the staged tarball's real size are only available
+        # once staging has already happened, at this point in the flow.
+        - name: Check available disk space on hub content destination filesystem
+          ansible.builtin.command:
+            cmd: "df -Pk {{ _automationhub_content_data_path }}"
+          changed_when: false
+          register: _automationhub_content_disk_free
+
+        - name: Determine required and available space for hub content extraction
+          ansible.builtin.set_fact:
+            _automationhub_content_available_kb: "{{ _automationhub_content_disk_free.stdout_lines[-1].split()[3] | int }}"
+            # Require at least 2x the staged tarball size: peak usage is the
+            # staged tarball plus its extracted content until the tarball is
+            # removed right after extraction below.
+            _automationhub_content_required_kb: "{{ ((_automationhub_staged_content_stat.stat.size / 1024) * 2) | round(0, 'ceil') | int }}"
+
+        - name: Fail if insufficient disk space for hub content extraction
+          ansible.builtin.fail:
+            msg: >-
+              Insufficient disk space on {{ inventory_hostname }} to extract hub
+              content: {{ _automationhub_content_available_kb }}KB available at
+              {{ _automationhub_content_data_path }}, but at least
+              {{ _automationhub_content_required_kb }}KB is needed (2x the staged
+              {{ ((_automationhub_staged_content_stat.stat.size / 1024 / 1024) | round(1)) }}MB
+              tarball, to cover both the staged tarball and its extracted content
+              before cleanup). Free up space on this host's Pulp storage
+              filesystem before retrying, or set
+              automationhub_import_hub_content=false to skip content restore
+              and sync it manually instead.
+          when: (_automationhub_content_available_kb | int) < (_automationhub_content_required_kb | int)
+
         # remote_src (not become) - extracting as ansible_user leaves files
         # owned by the same rootless UID the hub container maps to. Adding
         # become here would write root-owned blobs the pulp process inside
