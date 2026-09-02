@@ -1,0 +1,8 @@
+---
+bugfixes:
+  - artifact role - add preflight stat checks at the start of init.yml to
+    validate that artifact_dest_dir exists and is a directory, and that the
+    parent of artifact_build_dir exists, before any build directory is cleared;
+    previously a bad path would produce a raw Python traceback deep in
+    package.yml after all export work had completed
+    (https://github.com/ansible-collections/aap-snapshot-collection/issues/105).
