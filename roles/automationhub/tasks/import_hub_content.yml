@@ -53,7 +53,7 @@
         name: ansible.aap_snapshot.ocp_utils
         tasks_from: create_temp_resources.yml
       vars:
-        _ocp_utils_temp_service_account: aap-hub
+        _ocp_utils_temp_service_account: "{{ aap_instance_name | default('aap') }}-hub"
         _ocp_utils_temp_security_context:
           runAsUser: 1000
         _ocp_utils_temp_volume_mounts:
