@@ -48,7 +48,11 @@
 
         - name: Determine required and available space for hub content extraction
           ansible.builtin.set_fact:
-            _automationhub_content_available_kb: "{{ _automationhub_content_disk_free.stdout_lines[-1].split()[3] | int }}"
+            # Available is always 3rd-from-last in POSIX `df -Pk` output,
+            # whether or not a long device name forced the stats onto their
+            # own line (split()[3] would grab Use% instead of Available in
+            # that wrapped case, making this check always fail).
+            _automationhub_content_available_kb: "{{ _automationhub_content_disk_free.stdout_lines[-1].split()[-3] | int }}"
             # Require at least 2x the staged tarball size: peak usage is the
             # staged tarball plus its extracted content until the tarball is
             # removed right after extraction below.
