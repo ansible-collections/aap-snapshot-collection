@@ -1,0 +1,70 @@
+---
+# Transfers the hub content tarball from the control node (where the
+# artifact was already extracted) to EVERY host in hub_groups - unlike
+# transfer.yml's per-component DB dump (which only needs to land on the
+# first host of its group, for the host doing the DB restore), Pulp's
+# FileSystem storage is per-node, so every hub node needs its own copy of
+# the content to serve downloads regardless of which node a request is
+# routed to.
+- name: Transfer hub content tarball if this host needs it
+  when:
+    - groups.get('hub_groups', []) | length > 0
+    - inventory_hostname in groups['hub_groups']
+  block:
+    - name: Check if hub content tarball exists in extracted artifact
+      ansible.builtin.stat:
+        path: "{{ _preflight_resolved_artifact | dirname }}/artifact/hub/{{ automationhub_content_tar_name }}"
+      delegate_to: localhost
+      register: _artifact_transfer_hub_content_source_stat
+
+    - name: Transfer hub content tarball
+      when: _artifact_transfer_hub_content_source_stat.stat.exists
+      block:
+        # Captured in the TARGET host's own context, before the delegated
+        # tasks below - delegate_to: localhost makes a direct
+        # `ansible_connection == 'local'` check in those tasks' `when`
+        # always resolve to the delegate's ('localhost') connection rather
+        # than this host's, which is what broke transfer.yml on remote
+        # multi-node hosts (see PR #136).
+        - name: Determine whether this hub host uses a local connection
+          ansible.builtin.set_fact:
+            _transfer_target_is_local: "{{ ansible_connection | default('ssh') == 'local' }}"
+
+        - name: Ensure destination directory exists for hub content tarball
+          ansible.builtin.file:
+            path: "{{ preflight_containerized_staging_dir }}/artifact/hub"
+            state: directory
+            mode: '0700'
+            owner: "{{ ansible_user_id }}"
+
+        # _preflight_resolved_artifact's dirname is where the control node
+        # extracted the artifact in the earlier localhost play.
+        - name: Transfer hub content tarball from control node (remote)
+          ansible.posix.synchronize:
+            mode: push
+            src: "{{ _preflight_resolved_artifact | dirname }}/artifact/hub/{{ automationhub_content_tar_name }}"
+            dest: "{{ preflight_containerized_staging_dir }}/artifact/hub/{{ automationhub_content_tar_name }}"
+            rsync_opts:
+              - "--chmod=F600"
+              - "--no-perms"
+              - "--no-owner"
+              - "--no-group"
+              - "--compress"
+          delegate_to: localhost
+          when: not _transfer_target_is_local
+
+        - name: Transfer hub content tarball from control node (local)
+          ansible.builtin.copy:
+            src: "{{ _preflight_resolved_artifact | dirname }}/artifact/hub/{{ automationhub_content_tar_name }}"
+            dest: "{{ preflight_containerized_staging_dir }}/artifact/hub/{{ automationhub_content_tar_name }}"
+            mode: '0600'
+            owner: "{{ ansible_user_id }}"
+          delegate_to: localhost
+          when: _transfer_target_is_local
+
+        - name: Set ownership on transferred hub content tarball
+          ansible.builtin.file:
+            path: "{{ preflight_containerized_staging_dir }}/artifact/hub/{{ automationhub_content_tar_name }}"
+            owner: "{{ ansible_user_id }}"
+            mode: '0600'
+...

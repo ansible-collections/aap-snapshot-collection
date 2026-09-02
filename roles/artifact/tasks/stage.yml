@@ -36,4 +36,12 @@
       vars:
         _transfer_component_name: "{{ item.name }}"
         _transfer_group_name: "{{ item.group }}"
+
+    - name: Transfer hub content tarball to every hub node
+      ansible.builtin.include_tasks: transfer_hub_content.yml
+      when: >-
+        (artifact_manifest.components
+          | selectattr('name', 'equalto', 'hub')
+          | map(attribute='has_content_data')
+          | first | default(false) | bool)
 ...
