@@ -16,6 +16,17 @@
     - name: Transfer {{ _transfer_component_name }} database dump
       when: _artifact_transfer_source_stat.stat.exists
       block:
+        # Capture the TARGET host's real connection in a non-delegated task.
+        # The transfer tasks below use delegate_to: localhost, which makes
+        # `ansible_connection` in their `when` resolve to the delegate's
+        # (localhost's) 'local' connection for every host - so a plain
+        # `ansible_connection == 'local'` check always picked the local-copy
+        # branch, breaking remote (multi-node) targets whose staging path
+        # lives under a home dir that doesn't exist on the control node.
+        - name: Determine whether {{ _transfer_component_name }} host uses a local connection
+          ansible.builtin.set_fact:
+            _transfer_target_is_local: "{{ ansible_connection | default('ssh') == 'local' }}"
+
         - name: Ensure destination directory exists for {{ _transfer_component_name }} dump
           ansible.builtin.file:
             path: "{{ preflight_containerized_staging_dir }}/artifact/{{ _transfer_component_name }}"
@@ -36,7 +47,7 @@
               - "--no-owner"
               - "--no-group"
           delegate_to: localhost
-          when: ansible_connection != 'local'
+          when: not _transfer_target_is_local
 
         - name: Transfer {{ _transfer_component_name }} database dump from control node (local)
           ansible.builtin.copy:
@@ -45,7 +56,7 @@
             mode: '0600'
             owner: "{{ ansible_user_id }}"
           delegate_to: localhost
-          when: ansible_connection == 'local'
+          when: _transfer_target_is_local
 
         - name: Set ownership on transferred {{ _transfer_component_name }} dump
           ansible.builtin.file:

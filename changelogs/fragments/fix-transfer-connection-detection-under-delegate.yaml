@@ -1,0 +1,10 @@
+---
+bugfixes:
+  - "artifact - fix artifact transfer selecting the wrong branch on remote
+    (multi-node) containerized targets. The local-vs-remote transfer tasks
+    are delegated to localhost, so checking ansible_connection directly in
+    their when clause always evaluated against the delegate's own
+    connection rather than the target host's, forcing every host onto the
+    local-copy path and failing with a missing destination directory on
+    genuinely remote hosts. Capture the target host's real connection in a
+    non-delegated fact before delegating, and branch on that fact instead."
