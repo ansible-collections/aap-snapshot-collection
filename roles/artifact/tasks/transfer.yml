@@ -47,7 +47,7 @@
               - "--no-owner"
               - "--no-group"
           delegate_to: localhost
-          when: not _transfer_target_is_local
+          when: not (_transfer_target_is_local | bool)
 
         - name: Transfer {{ _transfer_component_name }} database dump from control node (local)
           ansible.builtin.copy:
@@ -56,7 +56,7 @@
             mode: '0600'
             owner: "{{ ansible_user_id }}"
           delegate_to: localhost
-          when: _transfer_target_is_local
+          when: _transfer_target_is_local | bool
 
         - name: Set ownership on transferred {{ _transfer_component_name }} dump
           ansible.builtin.file:
