@@ -1,4 +1,30 @@
 ---
+- name: Stat artifact_dest_dir
+  ansible.builtin.stat:
+    path: '{{ artifact_dest_dir }}'
+  register: _artifact_dest_dir_stat
+
+- name: Validate artifact_dest_dir exists and is a directory
+  ansible.builtin.fail:
+    msg: >-
+      artifact_dest_dir '{{ artifact_dest_dir }}' does not exist or is not a directory.
+      Create it first or pass an absolute path to an existing directory,
+      e.g. -e artifact_dest_dir=/tmp/snapshots
+  when: not _artifact_dest_dir_stat.stat.exists or not _artifact_dest_dir_stat.stat.isdir
+
+- name: Stat artifact_build_dir parent
+  ansible.builtin.stat:
+    path: '{{ __artifact_build_dir | dirname }}'
+  register: _artifact_build_dir_parent_stat
+
+- name: Validate artifact_build_dir parent exists and is a directory
+  ansible.builtin.fail:
+    msg: >-
+      Parent directory of artifact_build_dir '{{ __artifact_build_dir | dirname }}' does not exist
+      or is not a directory. Pass an absolute path whose parent exists,
+      e.g. -e artifact_build_dir=/tmp/artifact-build
+  when: not _artifact_build_dir_parent_stat.stat.exists or not _artifact_build_dir_parent_stat.stat.isdir
+
 - name: Ensure artifact directory is clear before initialized
   ansible.builtin.file:
     path: '{{ __artifact_build_dir }}'
