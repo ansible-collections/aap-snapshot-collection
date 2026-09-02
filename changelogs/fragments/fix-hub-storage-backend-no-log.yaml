@@ -1,0 +1,7 @@
+---
+security_fixes:
+  - "automationhub - add no_log to the containerized storage-backend check
+    tasks. On a hub configured with Azure Blob or AWS S3 storage, the
+    dumped and parsed settings.STORAGES value can contain the storage
+    account key, secret access key, or SAS token, which was previously
+    printed unmasked to Ansible output, CI artifacts, and log aggregators."
