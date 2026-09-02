@@ -137,6 +137,16 @@
         - groups.get('hub_groups', []) | length > 0
         - inventory_hostname == groups['hub_groups'][0]
 
+    # Runs on every hub host (not just group[0] like the DB import above) -
+    # Pulp content storage is per-node.
+    - name: Restore hub content
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.automationhub
+        tasks_from: import_hub_content_containerized.yml
+      when:
+        - groups.get('hub_groups', []) | length > 0
+        - inventory_hostname in groups.get('hub_groups', [])
+
     - name: Import gateway
       ansible.builtin.include_role:
         name: ansible.aap_snapshot.automationgateway
