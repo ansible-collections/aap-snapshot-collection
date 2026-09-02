@@ -1,0 +1,8 @@
+---
+bugfixes:
+  - "automationhub - fix the containerized hub storage-backend guard
+    crashing on every hub, even a valid FileSystem-backed one. Django's
+    settings.STORAGES is a dynaconf Box object whose repr
+    (\"<Box: {...}>\") is not valid YAML, so parsing it with from_yaml
+    always failed and aborted the import. Convert the Box to a plain dict
+    and emit real JSON instead, parsed with from_json."
