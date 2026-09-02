@@ -79,7 +79,17 @@
           Check pod status in namespace {{ preflight_ocp_namespace }}.
 
 - name: Check component services (containerized)
-  when: aap_platform == 'containerized'
+  when:
+    - aap_platform == 'containerized'
+    # Scope to hosts this collection actually operates on. On a multi-node
+    # topology `hosts: all` in the Preflight play otherwise fans this remote
+    # fact-gather out to out-of-scope hosts (hop_nodes/execution_nodes/
+    # installer/external_database) that may be unreachable or lack the
+    # expected interpreter, aborting the whole run via any_errors_fatal.
+    - inventory_hostname in (groups.get('controller_groups', [])
+        + groups.get('eda_groups', [])
+        + groups.get('gateway_groups', [])
+        + groups.get('hub_groups', []))
   block:
     - name: Gather minimal facts for user home directory
       ansible.builtin.setup:
