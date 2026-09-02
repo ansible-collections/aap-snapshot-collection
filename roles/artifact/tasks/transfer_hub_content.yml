@@ -11,9 +11,18 @@
     - groups.get('hub_groups', []) | length > 0
     - inventory_hostname in groups['hub_groups']
   block:
+    # automationhub_content_tar_name is a role default of automationhub, not
+    # artifact (this file runs via include_tasks from the artifact role, so
+    # automationhub's defaults were never loaded) - resolve it once here with
+    # the same literal default, rather than referencing it directly and
+    # getting an undefined-variable error on every hub host.
+    - name: Resolve hub content tarball name
+      ansible.builtin.set_fact:
+        _artifact_hub_content_tar_name: "{{ automationhub_content_tar_name | default('hub_content.tar') }}"
+
     - name: Check if hub content tarball exists in extracted artifact
       ansible.builtin.stat:
-        path: "{{ _preflight_resolved_artifact | dirname }}/artifact/hub/{{ automationhub_content_tar_name }}"
+        path: "{{ _preflight_resolved_artifact | dirname }}/artifact/hub/{{ _artifact_hub_content_tar_name }}"
       delegate_to: localhost
       register: _artifact_transfer_hub_content_source_stat
 
@@ -42,8 +51,8 @@
         - name: Transfer hub content tarball from control node (remote)
           ansible.posix.synchronize:
             mode: push
-            src: "{{ _preflight_resolved_artifact | dirname }}/artifact/hub/{{ automationhub_content_tar_name }}"
-            dest: "{{ preflight_containerized_staging_dir }}/artifact/hub/{{ automationhub_content_tar_name }}"
+            src: "{{ _preflight_resolved_artifact | dirname }}/artifact/hub/{{ _artifact_hub_content_tar_name }}"
+            dest: "{{ preflight_containerized_staging_dir }}/artifact/hub/{{ _artifact_hub_content_tar_name }}"
             rsync_opts:
               - "--chmod=F600"
               - "--no-perms"
@@ -55,8 +64,8 @@
 
         - name: Transfer hub content tarball from control node (local)
           ansible.builtin.copy:
-            src: "{{ _preflight_resolved_artifact | dirname }}/artifact/hub/{{ automationhub_content_tar_name }}"
-            dest: "{{ preflight_containerized_staging_dir }}/artifact/hub/{{ automationhub_content_tar_name }}"
+            src: "{{ _preflight_resolved_artifact | dirname }}/artifact/hub/{{ _artifact_hub_content_tar_name }}"
+            dest: "{{ preflight_containerized_staging_dir }}/artifact/hub/{{ _artifact_hub_content_tar_name }}"
             mode: '0600'
             owner: "{{ ansible_user_id }}"
           delegate_to: localhost
@@ -64,7 +73,7 @@
 
         - name: Set ownership on transferred hub content tarball
           ansible.builtin.file:
-            path: "{{ preflight_containerized_staging_dir }}/artifact/hub/{{ automationhub_content_tar_name }}"
+            path: "{{ preflight_containerized_staging_dir }}/artifact/hub/{{ _artifact_hub_content_tar_name }}"
             owner: "{{ ansible_user_id }}"
             mode: '0600'
 ...
