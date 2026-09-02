@@ -118,7 +118,7 @@
     force_basic_auth: true
     validate_certs: "{{ operations_validate_certs | default(false) }}"
   register: _automationcontroller_ee_list
-  retries: 6
+  retries: 20
   delay: 10
   until: _automationcontroller_ee_list is not failed
   no_log: "{{ not (disable_no_log | default(false) | bool) }}"
