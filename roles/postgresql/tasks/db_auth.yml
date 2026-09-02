@@ -33,8 +33,14 @@
       register: _postgresql_dump_result
 
     - name: Set db settings
+      # _postgresql_dump_result.stdout is the printed repr of a Python dict
+      # (e.g. "{'default': {'HOST': 'x', ...}}"), not JSON -- single-quoted
+      # strings, bare True/False. `from_yaml` (YAML 1.1 accepts True/False as
+      # booleans and single-quoted flow-mapping syntax) parses this into a
+      # real dict so `.default.NAME/.HOST/.USER/...` resolve correctly
+      # downstream, instead of leaving it as an unparsed string.
       ansible.builtin.set_fact:
-        postgresql_auth_settings: "{{ _postgresql_dump_result.stdout | trim }}"
+        postgresql_auth_settings: "{{ (_postgresql_dump_result.stdout | trim) | from_yaml }}"
       no_log: "{{ __postgresql_no_log }}"
 
 - name: OCP - Get DB credentials from K8s secret

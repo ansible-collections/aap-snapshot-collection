@@ -27,10 +27,20 @@
         filter:
           - 'ansible_user_dir'
 
-    - name: "Discover worker service units"
+    - name: "Discover worker and static service units"
+      # Matches both the worker glob pattern and each configured static
+      # service's exact unit filename. Static service names can drift across
+      # AAP versions/topologies (e.g. a service present on one release but
+      # renamed/removed on another) -- discovering via `find` instead of
+      # looping the hardcoded static_services list directly means a
+      # since-removed unit is simply absent from the results instead of
+      # hard-failing the whole stop/start with "Could not find the requested
+      # service".
       ansible.builtin.find:
         paths: "{{ ansible_user_dir }}/.config/systemd/user"
-        patterns: "{{ _operations_current_component.worker_service_pattern }}"
+        patterns: >-
+          {{ [_operations_current_component.worker_service_pattern]
+             + (_operations_current_component.static_services | map('regex_replace', '$', '.service') | list) }}
         file_type: any
       register: _operations_worker_files
 
@@ -43,8 +53,7 @@
         {{ _operations_worker_files.files
            | map(attribute='path') | map('basename')
            | map('regex_replace', '\.service$', '')
-           | list
-           + _operations_current_component.static_services }}
+           | list }}
       loop_control:
         label: "{{ item }}"
 ...

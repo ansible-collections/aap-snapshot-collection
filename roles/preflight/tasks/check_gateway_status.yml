@@ -34,22 +34,39 @@
           Gateway status API returned HTTP {{ _preflight_gateway_status.status | default('unreachable') }}.
           The gateway may not be fully initialized.
 
-    - name: Assert overall gateway status is healthy
-      ansible.builtin.assert:
-        that:
-          - _preflight_gateway_status.json.status == 'good'
-        fail_msg: >-
-          Gateway reports overall status '{{ _preflight_gateway_status.json.status }}'.
-          Service details: {{ _preflight_gateway_status.json.services | default([]) | to_nice_json }}
-      when: _preflight_gateway_status.status == 200
+    - name: Determine in-scope gateway services actually deployed (RPM/containerized)
+      ansible.builtin.set_fact:
+        _preflight_in_scope_gateway_services: >-
+          {{
+            groups
+            | dict2items
+            | selectattr('key', 'match', '.*_groups$')
+            | rejectattr('key', 'equalto', 'gateway_groups')
+            | selectattr('value')
+            | map(attribute='key')
+            | map('regex_replace', '_groups$', '')
+            | list
+          }}
 
-    - name: Assert each backend service is healthy
+    - name: Warn if gateway reports an out-of-scope backend as unhealthy
+      ansible.builtin.debug:
+        msg: >-
+          Gateway reports overall status '{{ _preflight_gateway_status.json.status }}',
+          but this is only a concern for services this collection actually
+          exports/imports and that are deployed on this target
+          ({{ _preflight_in_scope_gateway_services | join(', ') }}).
+          Full service details: {{ _preflight_gateway_status.json.services | default([]) | to_nice_json }}
+      when:
+        - _preflight_gateway_status.status == 200
+        - _preflight_gateway_status.json.status != 'good'
+
+    - name: Assert each in-scope backend service is healthy
       ansible.builtin.assert:
         that:
           - item.status == 'good'
         fail_msg: >-
           Service '{{ item.service_name }}' reports status '{{ item.status }}'
-      loop: "{{ _preflight_gateway_status.json.services | default([]) }}"
+      loop: "{{ _preflight_gateway_status.json.services | default([]) | selectattr('service_name', 'in', _preflight_in_scope_gateway_services) }}"
       loop_control:
         label: "{{ item.service_name }}"
       when: _preflight_gateway_status.status == 200
@@ -96,22 +113,37 @@
         - _preflight_gateway_status_ocp.rc == 0
         - _preflight_gateway_status_ocp.stdout | length > 0
 
-    - name: Assert overall gateway status is healthy (OCP)
-      ansible.builtin.assert:
-        that:
-          - _preflight_gateway_status_json.status == 'good'
-        fail_msg: >-
-          Gateway reports overall status '{{ _preflight_gateway_status_json.status }}'.
-          Service details: {{ _preflight_gateway_status_json.services | default([]) | to_nice_json }}
+    - name: Determine in-scope gateway services actually deployed (OCP)
+      ansible.builtin.set_fact:
+        _preflight_in_scope_gateway_services: >-
+          {{
+            (
+              ((_controller_cr_name is defined) | ternary(['controller'], []))
+              + ((_hub_cr_name is defined) | ternary(['hub'], []))
+              + ((_eda_cr_name is defined) | ternary(['eda'], []))
+            ) | intersect(preflight_in_scope_gateway_services)
+          }}
       when: _preflight_gateway_status_json is defined
 
-    - name: Assert each backend service is healthy (OCP)
+    - name: Warn if gateway reports an out-of-scope backend as unhealthy (OCP)
+      ansible.builtin.debug:
+        msg: >-
+          Gateway reports overall status '{{ _preflight_gateway_status_json.status }}',
+          but this is only a concern for services this collection actually
+          exports/imports and that are deployed on this target
+          ({{ _preflight_in_scope_gateway_services | join(', ') }}).
+          Full service details: {{ _preflight_gateway_status_json.services | default([]) | to_nice_json }}
+      when:
+        - _preflight_gateway_status_json is defined
+        - _preflight_gateway_status_json.status != 'good'
+
+    - name: Assert each in-scope backend service is healthy (OCP)
       ansible.builtin.assert:
         that:
           - item.status == 'good'
         fail_msg: >-
           Service '{{ item.service_name }}' reports status '{{ item.status }}'
-      loop: "{{ _preflight_gateway_status_json.services | default([]) }}"
+      loop: "{{ _preflight_gateway_status_json.services | default([]) | selectattr('service_name', 'in', _preflight_in_scope_gateway_services) }}"
       loop_control:
         label: "{{ item.service_name }}"
       when: _preflight_gateway_status_json is defined
