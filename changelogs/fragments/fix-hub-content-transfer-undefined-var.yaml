@@ -1,0 +1,9 @@
+---
+bugfixes:
+  - "artifact - fix hub content staging failing on every hub host with an
+    undefined-variable error. transfer_hub_content.yml referenced
+    automationhub_content_tar_name, a role default that belongs to
+    automationhub, but this task runs via include_tasks from the artifact
+    role, which never loads automationhub's defaults. Resolve the tarball
+    name once with the same default instead of referencing the role
+    default directly."
