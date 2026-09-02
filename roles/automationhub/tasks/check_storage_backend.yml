@@ -9,15 +9,19 @@
 - name: Determine Hub Pulp storage backend
   containers.podman.podman_container_exec:
     name: automation-hub-api
+    # settings.STORAGES is a dynaconf Box, not a plain dict - its repr
+    # (`<Box: {...}>`) isn't valid YAML/JSON, so convert it explicitly and
+    # emit real JSON rather than a Python repr (same class of bug as the
+    # original BUG-1 in db_auth.yml).
     command: >-
       pulpcore-manager shell -c
-      "from django.conf import settings; print({'STORAGES': getattr(settings, 'STORAGES', None), 'DEFAULT_FILE_STORAGE': getattr(settings, 'DEFAULT_FILE_STORAGE', None)})"
+      "import json; from django.conf import settings; s = getattr(settings, 'STORAGES', None); s = s.to_dict() if hasattr(s, 'to_dict') else s; print(json.dumps({'STORAGES': s, 'DEFAULT_FILE_STORAGE': getattr(settings, 'DEFAULT_FILE_STORAGE', None)}))"
   changed_when: false
   register: _automationhub_storage_dump
 
 - name: Parse Hub storage backend settings
   ansible.builtin.set_fact:
-    _automationhub_storage_settings: "{{ (_automationhub_storage_dump.stdout | trim) | from_yaml }}"
+    _automationhub_storage_settings: "{{ (_automationhub_storage_dump.stdout | trim) | from_json }}"
 
 - name: Resolve Hub's configured storage backend class
   ansible.builtin.set_fact:
