@@ -1,0 +1,6 @@
+---
+minor_changes:
+  - "artifact - stage the hub content tarball from the extracted artifact to
+    every hub node on containerized import (previously only each
+    component's database dump was staged; hub content was never
+    transferred at all)."

@@ -1,0 +1,8 @@
+---
+bugfixes:
+  - "playbooks - warn in the post-import advisory when hub content exists in
+    the artifact but was not restored on a containerized target. The
+    existing advisory logic only ever populated on OCP imports (it keyed off
+    a fact the containerized import path never sets), so a containerized
+    import that carried hub content but did not restore it previously gave
+    no warning at all."
