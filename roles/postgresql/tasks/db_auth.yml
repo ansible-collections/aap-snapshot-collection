@@ -51,7 +51,7 @@
         name: ansible.aap_snapshot.ocp_utils
         tasks_from: get_db_credentials.yml
       vars:
-        ocp_pg_config_secret: "{{ postgresql_ocp_secret | default('aap-' + postgresql_component_name + '-postgres-configuration') }}"
+        ocp_pg_config_secret: "{{ aap_instance_name | default('aap') }}-{{ postgresql_component_name }}-postgres-configuration"
 
     - name: Set db settings from OCP secret
       ansible.builtin.set_fact:
