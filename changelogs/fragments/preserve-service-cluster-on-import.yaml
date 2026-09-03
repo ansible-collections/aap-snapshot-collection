@@ -1,0 +1,12 @@
+---
+bugfixes:
+  - >-
+    automationgateway reconcile - stop deleting ServiceCluster during gateway
+    cleanup; ServiceCluster has an on_delete=CASCADE FK to ServiceKey, so
+    deleting it silently wiped all service keys from the restored gateway DB.
+    On cross-cluster import the restored gateway and component DBs share
+    consistent service key secrets - removing ServiceCluster broke that
+    consistency and caused periodic_resource_sync to receive 401 errors.
+    ServiceCluster carries no environment-specific addressing data (hostnames
+    live in ServiceNode and Route, which are still purged); preserving it
+    keeps the service key chain intact across the import.
