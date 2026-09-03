@@ -1,0 +1,5 @@
+---
+bugfixes:
+  - "automationhub - check available disk space on the destination
+    filesystem before extracting hub content on a containerized import,
+    failing with a clear error rather than potentially exhausting disk mid-extraction."

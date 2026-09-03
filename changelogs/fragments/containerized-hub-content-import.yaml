@@ -1,0 +1,9 @@
+---
+bugfixes:
+  - "automationhub - restore hub collection content (Pulp artifact blobs) on
+    containerized import, not just the Pulp database. Migrated collections
+    previously appeared in the published index with correct checksums but
+    returned HTTP 500 on download, since the underlying blob files were
+    never staged or restored. Extraction runs on every hub node (set
+    automationhub_import_hub_content to false to opt out for very large
+    hubs synced out-of-band instead)."
