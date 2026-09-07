@@ -61,4 +61,16 @@ __ocp_utils_artifact_secret_mapping:
     secret_name: "{{ ocp_utils_aap_instance_name }}-eda-db-fields-encryption-secret"
     field: "secret_key"
     artifact_key: "eda_secret_key"
+  - component: controller
+    secret_name: "{{ ocp_utils_aap_instance_name }}-resource-server"
+    field: "controller_resource_server_secret"
+    artifact_key: "controller_resource_key"
+  - component: hub
+    secret_name: "{{ ocp_utils_aap_instance_name }}-resource-server"
+    field: "galaxy_resource_server_secret"
+    artifact_key: "hub_resource_key"
+  - component: eda
+    secret_name: "{{ ocp_utils_aap_instance_name }}-resource-server"
+    field: "eda_resource_server_secret"
+    artifact_key: "eda_resource_key"
 ...
