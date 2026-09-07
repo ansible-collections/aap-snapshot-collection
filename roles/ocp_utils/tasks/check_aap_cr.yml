@@ -11,16 +11,31 @@
   ansible.builtin.set_fact:
     _ocp_utils_aap_cr_exists: "{{ (_ocp_utils_aap_cr_check.resources | length > 0) }}"
 
+- name: Fail when user-provided aap_instance_name is not found in namespace
+  ansible.builtin.fail:
+    msg: >-
+      No AnsibleAutomationPlatform CR named '{{ aap_instance_name }}' found in
+      namespace '{{ ocp_utils_ocp_namespace }}'.
+      Available: {{ _ocp_utils_aap_cr_check.resources | map(attribute='metadata.name') | list | join(', ') }}.
+  when:
+    - aap_instance_name is defined
+    - _ocp_utils_aap_cr_check.resources | length > 0
+    - _ocp_utils_aap_cr_check.resources | selectattr('metadata.name', 'equalto', aap_instance_name) | list | length == 0
+
 - name: Fail when multiple AAP CRs found in namespace
   ansible.builtin.fail:
     msg: >-
       Found {{ _ocp_utils_aap_cr_check.resources | length }} AAP CRs in namespace '{{ ocp_utils_ocp_namespace }}':
       {{ _ocp_utils_aap_cr_check.resources | map(attribute='metadata.name') | list | join(', ') }}.
-      Set -e ocp_utils_aap_instance_name=<name> to specify which one to target.
-  when: _ocp_utils_aap_cr_check.resources | length > 1
+      Set -e aap_instance_name=<name> to specify which one to target.
+  when:
+    - aap_instance_name is not defined
+    - _ocp_utils_aap_cr_check.resources | length > 1
 
 - name: Set aap_instance_name from discovered CR
   ansible.builtin.set_fact:
     ocp_utils_aap_instance_name: "{{ _ocp_utils_aap_cr_check.resources[0].metadata.name }}"
-  when: _ocp_utils_aap_cr_check.resources | length == 1
+  when:
+    - aap_instance_name is not defined
+    - _ocp_utils_aap_cr_check.resources | length == 1
 ...
