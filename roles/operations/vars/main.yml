@@ -94,6 +94,7 @@ _operations_component_config:
     container_name: "automation-hub-api"
     python_package: "pulpcore"
     secret_keys: ["hub_db_fields_encryption_key"]
+    optional_secret_keys: ["hub_secret"]
     k8s_secret_name: "{{ operations_aap_instance_name }}-hub-db-fields-encryption"
     k8s_secret_field: "database_fields.symmetric.key"
     postgres_secret: "{{ operations_aap_instance_name }}-hub-postgres-configuration"
