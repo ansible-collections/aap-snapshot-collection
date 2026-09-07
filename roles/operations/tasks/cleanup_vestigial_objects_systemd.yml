@@ -7,7 +7,7 @@
 # just-rotated secret.
 #
 # For gateway, an ephemeral init container is also run after removal to delete
-# vestigial API objects (HTTPPort, ServiceNode, ServiceCluster) from the
+# vestigial API objects (HTTPPort, ServiceNode) from the
 # restored database before the installer re-run takes ownership of the services.
 - name: Gather user home directory
   ansible.builtin.setup:
@@ -107,11 +107,10 @@
 - name: Delete vestigial gateway objects via init container
   vars:
     _gateway_cleanup_script: >-
-      from aap_gateway_api.models import HTTPPort, ServiceNode, ServiceCluster;
+      from aap_gateway_api.models import HTTPPort, ServiceNode;
       from aap_gateway_api.models.migrate_data import MigrateServiceDataHasRan;
       HTTPPort.objects.all().delete();
       ServiceNode.objects.all().delete();
-      ServiceCluster.objects.all().delete();
       MigrateServiceDataHasRan.mark_migration_not_completed()
   containers.podman.podman_container:
     name: automation-gateway-init
