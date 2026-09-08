@@ -20,9 +20,10 @@
         that: _automationhub_pvcs.resources | length > 0
         fail_msg: >-
           No hub file-storage PVC found in namespace {{ automationhub_ocp_namespace }}
-          for hub instance {{ _hub_cr_name }}.
-          Hub may be using S3 or Azure storage (content file restore
-          is only supported for file-storage PVCs).
+          for hub instance {{ _hub_cr_name }}, even though Hub's Pulp storage
+          backend was already confirmed to be FileSystem-based. Check that the
+          PVC labels match app.kubernetes.io/instance=automationhub-storage-{{ _hub_cr_name }}
+          and that the operator has finished provisioning file storage for this Hub.
 
     - name: Set hub file-storage PVC fact
       ansible.builtin.set_fact:
