@@ -5,6 +5,15 @@
 # not-yet-implemented S3/Azure Blob target is caught before any destructive
 # stop/restore work starts, matching the containerized path's fail-fast
 # behavior.
+- name: Assert hub pod was discovered for storage backend check
+  ansible.builtin.assert:
+    that: _ocp_utils_hub_pod_name is defined
+    fail_msg: >-
+      No running hub pod found in namespace {{ automationhub_ocp_namespace }}
+      for hub CR '{{ _hub_cr_name }}'. The Pulp storage backend must be
+      verified before importing hub content - bring the hub pod to Running
+      and retry.
+
 - name: Determine Hub Pulp storage backend (OCP)
   kubernetes.core.k8s_exec:
     namespace: "{{ automationhub_ocp_namespace }}"
@@ -19,6 +28,10 @@
       "import json; from django.conf import settings; s = getattr(settings, 'STORAGES', None); s = s.to_dict() if hasattr(s, 'to_dict') else s; print(json.dumps({'STORAGES': s, 'DEFAULT_FILE_STORAGE': getattr(settings, 'DEFAULT_FILE_STORAGE', None)}))"
   environment: "{{ automationhub_ocp_environment }}"
   changed_when: false
+  # k8s_exec never fails the task on its own - it always exit_json()s with
+  # whatever rc the command produced, unlike podman_container_exec (used by
+  # the containerized version of this check).
+  failed_when: _automationhub_storage_dump.rc != 0
   no_log: "{{ not (disable_no_log | default(false) | bool) }}"
   register: _automationhub_storage_dump
 
@@ -42,7 +55,8 @@
       Hub content import currently only supports Pulp's local FileSystem
       storage (backed by a PVC). Importing hub content into an Azure Blob or
       AWS S3-backed hub is not yet implemented and is tracked separately -
-      re-run the import without hub content, or wait for object-storage
-      import support to land, before importing hub content onto this target.
+      re-export the artifact with automationhub_export_hub_content=false to
+      import without hub content, or wait for object-storage import support
+      to land, before importing hub content onto this target.
   when: "'filesystem' not in (_automationhub_storage_backend | lower)"
 ...

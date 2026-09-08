@@ -1,5 +1,5 @@
 ---
-minor_changes:
+bugfixes:
   - "automationhub - move the Hub Pulp storage backend check for OCP hub
     content import earlier, before the artifact is staged and AAP is idled,
     instead of failing deep into the import after the controller and hub
