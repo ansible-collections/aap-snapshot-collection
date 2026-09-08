@@ -1,3 +1,0 @@
----
-bugfixes:
-  - Rewrite Execution Environment image URLs in Controller to point to the destination Hub after import.

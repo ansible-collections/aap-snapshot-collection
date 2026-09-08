@@ -1,3 +1,0 @@
----
-bugfixes:
-  - Remove unnecessary root privilege escalation when gathering service facts during RPM preflight checks - systemd unit state is readable without elevation.

@@ -1,3 +1,0 @@
----
-bugfixes:
-  - Gather user directory facts before containerized service checks to prevent undefined ``ansible_user_dir`` errors during preflight.

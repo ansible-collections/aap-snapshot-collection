@@ -1,3 +1,0 @@
----
-minor_changes:
-  - Bump the kubernetes Python requirement from >=28.0.0 to >=36.0.3.

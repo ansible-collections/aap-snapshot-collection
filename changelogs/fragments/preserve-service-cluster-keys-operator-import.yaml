@@ -1,9 +1,0 @@
----
-bugfixes:
-  - ocp_utils - Preserve ServiceCluster resource keys from backup artifact
-    during operator platform import. The resource-server K8s secret now gets
-    updated with controller_resource_key, hub_resource_key, and eda_resource_key
-    values from the source system, fixing authentication failures between
-    components after restore. Previously, components used the target cluster's
-    original keys instead of the restored ServiceCluster keys, causing gateway
-    database ServiceCluster records to mismatch component RESOURCE_SERVER secrets.
