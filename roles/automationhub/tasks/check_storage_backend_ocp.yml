@@ -1,0 +1,48 @@
+---
+# OCP equivalent of check_storage_backend.yml - execs into the hub pod via
+# kubernetes.core.k8s_exec instead of a local podman container. Called from
+# consume.yml before the artifact is staged or AAP is idled, so a
+# not-yet-implemented S3/Azure Blob target is caught before any destructive
+# stop/restore work starts, matching the containerized path's fail-fast
+# behavior.
+- name: Determine Hub Pulp storage backend (OCP)
+  kubernetes.core.k8s_exec:
+    namespace: "{{ automationhub_ocp_namespace }}"
+    pod: "{{ _ocp_utils_hub_pod_name }}"
+    container: "{{ _ocp_utils_hub_container_name }}"
+    # settings.STORAGES is a dynaconf Box, not a plain dict - its repr
+    # (`<Box: {...}>`) isn't valid YAML/JSON, so convert it explicitly and
+    # emit real JSON rather than a Python repr (same class of bug as the
+    # original BUG-1 in db_auth.yml).
+    command: >-
+      pulpcore-manager shell -c
+      "import json; from django.conf import settings; s = getattr(settings, 'STORAGES', None); s = s.to_dict() if hasattr(s, 'to_dict') else s; print(json.dumps({'STORAGES': s, 'DEFAULT_FILE_STORAGE': getattr(settings, 'DEFAULT_FILE_STORAGE', None)}))"
+  environment: "{{ automationhub_ocp_environment }}"
+  changed_when: false
+  no_log: "{{ not (disable_no_log | default(false) | bool) }}"
+  register: _automationhub_storage_dump
+
+- name: Parse Hub storage backend settings (OCP)
+  ansible.builtin.set_fact:
+    _automationhub_storage_settings: "{{ (_automationhub_storage_dump.stdout | trim) | from_json }}"
+  no_log: "{{ not (disable_no_log | default(false) | bool) }}"
+
+- name: Resolve Hub's configured storage backend class (OCP)
+  ansible.builtin.set_fact:
+    _automationhub_storage_backend: >-
+      {{ ((_automationhub_storage_settings.STORAGES.default.BACKEND | default(''))
+          if (_automationhub_storage_settings.STORAGES | default(none)) is mapping
+          else (_automationhub_storage_settings.DEFAULT_FILE_STORAGE | default(''))) }}
+
+- name: Fail if Hub is not using local FileSystem storage (OCP)
+  ansible.builtin.fail:
+    msg: >-
+      Hub CR '{{ _hub_cr_name }}' in namespace {{ automationhub_ocp_namespace }}
+      is configured with storage backend '{{ _automationhub_storage_backend }}'.
+      Hub content import currently only supports Pulp's local FileSystem
+      storage (backed by a PVC). Importing hub content into an Azure Blob or
+      AWS S3-backed hub is not yet implemented and is tracked separately -
+      re-run the import without hub content, or wait for object-storage
+      import support to land, before importing hub content onto this target.
+  when: "'filesystem' not in (_automationhub_storage_backend | lower)"
+...

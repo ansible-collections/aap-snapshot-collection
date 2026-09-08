@@ -263,6 +263,17 @@
              | first | default(false) | bool }}
       # first catches missing hub component, default catches older artifacts without has_content_data
 
+    # Must run before staging/idling AAP below - a hub content restore
+    # requires local FileSystem storage, and that must be confirmed before
+    # the artifact is staged or AAP is idled for import.
+    - name: Verify Hub storage backend supports content import
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.automationhub
+        tasks_from: check_storage_backend_ocp.yml
+      when:
+        - "'hub' in _artifact_import_components"
+        - artifact_hub_has_content_data | default(false) | bool
+
     - name: Warn about components in artifact but not on target
       ansible.builtin.debug:
         msg: >-
