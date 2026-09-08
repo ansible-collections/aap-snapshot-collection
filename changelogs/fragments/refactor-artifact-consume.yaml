@@ -1,7 +1,0 @@
----
-minor_changes:
-  - Introduce artifact/consume.yml to consolidate the full OCP import
-    orchestration flow, mirroring artifact/build.yml. Decompose
-    operations/import.yml into atomic get_db_credentials.yml,
-    db_import.yml, and update_secret.yml task files, consistent with
-    the export-side structure.

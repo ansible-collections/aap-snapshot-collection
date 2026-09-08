@@ -1,3 +1,0 @@
----
-bugfixes:
-  - Add support for db name different than db username.

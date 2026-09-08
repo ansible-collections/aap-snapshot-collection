@@ -1,3 +1,0 @@
----
-bugfixes:
-  - Remove security context from hub content import that fails on OCP deployments.

@@ -1,3 +1,0 @@
----
-minor_changes:
-  - Increase retries for listing execution environments in controller reconciliation to handle slower environments.
