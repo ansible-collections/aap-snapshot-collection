@@ -1,0 +1,8 @@
+---
+minor_changes:
+  - Lower the minimum ansible-core requirement from 2.16 to 2.14 to support
+    RHEL 9 control nodes where the containerized installer ships ansible-core
+    2.14, and RHEL 10 control nodes where it ships ansible-core 2.16. The
+    community.general dependency constraint is lowered from >=10.7.0 to >=9.0.0
+    accordingly; the only module used from that collection (community.general.archive)
+    has had a stable interface since 1.x.
