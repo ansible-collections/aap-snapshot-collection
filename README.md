@@ -22,6 +22,7 @@ what is present in the inventory and artifact.
 
 ## Requirements
 
+- Ansible Automation Platform (AAP) 2.6 or later
 - Ansible core >= 2.14.0
 - PyYAML
 - kubernetes
@@ -49,6 +50,36 @@ what is present in the inventory and artifact.
 - **OCP Operator import:** `kubeconfig` with cluster-admin or namespace-admin access
 - **Containerized export:** SSH access to component hosts, podman access on component hosts
 - **Containerized import:** SSH access to component hosts, podman access on component hosts
+
+## Pre-Import Setup
+
+The target environment must be installed and configured **before** running an import. This includes:
+
+- Authentication (LDAP, SAML, OAuth, local users)
+- TLS certificates and encryption settings
+- Remote Execution Environments (REEs)
+- Network and firewall configuration
+- Any other environment-specific customization
+
+### Version Matching Requirement
+
+**The target AAP version must match the source AAP version exactly (major.minor).** For example:
+- A 2.6 artifact can only be imported into a 2.6 target
+- A 2.7 artifact can only be imported into a 2.7 target
+- Cross-version imports (e.g., 2.6 source → 2.7 target) are not supported
+
+Cross-version database restores cause migration failures due to schema mismatches. If you need to migrate to a different AAP version, export a new artifact from a source running the target AAP version.
+
+### Target Configuration Independence
+
+**Important:** The import process transfers data (objects, content, configurations) from the source environment but does **not** override target environment configuration. The target must be set up according to your deployment patterns and requirements *before* import runs. This ensures:
+
+- Customer-configured settings are preserved
+- Target environment follows the intended design
+- No unexpected configuration changes occur during import
+- Each target deployment remains independent and customized
+
+See [Workflows](https://github.com/ansible-collections/aap-snapshot-collection/blob/main/docs/workflows.md) for detailed pre-import checklist steps.
 
 ## Installation
 
@@ -95,15 +126,21 @@ ansible-galaxy collection install ansible.aap_snapshot --upgrade
 
 ### Export a migration artifact
 
-Create a migration artifact from a running RPM deployment:
+Export from an RPM deployment:
 
 ```bash
 ansible-playbook -i inventory ansible.aap_snapshot.artifact_export -e aap_platform=rpm
 ```
 
+Export from a containerized deployment:
+
+```bash
+ansible-playbook -i inventory ansible.aap_snapshot.artifact_export -e aap_platform=containerized
+```
+
 ### Import a migration artifact
 
-Restore a migration artifact into an OCP operator deployment:
+Restore into an OCP operator deployment:
 
 ```bash
 ansible-playbook -i inventory ansible.aap_snapshot.artifact_import \
@@ -111,6 +148,14 @@ ansible-playbook -i inventory ansible.aap_snapshot.artifact_import \
   -e artifact_file=/path/to/aap-snapshot-2.6-20260701-120000.tar \
   -e ocp_namespace=aap \
   -e aap_instance_name=aap
+```
+
+Restore into a containerized deployment:
+
+```bash
+ansible-playbook -i inventory ansible.aap_snapshot.artifact_import \
+  -e aap_platform=containerized \
+  -e artifact_file=/path/to/aap-snapshot-2.6-20260701-120000.tar
 ```
 
 ### Verify an artifact
