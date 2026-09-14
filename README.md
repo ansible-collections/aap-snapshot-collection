@@ -22,6 +22,7 @@ what is present in the inventory and artifact.
 
 ## Requirements
 
+- Ansible Automation Platform (AAP) 2.6 or later
 - Ansible core >= 2.14.0
 - PyYAML
 - kubernetes
