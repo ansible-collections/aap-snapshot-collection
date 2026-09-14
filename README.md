@@ -51,6 +51,25 @@ what is present in the inventory and artifact.
 - **Containerized export:** SSH access to component hosts, podman access on component hosts
 - **Containerized import:** SSH access to component hosts, podman access on component hosts
 
+## Pre-Import Setup
+
+The target environment must be installed and configured **before** running an import. This includes:
+
+- Authentication (LDAP, SAML, OAuth, local users)
+- TLS certificates and encryption settings
+- Remote Execution Environments (REEs)
+- Network and firewall configuration
+- Any other environment-specific customization
+
+**Important:** The import process transfers data (objects, content, configurations) from the source environment but does **not** override target environment configuration. The target must be set up according to your deployment patterns and requirements *before* import runs. This ensures:
+
+- Customer-configured settings are preserved
+- Target environment follows the intended design
+- No unexpected configuration changes occur during import
+- Each target deployment remains independent and customized
+
+See [Workflows](https://github.com/ansible-collections/aap-snapshot-collection/blob/main/docs/workflows.md) for detailed pre-import checklist steps.
+
 ## Installation
 
 Red Hat customers install certified collections from
