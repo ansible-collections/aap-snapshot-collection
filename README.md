@@ -126,15 +126,21 @@ ansible-galaxy collection install ansible.aap_snapshot --upgrade
 
 ### Export a migration artifact
 
-Create a migration artifact from a running RPM deployment:
+Export from an RPM deployment:
 
 ```bash
 ansible-playbook -i inventory ansible.aap_snapshot.artifact_export -e aap_platform=rpm
 ```
 
+Export from a containerized deployment:
+
+```bash
+ansible-playbook -i inventory ansible.aap_snapshot.artifact_export -e aap_platform=containerized
+```
+
 ### Import a migration artifact
 
-Restore a migration artifact into an OCP operator deployment:
+Restore into an OCP operator deployment:
 
 ```bash
 ansible-playbook -i inventory ansible.aap_snapshot.artifact_import \
@@ -142,6 +148,14 @@ ansible-playbook -i inventory ansible.aap_snapshot.artifact_import \
   -e artifact_file=/path/to/aap-snapshot-2.6-20260701-120000.tar \
   -e ocp_namespace=aap \
   -e aap_instance_name=aap
+```
+
+Restore into a containerized deployment:
+
+```bash
+ansible-playbook -i inventory ansible.aap_snapshot.artifact_import \
+  -e aap_platform=containerized \
+  -e artifact_file=/path/to/aap-snapshot-2.6-20260701-120000.tar
 ```
 
 ### Verify an artifact
