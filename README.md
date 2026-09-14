@@ -61,6 +61,17 @@ The target environment must be installed and configured **before** running an im
 - Network and firewall configuration
 - Any other environment-specific customization
 
+### Version Matching Requirement
+
+**The target AAP version must match the source AAP version exactly (major.minor).** For example:
+- A 2.6 artifact can only be imported into a 2.6 target
+- A 2.7 artifact can only be imported into a 2.7 target
+- Cross-version imports (e.g., 2.6 source → 2.7 target) are not supported
+
+Cross-version database restores cause migration failures due to schema mismatches. If you need to migrate to a different AAP version, export a new artifact from a source running the target AAP version.
+
+### Target Configuration Independence
+
 **Important:** The import process transfers data (objects, content, configurations) from the source environment but does **not** override target environment configuration. The target must be set up according to your deployment patterns and requirements *before* import runs. This ensures:
 
 - Customer-configured settings are preserved
