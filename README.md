@@ -11,9 +11,9 @@ imports it into a new deployment.
 | Source | Target | Status |
 |--------|--------|--------|
 | RPM Installer | OCP Operator | Supported |
-| RPM Installer | Containerized Installer | Planned |
-| Containerized Installer | OCP Operator | Planned |
-| Containerized Installer | Containerized Installer | Planned |
+| RPM Installer | Containerized Installer | Supported |
+| Containerized Installer | OCP Operator | Supported |
+| Containerized Installer | Containerized Installer | Supported |
 | OCP Operator | OCP Operator | Planned |
 
 The collection handles four AAP components: Controller, Hub (with Pulp
@@ -22,7 +22,7 @@ what is present in the inventory and artifact.
 
 ## Requirements
 
-- Ansible core >= 2.16.0
+- Ansible core >= 2.14.0
 - PyYAML
 - kubernetes
 
@@ -33,7 +33,7 @@ what is present in the inventory and artifact.
 | `ansible.posix` | `>=1.6.0` |
 | `community.postgresql` | `>=3.0.0` |
 | `containers.podman` | `>=1.14.0` |
-| `community.general` | `>=10.7.0` |
+| `community.general` | `>=9.0.0` |
 | `kubernetes.core` | `>=3.0.0` |
 
 > **Community dependency disclaimer:** This collection depends on
@@ -47,7 +47,8 @@ what is present in the inventory and artifact.
 
 - **RPM export:** SSH access to component hosts, `become` privileges
 - **OCP Operator import:** `kubeconfig` with cluster-admin or namespace-admin access
-- **Containerized:** SSH access to component hosts, podman access *(planned)*
+- **Containerized export:** SSH access to component hosts, podman access on component hosts
+- **Containerized import:** SSH access to component hosts, podman access on component hosts
 
 ## Installation
 
@@ -125,8 +126,9 @@ ansible-playbook ansible.aap_snapshot.artifact_verify \
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `aap_platform` | Yes | - | Platform type: `rpm` (export) or `operator` (import); `containerized` is planned |
-| `artifact_dir` | No | `$PWD` | Directory for artifact creation/extraction |
+| `aap_platform` | Yes | - | Source/target platform: `rpm`, `containerized`, or `operator` |
+| `artifact_dest_dir` | No | `$PWD` | Directory where the final artifact `.tar` is written (export) |
+| `artifact_build_dir` | No | `$PWD/artifact` | Scratch directory used during artifact assembly (export) |
 | `artifact_file` | Import/Verify | - | Path to the artifact archive |
 | `ocp_namespace` | OCP | `aap` | OpenShift namespace |
 | `aap_instance_name` | OCP | `aap` | AAP CR instance name |
@@ -137,7 +139,7 @@ See the [variables reference](https://github.com/ansible-collections/aap-snapsho
 
 ## Testing
 
-The collection supports RPM export and OCP operator import on RHEL 8 and RHEL 9.
+The collection supports RPM and containerized export, and OCP operator and containerized import, on RHEL 8 and RHEL 9.
 
 Dev dependencies: `pip install pytest pyyaml ansible-lint`
 
