@@ -16,11 +16,10 @@
     msg: >-
       No AnsibleAutomationPlatform CR named '{{ aap_instance_name }}' found in
       namespace '{{ ocp_utils_ocp_namespace }}'.
-      Available: {{ _ocp_utils_aap_cr_check.resources | map(attribute='metadata.name') | list | join(', ') }}.
+      Available: {{ _ocp_utils_aap_cr_check.resources | map(attribute='metadata.name') | list | join(', ') or 'none' }}.
   when:
     - aap_instance_name is defined
-    - _ocp_utils_aap_cr_check.resources | length > 0
-    - _ocp_utils_aap_cr_check.resources | selectattr('metadata.name', 'equalto', aap_instance_name) | list | length == 0
+    - aap_instance_name not in (_ocp_utils_aap_cr_check.resources | map(attribute='metadata.name') | list)
 
 - name: Fail when multiple AAP CRs found in namespace
   ansible.builtin.fail:
