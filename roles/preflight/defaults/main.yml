@@ -17,9 +17,11 @@ preflight_gateway_manage_cmd: "aap-gateway-manage"
 # never touches.
 #
 # On RPM/containerized targets, the in-scope list is instead derived directly
-# from non-empty inventory groups (see check_gateway_status.yml), so this var
-# is only consulted on operator (OCP) targets, where component discovery uses
-# per-component CR-name facts rather than a uniform group structure.
+# from non-empty inventory groups, minus any component excluded via
+# artifact_import_* on a containerized import (see check_gateway_status.yml),
+# so this var is only consulted on operator (OCP) targets, where component
+# discovery uses per-component CR-name facts rather than a uniform group
+# structure.
 preflight_in_scope_gateway_services:
   - controller
   - hub
@@ -37,6 +39,13 @@ preflight_known_rwx_storage_classes:
 preflight_containerized_staging_dir: "{{ ansible_user_dir | default('~') }}/aap/backups/migration"
 preflight_containerized_temp_container: "aap-snapshot-restore"
 preflight_containerized_postgresql_container: "postgresql"
+
+# Import control (containerized only; gateway is always imported). Duplicated
+# from roles/artifact/defaults/main.yml - preflight runs before the artifact
+# role is included, so it can't rely on that role's defaults being loaded yet.
+artifact_import_controller: true
+artifact_import_eda: true
+artifact_import_hub: true
 
 # Kubeconfig resolution for this role's own OCP checks (check_ocp_target.yml),
 # which run before ocp_utils is loaded elsewhere in the play and so can't rely

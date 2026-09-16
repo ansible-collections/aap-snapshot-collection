@@ -67,8 +67,14 @@ Control artifact restoration to the target platform.
 ### Containerized Component Exclusion
 
 Set any of these to `false` to skip that component's DB restore, content
-transfer, and secret update during a containerized import. There is no
-equivalent switch for gateway - it's always imported.
+transfer, and secret update during a containerized import, along with its
+preflight checks (service status, database connectivity, version, and the
+gateway status API's in-scope backend list) - so a component that is
+intentionally excluded, including one that's unhealthy or on a mismatched
+version, won't block the rest of the import. There is no equivalent switch
+for gateway - it's always imported. These variables only affect containerized
+imports; they have no effect on export or on OCP (operator) imports, which
+use CR presence on the target to decide which components to import.
 
 | Variable | Default | Description |
 |----------|---------|--------------|
