@@ -1,0 +1,3 @@
+---
+bugfixes:
+  - Fix incorrect parameter usage in preflight database checks - use login_db instead of deprecated db parameter for community.postgresql.postgresql_query module.
