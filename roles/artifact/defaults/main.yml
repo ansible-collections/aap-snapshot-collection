@@ -23,6 +23,11 @@ __artifact_supported_schema_versions:
 artifact_export_hub_content: true
 artifact_postgresql_db_type: 'managed'
 
+### import control (containerized only; gateway is always imported)
+artifact_import_controller: true
+artifact_import_eda: true
+artifact_import_hub: true
+
 ### build variables
 artifact_build_dir: '{{ lookup("env", "PWD") }}/artifact'
 __artifact_build_dir: '{{ artifact_build_dir.rstrip("/") }}'

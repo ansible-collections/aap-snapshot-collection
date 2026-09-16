@@ -12,6 +12,36 @@
              + (['gateway'] if groups.get('gateway_groups', []) | length > 0 else []) }}
       run_once: true
 
+    - name: Determine components explicitly excluded from this import
+      ansible.builtin.set_fact:
+        _artifact_containerized_excluded_components: >-
+          {{ (['controller'] if not (artifact_import_controller | bool) else [])
+             + (['eda'] if not (artifact_import_eda | bool) else [])
+             + (['hub'] if not (artifact_import_hub | bool) else [])
+             | intersect(_artifact_containerized_target_components) }}
+      run_once: true
+      delegate_to: localhost
+      delegate_facts: true
+
+    - name: Determine components actually being imported
+      ansible.builtin.set_fact:
+        _artifact_import_components: >-
+          {{ _artifact_containerized_target_components
+             | difference(_artifact_containerized_excluded_components) }}
+      run_once: true
+      delegate_to: localhost
+      delegate_facts: true
+
+    - name: Warn about components explicitly excluded from this import
+      ansible.builtin.debug:
+        msg: >-
+          Component '{{ item }}' is present on the target but was explicitly
+          excluded from this import (artifact_import_{{ item }}=false) - skipping.
+      loop: "{{ _artifact_containerized_excluded_components }}"
+      loop_control:
+        label: "{{ item }}"
+      run_once: true
+
     - name: Check if hub content data is available in artifact
       ansible.builtin.set_fact:
         artifact_hub_has_content_data: >-
@@ -29,6 +59,7 @@
         tasks_from: check_storage_backend.yml
       when:
         - artifact_hub_has_content_data | bool
+        - artifact_import_hub | bool
         - inventory_hostname in groups.get('hub_groups', [])
 
     - name: Warn about components in artifact but not on target
@@ -65,6 +96,7 @@
         component_name: controller
       when:
         - groups.get('controller_groups', []) | length > 0
+        - artifact_import_controller | bool
         - inventory_hostname == groups['controller_groups'][0]
 
     - name: Get DB credentials for hub
@@ -75,6 +107,7 @@
         component_name: hub
       when:
         - groups.get('hub_groups', []) | length > 0
+        - artifact_import_hub | bool
         - inventory_hostname == groups['hub_groups'][0]
 
     - name: Get DB credentials for gateway
@@ -95,6 +128,7 @@
         component_name: eda
       when:
         - groups.get('eda_groups', []) | length > 0
+        - artifact_import_eda | bool
         - inventory_hostname == groups['eda_groups'][0]
 
     # --- Stop services ---
@@ -113,6 +147,7 @@
         tasks_from: stop_service.yml
       when:
         - groups.get('eda_groups', []) | length > 0
+        - artifact_import_eda | bool
         - inventory_hostname in groups.get('eda_groups', [])
 
     - name: Stop hub
@@ -121,6 +156,7 @@
         tasks_from: stop_service.yml
       when:
         - groups.get('hub_groups', []) | length > 0
+        - artifact_import_hub | bool
         - inventory_hostname in groups.get('hub_groups', [])
 
     - name: Stop controller
@@ -129,6 +165,7 @@
         tasks_from: stop_service.yml
       when:
         - groups.get('controller_groups', []) | length > 0
+        - artifact_import_controller | bool
         - inventory_hostname in groups.get('controller_groups', [])
 
     - name: Stop gateway
@@ -146,6 +183,7 @@
         tasks_from: import.yml
       when:
         - groups.get('controller_groups', []) | length > 0
+        - artifact_import_controller | bool
         - inventory_hostname == groups['controller_groups'][0]
 
     - name: Import hub
@@ -154,6 +192,7 @@
         tasks_from: import.yml
       when:
         - groups.get('hub_groups', []) | length > 0
+        - artifact_import_hub | bool
         - inventory_hostname == groups['hub_groups'][0]
 
     # Runs on every hub host (not just group[0] like the DB import above) -
@@ -164,6 +203,7 @@
         tasks_from: import_hub_content_containerized.yml
       when:
         - groups.get('hub_groups', []) | length > 0
+        - artifact_import_hub | bool
         - inventory_hostname in groups.get('hub_groups', [])
 
     - name: Import gateway
@@ -180,6 +220,7 @@
         tasks_from: import.yml
       when:
         - groups.get('eda_groups', []) | length > 0
+        - artifact_import_eda | bool
         - inventory_hostname == groups['eda_groups'][0]
 
     # --- Update secrets (every node - each has its own local podman secret store) ---
@@ -191,6 +232,7 @@
         component_name: controller
       when:
         - groups.get('controller_groups', []) | length > 0
+        - artifact_import_controller | bool
         - inventory_hostname in groups.get('controller_groups', [])
 
     - name: Update hub secret
@@ -201,6 +243,7 @@
         component_name: hub
       when:
         - groups.get('hub_groups', []) | length > 0
+        - artifact_import_hub | bool
         - inventory_hostname in groups.get('hub_groups', [])
 
     - name: Update gateway secret
@@ -221,6 +264,7 @@
         component_name: eda
       when:
         - groups.get('eda_groups', []) | length > 0
+        - artifact_import_eda | bool
         - inventory_hostname in groups.get('eda_groups', [])
 
     # Service startup and reconciliation are intentionally omitted here.
