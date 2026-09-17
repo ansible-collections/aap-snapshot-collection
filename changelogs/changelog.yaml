@@ -572,3 +572,24 @@ releases:
     - skip-orphan-deprovision-containerized.yaml
     - use-operator-sa-token-for-pulp-repair.yaml
     release_date: '2026-09-08'
+  1.1.1:
+    changes:
+      bugfixes:
+      - Fix hub_secret (pulp Django SECRET_KEY) missing from RPM export artifact by
+        including optional_secret_keys returned by aap_component_info in the secrets
+        payload.
+      - Fix incorrect parameter usage in preflight database checks - use login_db
+        instead of deprecated db parameter for community.postgresql.postgresql_query
+        module.
+      minor_changes:
+      - Lower the minimum ansible-core requirement from 2.16 to 2.14 to support RHEL
+        9 control nodes where the containerized installer ships ansible-core 2.14,
+        and RHEL 10 control nodes where it ships ansible-core 2.16. The community.general
+        dependency constraint is lowered from >=10.7.0 to >=9.0.0 accordingly; the
+        only module used from that collection (community.general.archive) has had
+        a stable interface since 1.x.
+    fragments:
+    - fix-postgresql-query-login-db-parameter.yaml
+    - lower-ansible-core-requirement-to-2.14.yaml
+    - rpm-hub-secret-collection.yaml
+    release_date: '2026-09-17'
