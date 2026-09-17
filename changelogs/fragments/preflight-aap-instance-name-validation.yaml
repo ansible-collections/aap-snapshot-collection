@@ -1,0 +1,7 @@
+---
+bugfixes:
+  - ocp_utils check_aap_cr - fail early with a clear message when
+    ``aap_instance_name`` is explicitly provided but no
+    ``AnsibleAutomationPlatform`` CR with that name exists in the namespace;
+    previously the collection silently continued with the wrong name, causing
+    operations such as ``idle_aap`` to no-op without error.
