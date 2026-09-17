@@ -46,6 +46,7 @@
     tasks_from: preflight.yml
   when:
     - groups.get('controller_groups', []) | length > 0
+    - (_snapshot_operation | default('') != 'import') or (artifact_import_controller | bool)
     - inventory_hostname in groups.get('controller_groups', [])
 
 - name: Pre-flight Automation EDA
@@ -54,6 +55,7 @@
     tasks_from: preflight.yml
   when:
     - groups.get('eda_groups', []) | length > 0
+    - (_snapshot_operation | default('') != 'import') or (artifact_import_eda | bool)
     - inventory_hostname in groups.get('eda_groups', [])
 
 - name: Pre-flight Automation Gateway
@@ -70,5 +72,6 @@
     tasks_from: preflight.yml
   when:
     - groups.get('hub_groups', []) | length > 0
+    - (_snapshot_operation | default('') != 'import') or (artifact_import_hub | bool)
     - inventory_hostname in groups.get('hub_groups', [])
 ...

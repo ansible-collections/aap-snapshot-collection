@@ -104,12 +104,26 @@
         file_type: any
       register: _preflight_service_files
 
+    # Only excludes on import - export always needs every service running,
+    # regardless of an import-only exclusion switch left set in inventory.
+    - name: Determine excluded component service-name prefixes for this import
+      ansible.builtin.set_fact:
+        _preflight_excluded_service_prefixes: >-
+          {{ ((['automation-controller-'] if not (artifact_import_controller | bool) else [])
+              + (['automation-eda-'] if not (artifact_import_eda | bool) else [])
+              + (['automation-hub-'] if not (artifact_import_hub | bool) else []))
+             if _snapshot_operation | default('') == 'import' else [] }}
+
     - name: Check each AAP service is active
       ansible.builtin.systemd:
         name: "{{ item | basename | regex_replace('\\.service$', '') }}"
         scope: user
       register: _preflight_svc_status
-      loop: "{{ _preflight_service_files.files | map(attribute='path') | list }}"
+      loop: >-
+        {{ (_preflight_service_files.files | map(attribute='path') | list
+            | reject('search', '(' ~ _preflight_excluded_service_prefixes | join('|') ~ ')'))
+           if _preflight_excluded_service_prefixes | length > 0
+           else _preflight_service_files.files | map(attribute='path') | list }}
       loop_control:
         label: "{{ item | basename }}"
 

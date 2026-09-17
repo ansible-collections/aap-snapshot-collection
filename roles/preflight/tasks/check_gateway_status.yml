@@ -38,15 +38,25 @@
       ansible.builtin.set_fact:
         _preflight_in_scope_gateway_services: >-
           {{
-            groups
-            | dict2items
-            | selectattr('key', 'match', '.*_groups$')
-            | rejectattr('key', 'equalto', 'gateway_groups')
-            | selectattr('value')
-            | map(attribute='key')
-            | map('regex_replace', '_groups$', '')
-            | list
+            (groups
+             | dict2items
+             | selectattr('key', 'match', '.*_groups$')
+             | rejectattr('key', 'equalto', 'gateway_groups')
+             | selectattr('value')
+             | map(attribute='key')
+             | map('regex_replace', '_groups$', '')
+             | list)
+            | difference(_preflight_excluded_gateway_backends)
           }}
+      vars:
+        # Only excludes on a containerized import - RPM has no exclusion
+        # switches, and export always needs every backend present.
+        _preflight_excluded_gateway_backends: >-
+          {{ ((['controller'] if not (artifact_import_controller | bool) else [])
+              + (['eda'] if not (artifact_import_eda | bool) else [])
+              + (['hub'] if not (artifact_import_hub | bool) else []))
+             if (aap_platform == 'containerized' and _snapshot_operation | default('') == 'import')
+             else [] }}
 
     - name: Warn if gateway reports an out-of-scope backend as unhealthy
       ansible.builtin.debug:

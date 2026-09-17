@@ -1,0 +1,3 @@
+---
+minor_changes:
+  - Add `artifact_import_controller`, `artifact_import_eda`, and `artifact_import_hub` variables to allow excluding individual components from a containerized import, including their preflight checks (gateway is always imported).

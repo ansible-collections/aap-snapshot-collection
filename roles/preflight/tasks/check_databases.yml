@@ -180,6 +180,7 @@
       changed_when: false
       when:
         - groups.get('controller_groups', []) | length > 0
+        - (_snapshot_operation | default('') != 'import') or (artifact_import_controller | bool)
         - inventory_hostname == groups['controller_groups'][0]
 
     - name: Verify hub database (containerized)
@@ -190,6 +191,7 @@
       changed_when: false
       when:
         - groups.get('hub_groups', []) | length > 0
+        - (_snapshot_operation | default('') != 'import') or (artifact_import_hub | bool)
         - inventory_hostname == groups['hub_groups'][0]
 
     - name: Verify EDA database (containerized)
@@ -200,5 +202,6 @@
       changed_when: false
       when:
         - groups.get('eda_groups', []) | length > 0
+        - (_snapshot_operation | default('') != 'import') or (artifact_import_eda | bool)
         - inventory_hostname == groups['eda_groups'][0]
 ...

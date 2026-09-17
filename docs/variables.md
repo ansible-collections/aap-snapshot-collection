@@ -64,6 +64,24 @@ Control artifact restoration to the target platform.
 | `postgresql_restore_timeout` | `3600` | Async timeout in seconds for `pg_restore` |
 | `postgresql_temp_container_image` | `registry.redhat.io/rhel9/postgresql-15:latest` | Image used for the throwaway postgres client container that runs `pg_dump`/`pg_restore` on containerized targets. Override if your target's PostgreSQL server version differs |
 
+### Containerized Component Exclusion
+
+Set any of these to `false` to skip that component's DB restore, content
+transfer, and secret update during a containerized import, along with its
+preflight checks (service status, database connectivity, version, and the
+gateway status API's in-scope backend list) - so a component that is
+intentionally excluded, including one that's unhealthy or on a mismatched
+version, won't block the rest of the import. There is no equivalent switch
+for gateway - it's always imported. These variables only affect containerized
+imports; they have no effect on export or on OCP (operator) imports, which
+use CR presence on the target to decide which components to import.
+
+| Variable | Default | Description |
+|----------|---------|--------------|
+| `artifact_import_controller` | `true` | Set `false` to skip importing the controller component during containerized import |
+| `artifact_import_eda` | `true` | Set `false` to skip importing the EDA component during containerized import |
+| `artifact_import_hub` | `true` | Set `false` to skip importing the hub component (including hub content) during containerized import |
+
 ## OCP (Operator) Variables
 
 Apply when `aap_platform: operator`. Control interaction with the OpenShift
