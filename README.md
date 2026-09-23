@@ -34,7 +34,7 @@ what is present in the inventory and artifact.
 | `ansible.posix` | `>=1.6.0` |
 | `community.postgresql` | `>=3.0.0` |
 | `containers.podman` | `>=1.14.0` |
-| `community.general` | `>=9.0.0` |
+| `community.general` | `>=10.7.0` |
 | `kubernetes.core` | `>=3.0.0` |
 
 > **Community dependency disclaimer:** This collection depends on
@@ -214,7 +214,7 @@ help available on the [Ansible Forum](https://forum.ansible.com/).
 
 ## Release Notes
 
-See the [changelog](https://github.com/ansible-collections/aap-snapshot-collection/blob/main/CHANGELOG.md) for release notes.
+See the [changelog](https://github.com/ansible-collections/aap-snapshot-collection/blob/main/CHANGELOG.rst) for release notes.
 
 ## Related Information
 
