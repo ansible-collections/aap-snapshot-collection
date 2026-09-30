@@ -1,5 +1,7 @@
 ---
 extends: default
+ignore: |
+  changelogs/
 rules:
   line-length: disable
   truthy:

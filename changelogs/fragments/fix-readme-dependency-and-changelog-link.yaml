@@ -1,0 +1,3 @@
+---
+trivial:
+  - Fix README community.general dependency version to match galaxy.yml (>=10.7.0), fix changelog link to point to CHANGELOG.rst instead of non-existent CHANGELOG.md, and exclude changelogs/ from yamllint to suppress warnings on auto-generated files.
