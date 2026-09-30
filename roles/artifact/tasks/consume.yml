@@ -19,7 +19,7 @@
              | selectattr('name', 'equalto', 'hub')
              | map(attribute='has_content_data')
              | first | default(false) | bool }}
-      # default(false) catches both: empty list (hub absent) and missing has_content_data attribute (older artifacts)
+      # Missing Hub entries or legacy flags default to no embedded content.
 
     # Must run before Stop below - a hub restore requires local FileSystem
     # storage, and that must be confirmed before any component is stopped.
@@ -29,6 +29,7 @@
         tasks_from: check_storage_backend.yml
       when:
         - artifact_hub_has_content_data | bool
+        - automationhub_import_hub_content | default(true) | bool
         - inventory_hostname in groups.get('hub_groups', [])
 
     - name: Warn about components in artifact but not on target
@@ -261,18 +262,19 @@
              | selectattr('name', 'equalto', 'hub')
              | map(attribute='has_content_data')
              | first | default(false) | bool }}
-      # first catches missing hub component, default catches older artifacts without has_content_data
+      # Missing Hub entries or legacy flags default to no embedded content.
 
-    # Must run before staging/idling AAP below - a hub content restore
-    # requires local FileSystem storage, and that must be confirmed before
-    # the artifact is staged or AAP is idled for import.
-    - name: Verify Hub storage backend supports content import
+    # Determine the target backend and validate S3 connectivity before
+    # staging the artifact or idling AAP, but only when embedded content will
+    # actually be restored.
+    - name: Discover Hub storage backend and validate import prerequisites
       ansible.builtin.include_role:
         name: ansible.aap_snapshot.automationhub
         tasks_from: check_storage_backend_ocp.yml
       when:
         - "'hub' in _artifact_import_components"
         - artifact_hub_has_content_data | default(false) | bool
+        - automationhub_import_hub_content | default(true) | bool
 
     - name: Warn about components in artifact but not on target
       ansible.builtin.debug:
@@ -344,7 +346,11 @@
       ansible.builtin.include_role:
         name: ansible.aap_snapshot.ocp_utils
         tasks_from: delete_hub_file_storage_pvc.yml
-      when: "'hub' in _artifact_import_components"
+      when:
+        - "'hub' in _artifact_import_components"
+        - artifact_hub_has_content_data | default(false) | bool
+        - automationhub_import_hub_content | default(true) | bool
+        - _automationhub_storage_type == 'filesystem'
 
     - name: Import gateway
       ansible.builtin.include_role:
@@ -372,7 +378,19 @@
         tasks_from: import_hub_content.yml
       when:
         - "'hub' in _artifact_import_components"
-        - artifact_hub_has_content_data | default(false)
+        - artifact_hub_has_content_data | default(false) | bool
+        - automationhub_import_hub_content | default(true) | bool
+        - _automationhub_storage_type == 'filesystem'
+
+    - name: Restore hub content to S3 storage
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.automationhub
+        tasks_from: import_hub_content_s3.yml
+      when:
+        - "'hub' in _artifact_import_components"
+        - artifact_hub_has_content_data | default(false) | bool
+        - automationhub_import_hub_content | default(true) | bool
+        - _automationhub_storage_type == 's3'
 
     # --- Resume AAP ---
     - name: Scale operators back up

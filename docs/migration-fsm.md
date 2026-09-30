@@ -77,7 +77,8 @@ ansible-playbook ansible.aap_snapshot.artifact_export \
 
 ### Export decision points
 
-- **Hub content**: set `export_hub_content: false` to skip Pulp content data
+- **Hub content**: set `artifact_export_hub_content: false` to skip Pulp content data;
+  existing playbooks can also set `export_hub_content: false`
   (saves significant time and disk for large hub deployments)
 - **Component selection**: only components present in inventory are exported;
   omit a group to skip that component

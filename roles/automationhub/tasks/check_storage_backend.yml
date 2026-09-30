@@ -39,8 +39,9 @@
       '{{ _automationhub_storage_backend }}'. Containerized hub content
       import currently only supports Pulp's local FileSystem storage.
       Importing hub content into an Azure Blob or AWS S3-backed hub is not
-      yet implemented and is tracked separately - re-run the import without
-      hub content, or wait for object-storage import support to land,
-      before importing hub content onto this target.
+      implemented yet. Re-export with
+      artifact_export_hub_content=false, or set
+      automationhub_import_hub_content=false to skip restoring the embedded
+      content and handle it separately.
   when: "'filesystem' not in (_automationhub_storage_backend | lower)"
 ...

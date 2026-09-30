@@ -39,9 +39,11 @@
 
     - name: Transfer hub content tarball to every hub node
       ansible.builtin.include_tasks: transfer_hub_content.yml
-      when: >-
-        (artifact_manifest.components
+      when:
+        - >-
+          artifact_manifest.components
           | selectattr('name', 'equalto', 'hub')
           | map(attribute='has_content_data')
-          | first | default(false) | bool)
+          | first | default(false) | bool
+        - automationhub_import_hub_content | default(true) | bool
 ...

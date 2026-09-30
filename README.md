@@ -140,6 +140,10 @@ ansible-playbook -i inventory ansible.aap_snapshot.artifact_export -e aap_platfo
 
 ### Import a migration artifact
 
+OCP Hub content import supports a target Hub configured with an S3-compatible
+backend. The import uses the endpoint and credentials already configured on
+the target Hub. Azure Blob content import is not supported.
+
 Restore into an OCP operator deployment:
 
 ```bash
@@ -177,7 +181,7 @@ ansible-playbook ansible.aap_snapshot.artifact_verify \
 | `artifact_file` | Import/Verify | - | Path to the artifact archive |
 | `ocp_namespace` | OCP | `aap` | OpenShift namespace |
 | `aap_instance_name` | OCP | `aap` | AAP CR instance name |
-| `artifact_export_hub_content` | No | `true` | Include Pulp content data in artifact |
+| `artifact_export_hub_content` | No | `true` | Include Pulp content data in artifact; set `false` to omit it |
 | `artifact_postgresql_db_type` | No | `managed` | Database topology: `managed` or `external` |
 
 See the [variables reference](https://github.com/ansible-collections/aap-snapshot-collection/blob/main/docs/variables.md) for the complete list.

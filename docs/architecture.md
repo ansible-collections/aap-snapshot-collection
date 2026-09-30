@@ -83,7 +83,7 @@ checks, and service management.
 | `export_hub` | Export hub (delegates to `export_component`) | `artifact_export.yaml` |
 | `export_gateway` | Export gateway (delegates to `export_component`) | `artifact_export.yaml` |
 | `export_eda` | Export EDA (delegates to `export_component`) | `artifact_export.yaml` |
-| `export_hub_content` | Export Pulp content data as tarball | `export_component` (hub only) |
+| `artifact_export_hub_content` | Export Pulp content data as tarball | `export_component` (hub only) |
 
 ### Import Roles
 

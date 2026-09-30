@@ -1,10 +1,7 @@
 ---
-# OCP equivalent of check_storage_backend.yml - execs into the hub pod via
-# kubernetes.core.k8s_exec instead of a local podman container. Called from
-# consume.yml before the artifact is staged or AAP is idled, so a
-# not-yet-implemented S3/Azure Blob target is caught before any destructive
-# stop/restore work starts, matching the containerized path's fail-fast
-# behavior.
+# Inspect Hub's configured backend before any import work starts. Filesystem
+# content keeps the existing PVC restore path; S3 content is uploaded by the
+# temporary S3-capable pod after the Hub database is restored.
 - name: Assert hub pod was discovered for storage backend check
   ansible.builtin.assert:
     that: _ocp_utils_hub_pod_name is defined
@@ -14,49 +11,157 @@
       verified before importing hub content - bring the hub pod to Running
       and retry.
 
-- name: Determine Hub Pulp storage backend (OCP)
+- name: Determine Hub Pulp storage settings (OCP)
   kubernetes.core.k8s_exec:
     namespace: "{{ automationhub_ocp_namespace }}"
     pod: "{{ _ocp_utils_hub_pod_name }}"
     container: "{{ _ocp_utils_hub_container_name }}"
-    # settings.STORAGES is a dynaconf Box, not a plain dict - its repr
-    # (`<Box: {...}>`) isn't valid YAML/JSON, so convert it explicitly and
-    # emit real JSON rather than a Python repr (same class of bug as the
-    # original BUG-1 in db_auth.yml).
     command: >-
       pulpcore-manager shell -c
-      "import json; from django.conf import settings; s = getattr(settings, 'STORAGES', None); s = s.to_dict() if hasattr(s, 'to_dict') else s; print(json.dumps({'STORAGES': s, 'DEFAULT_FILE_STORAGE': getattr(settings, 'DEFAULT_FILE_STORAGE', None)}))"
+      "import json; from django.core.files.storage import storages; s = storages['default']; backend = type(s).__module__ + '.' + type(s).__name__; connection = getattr(s, 'connection', None); client = getattr(getattr(connection, 'meta', None), 'client', None); config = getattr(getattr(client, 'meta', None), 'config', None); s3_config = (getattr(config, 's3', {}) or {}) if config else {}; print(json.dumps({'backend': backend, 'bucket_name': getattr(s, 'bucket_name', ''), 'endpoint_url': getattr(getattr(client, '_endpoint', None), 'host', '') if client else '', 'region_name': getattr(getattr(client, 'meta', None), 'region_name', '') if client else '', 'location': getattr(s, 'location', ''), 'addressing_style': s3_config.get('addressing_style', '')}))"
   environment: "{{ automationhub_ocp_environment }}"
   changed_when: false
-  # k8s_exec never fails the task on its own - it always exit_json()s with
-  # whatever rc the command produced, unlike podman_container_exec (used by
-  # the containerized version of this check).
   failed_when: _automationhub_storage_dump.rc != 0
   no_log: "{{ not (disable_no_log | default(false) | bool) }}"
   register: _automationhub_storage_dump
 
-- name: Parse Hub storage backend settings (OCP)
+- name: Parse Hub storage settings (OCP)
   ansible.builtin.set_fact:
     _automationhub_storage_settings: "{{ (_automationhub_storage_dump.stdout | trim) | from_json }}"
   no_log: "{{ not (disable_no_log | default(false) | bool) }}"
 
-- name: Resolve Hub's configured storage backend class (OCP)
+- name: Resolve Hub storage backend and safe S3 settings (OCP)
   ansible.builtin.set_fact:
-    _automationhub_storage_backend: >-
-      {{ ((_automationhub_storage_settings.STORAGES.default.BACKEND | default(''))
-          if (_automationhub_storage_settings.STORAGES | default(none)) is mapping
-          else (_automationhub_storage_settings.DEFAULT_FILE_STORAGE | default(''))) }}
+    _automationhub_storage_backend: "{{ _automationhub_storage_settings.backend | default('') }}"
+    _automationhub_storage_type: >-
+      {{
+        's3'
+        if 's3' in (_automationhub_storage_settings.backend | default('') | lower)
+        else (
+          'filesystem'
+          if 'filesystem' in (_automationhub_storage_settings.backend | default('') | lower)
+          else 'unsupported'
+        )
+      }}
+    _automationhub_s3_bucket_name: "{{ _automationhub_storage_settings.bucket_name | default('') }}"
+    _automationhub_s3_endpoint_url: "{{ _automationhub_storage_settings.endpoint_url | default('') }}"
+    _automationhub_s3_region_name: "{{ _automationhub_storage_settings.region_name | default('') }}"
+    _automationhub_s3_storage_location: "{{ _automationhub_storage_settings.location | default('') }}"
+    _automationhub_s3_addressing_style: "{{ _automationhub_storage_settings.addressing_style | default('') }}"
+  no_log: "{{ not (disable_no_log | default(false) | bool) }}"
 
-- name: Fail if Hub is not using local FileSystem storage (OCP)
+- name: Read Hub CR for its S3 credentials Secret reference (OCP)
+  kubernetes.core.k8s_info:
+    api_version: automationhub.ansible.com/v1beta1
+    kind: AutomationHub
+    namespace: "{{ automationhub_ocp_namespace }}"
+    name: "{{ _hub_cr_name }}"
+  environment: "{{ automationhub_ocp_environment }}"
+  register: _automationhub_hub_cr
+  no_log: "{{ not (disable_no_log | default(false) | bool) }}"
+  when: _automationhub_storage_type == 's3'
+
+- name: Assert Hub CR exists for S3 storage configuration
+  ansible.builtin.assert:
+    that: _automationhub_hub_cr.resources | default([]) | length > 0
+    fail_msg: >-
+      Hub CR '{{ _hub_cr_name }}' was not found while resolving its S3
+      credentials Secret.
+  when: _automationhub_storage_type == 's3'
+
+- name: Resolve Hub S3 credentials Secret name
+  ansible.builtin.set_fact:
+    _automationhub_s3_secret_name: >-
+      {{ _automationhub_hub_cr.resources[0].spec.object_storage_s3_secret | default('') }}
+  no_log: "{{ not (disable_no_log | default(false) | bool) }}"
+  when: _automationhub_storage_type == 's3'
+
+- name: Assert Hub CR references an S3 credentials Secret
+  ansible.builtin.assert:
+    that: _automationhub_s3_secret_name | length > 0
+    fail_msg: >-
+      Hub CR '{{ _hub_cr_name }}' does not specify object_storage_s3_secret.
+      S3 content import requires the target Hub's configured credentials Secret.
+  when: _automationhub_storage_type == 's3'
+
+- name: Read Hub S3 credentials Secret metadata
+  kubernetes.core.k8s_info:
+    kind: Secret
+    namespace: "{{ automationhub_ocp_namespace }}"
+    name: "{{ _automationhub_s3_secret_name }}"
+  environment: "{{ automationhub_ocp_environment }}"
+  register: _automationhub_s3_secret
+  no_log: "{{ not (disable_no_log | default(false) | bool) }}"
+  when: _automationhub_storage_type == 's3'
+
+- name: Assert Hub S3 credentials Secret contains the required fields
+  ansible.builtin.assert:
+    that:
+      - _automationhub_s3_secret.resources | length > 0
+      - _automationhub_s3_secret.resources[0].data is defined
+      - "'s3-access-key-id' in _automationhub_s3_secret.resources[0].data"
+      - "'s3-secret-access-key' in _automationhub_s3_secret.resources[0].data"
+      - "'s3-bucket-name' in _automationhub_s3_secret.resources[0].data"
+      - "'s3-region' in _automationhub_s3_secret.resources[0].data"
+    fail_msg: >-
+      S3 Secret '{{ _automationhub_s3_secret_name }}' must contain
+      s3-access-key-id, s3-secret-access-key, s3-bucket-name, and s3-region.
+  when: _automationhub_storage_type == 's3'
+
+- name: Register Hub API pod as an S3 preflight host
+  ansible.builtin.add_host:
+    name: automationhub_s3_preflight
+    ansible_connection: kubernetes.core.kubectl
+    ansible_kubectl_kubeconfig: "{{ __automationhub_resolved_kubeconfig }}"
+    ansible_kubectl_namespace: "{{ automationhub_ocp_namespace }}"
+    ansible_kubectl_pod: "{{ _ocp_utils_hub_pod_name }}"
+    ansible_kubectl_container: "{{ _ocp_utils_hub_container_name }}"
+    ansible_python_interpreter: /usr/bin/python3
+    ansible_remote_tmp: /tmp/.ansible/tmp
+  no_log: "{{ not (disable_no_log | default(false) | bool) }}"
+  when:
+    - _automationhub_storage_type == 's3'
+    - artifact_hub_has_content_data | default(false) | bool
+    - automationhub_import_hub_content | default(true) | bool
+
+- name: Verify Ansible module execution in Hub API pod for S3 preflight
+  ansible.builtin.ping:
+  delegate_to: automationhub_s3_preflight
+  when:
+    - _automationhub_storage_type == 's3'
+    - artifact_hub_has_content_data | default(false) | bool
+    - automationhub_import_hub_content | default(true) | bool
+
+- name: Verify Hub S3 bucket is reachable before importing content (OCP)
+  amazon.aws.s3_object_info:
+    bucket_name: "{{ _automationhub_s3_bucket_name }}"
+    max_keys: 1
+    endpoint_url: "{{ _automationhub_s3_endpoint_url | default(omit, true) }}"
+    region: "{{ _automationhub_s3_region_name | default('us-east-1', true) }}"
+    access_key: "{{ _automationhub_s3_secret.resources[0].data['s3-access-key-id'] | b64decode }}"
+    secret_key: "{{ _automationhub_s3_secret.resources[0].data['s3-secret-access-key'] | b64decode }}"
+    aws_config: >-
+      {{ {'s3': {'addressing_style': _automationhub_s3_addressing_style}}
+         if _automationhub_s3_addressing_style in ['auto', 'path', 'virtual']
+         else omit }}
+    validate_certs: "{{ automationhub_s3_validate_certs | bool }}"
+  delegate_to: automationhub_s3_preflight
+  changed_when: false
+  no_log: "{{ not (disable_no_log | default(false) | bool) }}"
+  when:
+    - _automationhub_storage_type == 's3'
+    - artifact_hub_has_content_data | default(false) | bool
+    - automationhub_import_hub_content | default(true) | bool
+
+- name: Fail if Hub storage backend is unsupported for embedded content import
   ansible.builtin.fail:
     msg: >-
       Hub CR '{{ _hub_cr_name }}' in namespace {{ automationhub_ocp_namespace }}
       is configured with storage backend '{{ _automationhub_storage_backend }}'.
-      Hub content import currently only supports Pulp's local FileSystem
-      storage (backed by a PVC). Importing hub content into an Azure Blob or
-      AWS S3-backed hub is not yet implemented and is tracked separately -
-      re-export the artifact with automationhub_export_hub_content=false to
-      import without hub content, or wait for object-storage import support
-      to land, before importing hub content onto this target.
-  when: "'filesystem' not in (_automationhub_storage_backend | lower)"
+      OCP Hub content import supports Pulp FileSystem storage and S3-compatible
+      storage. Azure Blob Storage and other backends are not supported.
+  when:
+    - artifact_hub_has_content_data | default(false) | bool
+    - automationhub_import_hub_content | default(true) | bool
+    - _automationhub_storage_type not in ['filesystem', 's3']
 ...
