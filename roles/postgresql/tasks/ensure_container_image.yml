@@ -1,0 +1,92 @@
+---
+# Ensure the PostgreSQL container image is available on the current host.
+# On split topologies (database on a separate host) the image may only
+# exist on the database host.  This task checks locally first, and only
+# when the image is missing does it discover, save, transfer, and load
+# the image from the database host — which also covers air-gapped
+# environments where the target cannot reach registry.redhat.io.
+
+- name: Check if postgres image already exists on target host
+  containers.podman.podman_image_info:
+    name: "{{ postgresql_temp_container_image }}"
+  register: _postgresql_image_check
+
+- name: Provision image from database host
+  when:
+    - _postgresql_image_check.images | length == 0
+    - groups.get('database', []) | length > 0
+  block:
+    - name: Discover postgres container image on database host
+      containers.podman.podman_container_info:
+        name: "{{ postgresql_discover_container_name }}"
+      register: _postgresql_db_container_info
+      delegate_to: "{{ groups['database'][0] }}"
+      no_log: "{{ __postgresql_no_log }}"
+
+    - name: Assert postgres container was found on database host
+      ansible.builtin.assert:
+        that: (_postgresql_db_container_info.containers | default([])) | length > 0
+        fail_msg: >-
+          No container named '{{ postgresql_discover_container_name }}' found on
+          {{ groups['database'][0] }}.
+
+    - name: Set discovered image fact
+      ansible.builtin.set_fact:
+        _postgresql_resolved_image: "{{ (_postgresql_db_container_info.containers | first).ImageName }}"
+      no_log: "{{ __postgresql_no_log }}"
+
+    - name: Save image archive on database host
+      containers.podman.podman_save:
+        image: "{{ _postgresql_resolved_image }}"
+        dest: /tmp/aap-snapshot-pg-image.tar
+      delegate_to: "{{ groups['database'][0] }}"
+
+    - name: Fetch image archive to control host
+      ansible.builtin.fetch:
+        src: /tmp/aap-snapshot-pg-image.tar
+        dest: /tmp/aap-snapshot-pg-image.tar
+        flat: true
+      delegate_to: "{{ groups['database'][0] }}"
+
+    - name: Copy image archive to target host
+      ansible.builtin.copy:
+        src: /tmp/aap-snapshot-pg-image.tar
+        dest: /tmp/aap-snapshot-pg-image.tar
+        mode: "0600"
+
+    - name: Load image on target host
+      containers.podman.podman_load:
+        input: /tmp/aap-snapshot-pg-image.tar
+
+    - name: Use discovered image for temp container
+      ansible.builtin.set_fact:
+        postgresql_temp_container_image: "{{ _postgresql_resolved_image }}"
+      no_log: "{{ __postgresql_no_log }}"
+
+  rescue:
+    - name: Image provisioning failed — will attempt registry pull
+      ansible.builtin.debug:
+        msg: >-
+          Could not provision postgres image from the database host.
+          The temp container will attempt to pull
+          {{ postgresql_temp_container_image }} from the registry.
+
+  always:
+    - name: Remove image archive from database host
+      ansible.builtin.file:
+        path: /tmp/aap-snapshot-pg-image.tar
+        state: absent
+      delegate_to: "{{ groups['database'][0] }}"
+      when: groups.get('database', []) | length > 0
+
+    - name: Remove image archive from target host
+      ansible.builtin.file:
+        path: /tmp/aap-snapshot-pg-image.tar
+        state: absent
+
+    - name: Remove image archive from control host
+      ansible.builtin.file:
+        path: /tmp/aap-snapshot-pg-image.tar
+        state: absent
+      delegate_to: localhost
+...

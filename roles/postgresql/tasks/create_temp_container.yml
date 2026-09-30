@@ -1,4 +1,7 @@
 ---
+- name: Ensure postgres image is available
+  ansible.builtin.include_tasks: ensure_container_image.yml
+
 # keep-id maps the calling user's uid/gid into the container, so
 # podman_container_exec's user: param can read/write the connection
 # user's files without changing their permissions.

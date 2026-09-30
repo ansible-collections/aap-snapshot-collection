@@ -1,0 +1,7 @@
+---
+bugfixes:
+  - >-
+    Fix containerized import/export failing when the PostgreSQL container
+    image is not available on the target host by discovering and
+    transferring the image from the database host before creating the
+    temp container.
