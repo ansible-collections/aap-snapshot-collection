@@ -65,10 +65,10 @@
         msg: "{{ _postgresql_db_checksum }}"
 
     - name: Download the export tarball
-      ansible.builtin.fetch:
+      ansible.posix.synchronize:
+        mode: pull
         src: "{{ postgresql_export_dir }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
         dest: "{{ postgresql_export_dest }}/{{ postgresql_component_name }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
-        flat: true
       notify: Remove the export directory
 
 - name: DB Export (containerized)
@@ -158,10 +158,10 @@
         msg: "{{ _postgresql_db_checksum }}"
 
     - name: Download the export tarball
-      ansible.builtin.fetch:
+      ansible.posix.synchronize:
+        mode: pull
         src: "{{ postgresql_export_dir }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
         dest: "{{ postgresql_export_dest }}/{{ postgresql_component_name }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
-        flat: true
       notify: Remove the export directory
 
 - name: DB Export (OCP)
