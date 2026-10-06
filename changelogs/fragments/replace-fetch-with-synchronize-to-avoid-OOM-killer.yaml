@@ -1,9 +1,8 @@
 ---
 bugfixes:
   - >-
-    The fetch module has a memory issue while running as another user via become. 
+    The fetch module has a memory issue while running as another user via become.
     This causes the fetch module running on the managed host to consume RAM up to
     four times the size of the file being transferred.  For large databases, this
     can cause the transferring of the database export to fail, by consuming all
     RAM on the managed host, activating OOM-killer.
-
