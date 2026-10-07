@@ -5,4 +5,5 @@ bugfixes:
   - Match Pulp content-addressed paths correctly when importing Hub content into S3-compatible storage.
   - Calculate Hub content SHA256 checksums with the stat module so S3 imports work with ansible-core 2.16.
   - Keep S3 Hub preflight assertion failures visible for actionable import diagnostics.
+  - Keep the resolved artifact path available through OCP import so relative artifact_file values work during transfer to the temporary pod.
 ...
