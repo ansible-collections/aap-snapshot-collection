@@ -1,0 +1,134 @@
+---
+- name: Transfer the database dump with rsync
+  block:
+    # ansible.posix.synchronize currently maps become to sudo only. Other
+    # become methods, such as dzdo, use the Ansible fetch fallback below.
+    - name: Synchronize the database dump to the control node
+      ansible.posix.synchronize:
+        mode: pull
+        src: "{{ postgresql_export_dir }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+        dest: "{{ postgresql_export_dest }}/{{ postgresql_component_name }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+        archive: false
+        rsync_opts:
+          - "--chmod=F600"
+        use_ssh_args: true
+      become: "{{ _postgresql_export_transfer_become | default(false) | bool }}"
+      become_user: "{{ _postgresql_export_transfer_become_user | default(omit) }}"
+      notify: Remove the export directory
+
+  rescue:
+    - name: Report rsync failure and use the Ansible file transfer fallback
+      ansible.builtin.debug:
+        msg: >-
+          rsync could not transfer the database dump; retrying with the Ansible
+          fetch connection.
+
+    - name: Fetch the database dump without privilege escalation
+      block:
+        - name: Fetch the database dump through the Ansible connection
+          ansible.builtin.fetch:
+            src: "{{ postgresql_export_dir }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+            dest: "{{ postgresql_export_dest }}/{{ postgresql_component_name }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+            flat: true
+          become: false
+          notify: Remove the export directory
+
+        - name: Set permissions on the fetched database dump
+          ansible.builtin.file:
+            path: "{{ postgresql_export_dest }}/{{ postgresql_component_name }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+            state: file
+            mode: "0600"
+          delegate_to: localhost
+          become: false
+
+      rescue:
+        - name: Fail when the dump fetch process was killed
+          ansible.builtin.fail:
+            msg: >-
+              The Ansible fetch fallback was killed with exit code 137 while
+              transferring the database dump. This often indicates memory
+              exhaustion.
+          when:
+            - ansible_failed_result.rc | default(0) | int == 137
+
+        - name: Fetch the database dump after temporarily granting SSH-user access
+          block:
+            # Do not retry fetch with become: that makes fetch slurp the entire
+            # dump to calculate its checksum. Transfer ownership briefly so the
+            # regular Ansible connection can stream the file instead.
+            - name: Get the SSH connection user
+              ansible.builtin.command:
+                argv:
+                  - id
+                  - -un
+              register: _postgresql_export_connection_user
+              changed_when: false
+              become: false
+
+            - name: Temporarily set the dump owner to the SSH connection user
+              ansible.builtin.file:
+                path: "{{ postgresql_export_dir }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+                owner: "{{ _postgresql_export_connection_user.stdout }}"
+                mode: "0600"
+              register: _postgresql_export_temp_owner_result
+              become: true
+              become_user: root
+
+            - name: Temporarily allow path traversal to the dump
+              ansible.builtin.file:
+                path: "{{ postgresql_export_dir }}"
+                state: directory
+                mode: "0711"
+              register: _postgresql_export_temp_dir_result
+              become: true
+              become_user: root
+
+            - name: Fetch the database dump through the Ansible connection
+              ansible.builtin.fetch:
+                src: "{{ postgresql_export_dir }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+                dest: "{{ postgresql_export_dest }}/{{ postgresql_component_name }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+                flat: true
+              become: false
+              notify: Remove the export directory
+
+            - name: Set permissions on the fetched database dump
+              ansible.builtin.file:
+                path: "{{ postgresql_export_dest }}/{{ postgresql_component_name }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+                state: file
+                mode: "0600"
+              delegate_to: localhost
+              become: false
+
+          rescue:
+            - name: Fail when both dump transfer methods fail
+              ansible.builtin.fail:
+                msg: >-
+                  The rsync transfer and Ansible fetch fallback both failed.
+                  Check SSH connectivity and become access. The fetch fallback
+                  runs without become to avoid slurping the full dump into
+                  memory.
+
+          always:
+            - name: Restore the original database dump owner, group, and mode
+              ansible.builtin.file:
+                path: "{{ postgresql_export_dir }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+                owner: "{{ _postgresql_db_file_stat.stat.uid }}"
+                group: "{{ _postgresql_db_file_stat.stat.gid }}"
+                mode: "{{ _postgresql_db_file_stat.stat.mode }}"
+              when:
+                - _postgresql_export_temp_owner_result is defined
+                - _postgresql_export_temp_owner_result.changed | default(false) | bool
+              become: true
+              become_user: root
+
+            - name: Restore the export directory mode
+              ansible.builtin.file:
+                path: "{{ postgresql_export_dir }}"
+                state: directory
+                mode: "0750"
+              when:
+                - _postgresql_export_temp_dir_result is defined
+                - _postgresql_export_temp_dir_result.changed | default(false) | bool
+              become: true
+              become_user: root
+...

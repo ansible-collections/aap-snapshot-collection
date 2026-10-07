@@ -1,0 +1,5 @@
+---
+bugfixes:
+  - Fall back to the Ansible file transfer connection when rsync cannot transfer a PostgreSQL dump.
+  - Stop the PostgreSQL dump transfer when Ansible fetch is killed instead of retrying after changing file permissions.
+...
