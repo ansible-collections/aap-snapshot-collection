@@ -153,6 +153,105 @@
     - artifact_hub_has_content_data | default(false) | bool
     - automationhub_import_hub_content | default(true) | bool
 
+- name: Set Hub S3 write preflight object key
+  ansible.builtin.set_fact:
+    _automationhub_s3_probe_key: >-
+      {{ ((_automationhub_s3_storage_location | trim('/') ~ '/')
+          if (_automationhub_s3_storage_location | trim('/') | length > 0)
+          else '')
+         ~ 'artifact/aap-snapshot-preflight-'
+         ~ lookup('ansible.builtin.password',
+                  '/dev/null length=16 chars=ascii_lowercase,digits') }}
+  no_log: "{{ not (disable_no_log | default(false) | bool) }}"
+  when:
+    - _automationhub_storage_type == 's3'
+    - artifact_hub_has_content_data | default(false) | bool
+    - automationhub_import_hub_content | default(true) | bool
+
+- name: Verify Hub S3 write access before importing content (OCP)
+  block:
+    - name: Create temporary Hub S3 preflight directory
+      ansible.builtin.tempfile:
+        path: /tmp
+        prefix: aap-snapshot-s3-preflight-
+        state: directory
+      delegate_to: automationhub_s3_preflight
+      register: _automationhub_s3_probe_directory
+
+    - name: Create temporary Hub S3 preflight artifact directory
+      ansible.builtin.file:
+        path: "{{ _automationhub_s3_probe_directory.path }}/artifact"
+        state: directory
+        mode: "0700"
+      delegate_to: automationhub_s3_preflight
+
+    - name: Stage temporary Hub S3 preflight object
+      ansible.builtin.copy:
+        content: "aap-snapshot Hub content import preflight"
+        dest: "{{ _automationhub_s3_probe_directory.path }}/artifact/{{ _automationhub_s3_probe_key | basename }}"
+        mode: "0600"
+      delegate_to: automationhub_s3_preflight
+
+    - name: Upload temporary Hub S3 preflight object
+      community.aws.s3_sync:
+        bucket: "{{ _automationhub_s3_bucket_name }}"
+        file_root: "{{ _automationhub_s3_probe_directory.path }}"
+        key_prefix: "{{ _automationhub_s3_storage_location | trim('/') }}"
+        endpoint_url: "{{ _automationhub_s3_endpoint_url | default(omit, true) }}"
+        region: "{{ _automationhub_s3_region_name | default('us-east-1', true) }}"
+        access_key: "{{ _automationhub_s3_secret.resources[0].data['s3-access-key-id'] | b64decode }}"
+        secret_key: "{{ _automationhub_s3_secret.resources[0].data['s3-secret-access-key'] | b64decode }}"
+        aws_config: >-
+          {{ {'s3': {'addressing_style': _automationhub_s3_addressing_style}}
+             if _automationhub_s3_addressing_style in ['auto', 'path', 'virtual']
+             else omit }}
+        validate_certs: "{{ automationhub_s3_validate_certs | bool }}"
+        file_change_strategy: force
+        delete: false
+      delegate_to: automationhub_s3_preflight
+      no_log: "{{ not (disable_no_log | default(false) | bool) }}"
+  rescue:
+    - name: Report Hub S3 write preflight failure
+      ansible.builtin.fail:
+        msg: >-
+          Hub S3 preflight could not stage or upload a temporary object under
+          Pulp's configured content location. Confirm the Hub API pod can
+          stage files and the S3 credentials allow the object operations
+          required for Hub content import.
+  always:
+    - name: Clean up temporary Hub S3 preflight resources
+      block:
+        - name: Remove temporary Hub S3 preflight object
+          amazon.aws.s3_object:
+            bucket: "{{ _automationhub_s3_bucket_name }}"
+            object: "{{ _automationhub_s3_probe_key }}"
+            mode: delobj
+            endpoint_url: "{{ _automationhub_s3_endpoint_url | default(omit, true) }}"
+            region: "{{ _automationhub_s3_region_name | default('us-east-1', true) }}"
+            access_key: "{{ _automationhub_s3_secret.resources[0].data['s3-access-key-id'] | b64decode }}"
+            secret_key: "{{ _automationhub_s3_secret.resources[0].data['s3-secret-access-key'] | b64decode }}"
+            aws_config: >-
+              {{ {'s3': {'addressing_style': _automationhub_s3_addressing_style}}
+                 if _automationhub_s3_addressing_style in ['auto', 'path', 'virtual']
+                 else omit }}
+            validate_certs: "{{ automationhub_s3_validate_certs | bool }}"
+          delegate_to: automationhub_s3_preflight
+          no_log: "{{ not (disable_no_log | default(false) | bool) }}"
+          when: _automationhub_s3_probe_key is defined
+      always:
+        - name: Remove temporary Hub S3 preflight files
+          ansible.builtin.file:
+            path: "{{ _automationhub_s3_probe_directory.path }}"
+            state: absent
+          delegate_to: automationhub_s3_preflight
+          when:
+            - _automationhub_s3_probe_directory is defined
+            - _automationhub_s3_probe_directory.path is defined
+  when:
+    - _automationhub_storage_type == 's3'
+    - artifact_hub_has_content_data | default(false) | bool
+    - automationhub_import_hub_content | default(true) | bool
+
 - name: Fail if Hub storage backend is unsupported for embedded content import
   ansible.builtin.fail:
     msg: >-
