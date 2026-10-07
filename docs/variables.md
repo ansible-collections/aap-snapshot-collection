@@ -50,6 +50,7 @@ Control artifact creation and packaging.
 | `postgresql_export_dir` | `/tmp/backups/automation-platform` | Temp directory on source host for database dumps |
 | `postgresql_export_dest` | `$PWD/db_export` | Local directory to fetch database dumps to |
 | `postgresql_export_extension` | `pgc` | Database dump file extension (PostgreSQL custom format) |
+| `postgresql_export_rsync_opts` | `[]` | Additional rsync options for database dump transfers; the role applies `--chmod=F600` after these options |
 
 ## Import Variables
 

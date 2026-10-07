@@ -9,8 +9,7 @@
         src: "{{ postgresql_export_dir }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
         dest: "{{ postgresql_export_dest }}/{{ postgresql_component_name }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
         archive: false
-        rsync_opts:
-          - "--chmod=F600"
+        rsync_opts: "{{ (postgresql_export_rsync_opts | default([])) + ['--chmod=F600'] }}"
         use_ssh_args: true
       become: "{{ _postgresql_export_transfer_become | default(false) | bool }}"
       become_user: "{{ _postgresql_export_transfer_become_user | default(omit) }}"

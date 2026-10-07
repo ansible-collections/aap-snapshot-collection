@@ -1,4 +1,6 @@
 ---
 bugfixes:
   - Try rsync before Ansible fetch for PostgreSQL dump transfers and fail the play if both methods fail.
+minor_changes:
+  - Allow custom rsync options for PostgreSQL dump transfers with `postgresql_export_rsync_opts`.
 ...
