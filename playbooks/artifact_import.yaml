@@ -1,6 +1,7 @@
 ---
 - name: Preflight
-  hosts: all
+  # Implicit localhost is not selected by all, so include it explicitly for local checks.
+  hosts: localhost,all
   gather_facts: false
   any_errors_fatal: true
   max_fail_percentage: 0
