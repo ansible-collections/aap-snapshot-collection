@@ -314,6 +314,13 @@
       vars:
         artifact_path: "{{ _artifact_resolved_path }}"
 
+    - name: Scale Lightspeed and MCP workloads down before import
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.ocp_utils
+        tasks_from: scale_lightspeed_mcp.yml
+      vars:
+        ocp_utils_lightspeed_mcp_scale_down: true
+
     # --- Idle AAP for import ---
     - name: Set AAP to idle
       ansible.builtin.include_role:
@@ -406,6 +413,13 @@
         tasks_from: idle_aap.yml
       vars:
         ocp_idle_aap: false
+
+    - name: Restore Lightspeed and MCP workloads after import
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.ocp_utils
+        tasks_from: scale_lightspeed_mcp.yml
+      vars:
+        ocp_utils_lightspeed_mcp_scale_down: false
 
     # --- Gateway-first reconcile (unblocks operator) ---
     - name: Record current gateway pod name for restart
@@ -529,6 +543,13 @@
         tasks_from: idle_aap.yml
       vars:
         ocp_idle_aap: false
+
+    - name: Restore Lightspeed and MCP workloads after failed import
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.ocp_utils
+        tasks_from: scale_lightspeed_mcp.yml
+      vars:
+        ocp_utils_lightspeed_mcp_scale_down: false
 
     - name: Report import failure
       ansible.builtin.fail:
