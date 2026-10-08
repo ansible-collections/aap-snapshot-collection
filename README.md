@@ -24,8 +24,11 @@ what is present in the inventory and artifact.
 
 - Ansible Automation Platform (AAP) 2.6 or later
 - Ansible core >= 2.14.0
+- `rsync` on both the Ansible execution host (including the execution environment) and the managed AAP host for RPM/containerized database exports
 - PyYAML
 - kubernetes
+
+The collection falls back to Ansible `fetch` if rsync cannot run. That fallback can use substantial memory for large database dumps.
 
 ### Collection Dependencies
 
