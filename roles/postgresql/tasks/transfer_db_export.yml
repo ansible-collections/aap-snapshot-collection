@@ -1,0 +1,50 @@
+---
+- name: Transfer the database dump with rsync
+  block:
+    # ansible.posix.synchronize currently maps become to sudo only. Other
+    # become methods, such as dzdo, use the Ansible fetch fallback below.
+    - name: Synchronize the database dump to the control node
+      ansible.posix.synchronize:
+        mode: pull
+        src: "{{ postgresql_export_dir }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+        dest: "{{ postgresql_export_dest }}/{{ postgresql_component_name }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+        archive: false
+        rsync_opts: "{{ (postgresql_export_rsync_opts | default([])) + ['--chmod=F600'] }}"
+        use_ssh_args: true
+      become: "{{ _postgresql_export_transfer_become | default(false) | bool }}"
+      become_user: "{{ _postgresql_export_transfer_become_user | default(omit) }}"
+      notify: Remove the export directory
+
+  rescue:
+    - name: Report rsync failure and use the Ansible file transfer fallback
+      ansible.builtin.debug:
+        msg: >-
+          rsync could not transfer the database dump; retrying with the Ansible
+          fetch connection.
+
+    - name: Fetch the database dump with the original privilege escalation
+      block:
+        - name: Fetch the database dump through the Ansible connection
+          ansible.builtin.fetch:
+            src: "{{ postgresql_export_dir }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+            dest: "{{ postgresql_export_dest }}/{{ postgresql_component_name }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+            flat: true
+          become: "{{ _postgresql_export_transfer_become | default(false) | bool }}"
+          become_user: "{{ _postgresql_export_transfer_become_user | default(omit) }}"
+          notify: Remove the export directory
+
+      rescue:
+        - name: Fail when both dump transfer methods fail
+          ansible.builtin.fail:
+            msg: >-
+              Both rsync and the Ansible fetch fallback failed to transfer the
+              database dump.
+
+    - name: Set permissions on the fetched database dump
+      ansible.builtin.file:
+        path: "{{ postgresql_export_dest }}/{{ postgresql_component_name }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+        state: file
+        mode: "0600"
+      delegate_to: localhost
+      become: false
+...

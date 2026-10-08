@@ -64,12 +64,11 @@
       ansible.builtin.debug:
         msg: "{{ _postgresql_db_checksum }}"
 
-    - name: Download the export tarball
-      ansible.builtin.fetch:
-        src: "{{ postgresql_export_dir }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
-        dest: "{{ postgresql_export_dest }}/{{ postgresql_component_name }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
-        flat: true
-      notify: Remove the export directory
+    - name: Transfer the database dump to the control node
+      ansible.builtin.include_tasks: transfer_db_export.yml
+      vars:
+        _postgresql_export_transfer_become: true
+        _postgresql_export_transfer_become_user: "{{ postgresql_django_manage_user }}"
 
 - name: DB Export (containerized)
   when: aap_platform == 'containerized'
@@ -157,12 +156,10 @@
       ansible.builtin.debug:
         msg: "{{ _postgresql_db_checksum }}"
 
-    - name: Download the export tarball
-      ansible.builtin.fetch:
-        src: "{{ postgresql_export_dir }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
-        dest: "{{ postgresql_export_dest }}/{{ postgresql_component_name }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
-        flat: true
-      notify: Remove the export directory
+    - name: Transfer the database dump to the control node
+      ansible.builtin.include_tasks: transfer_db_export.yml
+      vars:
+        _postgresql_export_transfer_become: false
 
 - name: DB Export (OCP)
   when: aap_platform == 'operator'
