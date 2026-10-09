@@ -33,7 +33,7 @@ Control artifact creation and packaging.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `export_hub_content` | `true` | Include Pulp content data (`/var/lib/pulp/`) in artifact |
+| `export_hub_content` | `true` | Include Pulp content data in the artifact. Set `false` to omit it. |
 | `postgresql_db_type` | `managed` | Database topology: `managed` (co-located) or `external` |
 
 ### Hub Content Export
@@ -41,7 +41,7 @@ Control artifact creation and packaging.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `hub_pulp_data_dir` | `/var/lib/pulp/` | Pulp content directory on hub host |
-| `hub_content_tar_name` | `hub-content.tar.gz` | Filename for the content tarball |
+| `hub_content_tar_name` | `hub_content.tar` | Filename for the content tarball |
 
 ### Database Export
 
@@ -59,12 +59,21 @@ Control artifact restoration to the target platform.
 |----------|---------|-------------|
 | `artifact_file` | (required) | Path to the artifact archive to import. Validated at preflight before any destructive operations |
 | `target_aap_version` | (optional) | Target AAP version for compatibility validation |
+| `automationhub_import_hub_content` | `true` | Restore embedded Hub content. Set `false` to skip byte restoration and handle Hub content separately |
 | `keep_temp_on_failure` | `true` | Keep temporary OCP migration resources (PVC, pod) on failure for debugging. Set `false` to auto-cleanup |
 | `postgresql_restore_admin_user` | `postgres` | PostgreSQL superuser for database restore operations |
 | `postgresql_restore_timeout` | `3600` | Async timeout in seconds for `pg_restore` |
 | `postgresql_temp_container_image` | `registry.redhat.io/rhel9/postgresql-15:latest` | Image used for the throwaway postgres client container that runs `pg_dump`/`pg_restore` on containerized targets. Override if your target's PostgreSQL server version differs |
 
 ## OCP (Operator) Variables
+
+For embedded Hub content imports into S3-compatible storage, the temporary
+content uploader uses the target Hub's configured S3 endpoint and Secret. The
+S3 upload runs with Ansible's `community.aws.s3_sync` module inside the
+temporary pod. `automationhub_s3_import_image` controls that pod's image; its
+default is `registry.redhat.io/ansible-automation-platform-26/ee-supported-rhel9:latest`.
+Set `automationhub_s3_validate_certs: false` only when the S3 endpoint uses an
+untrusted certificate.
 
 Apply when `aap_platform: operator`. Control interaction with the OpenShift
 cluster and AAP operator.
@@ -82,7 +91,9 @@ cluster and AAP operator.
 ### Temporary Migration Resources
 
 During OCP import, a temporary PVC and PostgreSQL pod are created to perform
-database restores. These are cleaned up after import completes.
+database restores. For an S3-backed Hub, the temporary deployment is then
+recreated with the S3-capable Ansible execution image and the same PVC. These
+temporary resources are cleaned up after import completes.
 
 | Variable | Default | Description |
 |----------|---------|-------------|

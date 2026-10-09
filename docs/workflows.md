@@ -31,8 +31,8 @@ see [artifact-format.md](artifact-format.md).
   2. **Get secrets** - extracts Django SECRET_KEY and related credentials
   3. **Database export** - runs `pg_dump --format=custom` to create `.pgc` file
   4. **Custom configs** - controller on RPM only: copies configuration files
-  5. **Hub content** - hub only (when `export_hub_content: true`): creates
-     tarball of Pulp content directory
+  5. **Hub content** - hub only (when `export_hub_content: true`): creates a
+     tarball of the Pulp content directory
 
 **Platform differences:**
 - **RPM:** Uses `aap_component_info` module to discover settings by importing
@@ -111,11 +111,13 @@ For each component listed in the artifact manifest:
    - OCP: patches Kubernetes Secrets with artifact values
    - Containerized: creates/updates podman secrets
 
-**Hub-specific:** After the hub database is restored, the hub file-storage
-PVC is deleted (OCP only) so the operator provisions a fresh empty volume on
-resume. Content is then re-synced from configured remotes. Pulp repair during
-reconciliation cleans up any remaining stale artifact references in the
-restored database.
+**Hub-specific:** For a FileSystem-backed OCP Hub, the hub file-storage PVC is
+deleted after the database restore, then the embedded content tar is restored
+to the newly provisioned PVC. For an S3-compatible OCP Hub, the import uses a
+temporary `ee-supported-rhel9` pod and the `community.aws.s3_sync` Ansible
+module to upload the embedded Pulp artifact files to the bucket and keys
+configured by the target Hub. Pulp repair runs during reconciliation after
+either restore path. Azure Blob content import is not supported.
 
 **Platform routing:**
 - OCP: all imports run on `localhost` using `kubernetes.core.k8s_exec`

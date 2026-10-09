@@ -1,0 +1,4 @@
+---
+bugfixes:
+  - Use the Hub content sync module for the OCP S3 write preflight to match the import's S3 API calls.
+...

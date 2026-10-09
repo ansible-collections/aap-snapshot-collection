@@ -1,0 +1,149 @@
+---
+# Temporary workaround until the AAP operator idles these child workloads.
+- name: Temporarily scale Lightspeed and MCP workloads down
+  when: ocp_utils_lightspeed_mcp_scale_down | bool
+  environment: "{{ ocp_utils_ocp_environment }}"
+  block:
+    - name: Discover Lightspeed and MCP application deployments
+      kubernetes.core.k8s_info:
+        kind: Deployment
+        namespace: "{{ ocp_utils_ocp_namespace }}"
+        label_selectors:
+          - "app.kubernetes.io/part-of={{ ocp_utils_aap_instance_name }}-{{ item.suffix }}"
+          - "app.kubernetes.io/managed-by={{ item.managed_by }}"
+      loop: "{{ __ocp_utils_lightspeed_mcp_components }}"
+      loop_control:
+        label: "{{ item.suffix }}"
+      register: _ocp_utils_lightspeed_mcp_deployment_info
+
+    - name: Initialize Lightspeed and MCP replica backups
+      ansible.builtin.set_fact:
+        _ocp_utils_lightspeed_mcp_deployments: []
+        _ocp_utils_lightspeed_mcp_operators: []
+
+    - name: Record original Lightspeed and MCP deployment replicas
+      ansible.builtin.set_fact:
+        _ocp_utils_lightspeed_mcp_deployments: >-
+          {{ _ocp_utils_lightspeed_mcp_deployments
+             + [{'name': item.metadata.name,
+                 'replicas': item.spec.replicas | default(1) | int}] }}
+      loop: >-
+        {{ _ocp_utils_lightspeed_mcp_deployment_info.results
+           | map(attribute='resources') | flatten }}
+      loop_control:
+        label: "{{ item.metadata.name }}"
+
+    - name: Discover Lightspeed and MCP operator deployments
+      kubernetes.core.k8s_info:
+        kind: Deployment
+        name: "{{ item }}"
+        namespace: "{{ ocp_utils_operator_namespace }}"
+      loop: "{{ __ocp_utils_lightspeed_mcp_operator_deployments }}"
+      loop_control:
+        label: "{{ item }}"
+      register: _ocp_utils_lightspeed_mcp_operator_info
+      when:
+        - >-
+          _ocp_utils_lightspeed_mcp_deployments
+          | selectattr('replicas', 'greaterthan', 0) | list | length > 0
+
+    - name: Record original Lightspeed and MCP operator replicas
+      ansible.builtin.set_fact:
+        _ocp_utils_lightspeed_mcp_operators: >-
+          {{ _ocp_utils_lightspeed_mcp_operators
+             + [{'name': item.resources[0].metadata.name,
+                 'replicas': item.resources[0].spec.replicas | default(1) | int}] }}
+      loop: "{{ _ocp_utils_lightspeed_mcp_operator_info.results | default([]) }}"
+      loop_control:
+        label: "{{ item.item }}"
+      when: item.resources | length > 0
+
+    - name: Require an operator controller for discovered Lightspeed or MCP workloads
+      ansible.builtin.assert:
+        that:
+          - _ocp_utils_lightspeed_mcp_operators | length > 0
+        fail_msg: >-
+          Lightspeed or MCP deployments were found in namespace
+          '{{ ocp_utils_ocp_namespace }}', but no matching operator deployment was
+          found in namespace '{{ ocp_utils_operator_namespace }}'. Cannot safely
+          scale these workloads for import.
+      when:
+        - >-
+          _ocp_utils_lightspeed_mcp_deployments
+          | selectattr('replicas', 'greaterthan', 0) | list | length > 0
+
+    - name: Scale Lightspeed and MCP operator deployments down
+      kubernetes.core.k8s_scale:
+        api_version: apps/v1
+        kind: Deployment
+        name: "{{ item.name }}"
+        namespace: "{{ ocp_utils_operator_namespace }}"
+        replicas: 0
+        wait: false
+      loop: "{{ _ocp_utils_lightspeed_mcp_operators }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when: item.replicas | int > 0
+
+    - name: Wait for Lightspeed and MCP operator deployments to stop
+      kubernetes.core.k8s_info:
+        kind: Deployment
+        name: "{{ item.name }}"
+        namespace: "{{ ocp_utils_operator_namespace }}"
+      register: _ocp_utils_lightspeed_mcp_operator_status
+      until: >-
+        _ocp_utils_lightspeed_mcp_operator_status.resources | length == 0
+        or (_ocp_utils_lightspeed_mcp_operator_status.resources[0].status.replicas
+            | default(0) | int) == 0
+      retries: "{{ ocp_utils_scale_wait_retries }}"
+      delay: "{{ ocp_utils_scale_wait_delay }}"
+      loop: "{{ _ocp_utils_lightspeed_mcp_operators }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when: item.replicas | int > 0
+
+    - name: Scale Lightspeed and MCP application deployments down
+      kubernetes.core.k8s_scale:
+        api_version: apps/v1
+        kind: Deployment
+        name: "{{ item.name }}"
+        namespace: "{{ ocp_utils_ocp_namespace }}"
+        replicas: 0
+        wait: false
+      loop: "{{ _ocp_utils_lightspeed_mcp_deployments }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when: item.replicas | int > 0
+
+- name: Restore Lightspeed and MCP workloads after import
+  when:
+    - not (ocp_utils_lightspeed_mcp_scale_down | bool)
+    - _ocp_utils_lightspeed_mcp_deployments is defined
+  environment: "{{ ocp_utils_ocp_environment }}"
+  block:
+    - name: Restore Lightspeed and MCP application deployment replicas
+      kubernetes.core.k8s_scale:
+        api_version: apps/v1
+        kind: Deployment
+        name: "{{ item.name }}"
+        namespace: "{{ ocp_utils_ocp_namespace }}"
+        replicas: "{{ item.replicas | int }}"
+        wait: "{{ item.replicas | int > 0 }}"
+        wait_timeout: "{{ ocp_utils_scale_wait_retries | int * ocp_utils_scale_wait_delay | int }}"
+      loop: "{{ _ocp_utils_lightspeed_mcp_deployments }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Restore Lightspeed and MCP operator deployment replicas
+      kubernetes.core.k8s_scale:
+        api_version: apps/v1
+        kind: Deployment
+        name: "{{ item.name }}"
+        namespace: "{{ ocp_utils_operator_namespace }}"
+        replicas: "{{ item.replicas | int }}"
+        wait: "{{ item.replicas | int > 0 }}"
+        wait_timeout: "{{ ocp_utils_scale_wait_retries | int * ocp_utils_scale_wait_delay | int }}"
+      loop: "{{ _ocp_utils_lightspeed_mcp_operators | default([]) }}"
+      loop_control:
+        label: "{{ item.name }}"
+...

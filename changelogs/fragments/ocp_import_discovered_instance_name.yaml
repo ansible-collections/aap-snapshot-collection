@@ -1,0 +1,6 @@
+---
+bugfixes:
+  - >-
+    Resolve OCP database secret, preflight, and component resource lookups from
+    the discovered AAP instance during import.
+...

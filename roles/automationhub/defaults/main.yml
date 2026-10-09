@@ -1,5 +1,8 @@
 ---
 automationhub_ocp_namespace: "{{ ocp_namespace | default('aap') }}"
+automationhub_aap_instance_name: >-
+  {{ aap_instance_name
+     | default(ocp_utils_aap_instance_name | default('aap')) }}
 automationhub_gateway_admin_user: "admin"
 
 automationhub_pulp_data_dir: "/var/lib/pulp/media"
@@ -9,6 +12,8 @@ automationhub_content_tar_name: "hub_content.tar"
 automationhub_content_staging_dir: "/tmp"
 automationhub_export_hub_content: true
 automationhub_import_hub_content: true
+automationhub_s3_import_image: 'registry.redhat.io/ansible-automation-platform-26/ee-supported-rhel9:latest'
+automationhub_s3_validate_certs: true
 
 # Pulp repair task polling configuration (OCP only).
 # Total maximum wait = retries * delay (default: 120 * 30 = 3600s = 60 minutes).

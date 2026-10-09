@@ -1,6 +1,7 @@
 ---
 - name: Preflight
-  hosts: all
+  # Implicit localhost is not selected by all, so include it explicitly for local checks.
+  hosts: localhost,all
   gather_facts: false
   any_errors_fatal: true
   max_fail_percentage: 0
@@ -26,13 +27,17 @@
   any_errors_fatal: true
   max_fail_percentage: 0
   vars:
-    # localhost doesn't get _preflight_resolved_artifact, so resolve here too.
+    # Resolve the path here and persist it for the later consume play.
     _artifact_path: >-
       {{ artifact_file if (artifact_file | first == '/')
          else (lookup('env', 'PWD') ~ '/' ~ artifact_file) }}
     artifact_filename: "{{ _artifact_path | basename }}"
     artifact_dir: "{{ _artifact_path | dirname }}"
   tasks:
+    - name: Persist resolved artifact path for consume
+      ansible.builtin.set_fact:
+        _artifact_resolved_path: "{{ _artifact_path }}"
+
     - name: Extract and validate artifact
       ansible.builtin.include_role:
         name: ansible.aap_snapshot.artifact

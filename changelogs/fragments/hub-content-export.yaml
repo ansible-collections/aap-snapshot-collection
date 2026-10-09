@@ -1,0 +1,3 @@
+---
+bugfixes:
+  - Honor ``artifact_export_hub_content`` and validate ``has_content_data`` against the packaged tarball.

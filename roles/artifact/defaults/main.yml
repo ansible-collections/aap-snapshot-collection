@@ -20,8 +20,8 @@ __artifact_supported_schema_versions:
   - "1.0"
 
 ### export control
-artifact_export_hub_content: true
-artifact_postgresql_db_type: 'managed'
+artifact_export_hub_content: "{{ export_hub_content | default(automationhub_export_hub_content | default(true)) }}"
+artifact_postgresql_db_type: "{{ postgresql_db_type | default('managed') }}"
 
 ### build variables
 artifact_build_dir: '{{ lookup("env", "PWD") }}/artifact'
