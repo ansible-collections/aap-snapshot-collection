@@ -150,10 +150,10 @@ installation.
 
 ### Hub Content Data (Optional)
 
-When `artifact_export_hub_content: true` (the default), the hub directory includes
+When `export_hub_content: true` (the default), the hub directory includes
 `hub_content.tar` - a tarball of the Pulp media directory
 (`/var/lib/pulp/media/`). This preserves collection and execution environment
-artifact bytes stored outside the database. Set `artifact_export_hub_content: false` to
+artifact bytes stored outside the database. Set `export_hub_content: false` to
 omit the content tar; the manifest then records `has_content_data: false`.
 
 For schema 1.0 artifacts, `has_content_data: true` means `embedded`; a false or

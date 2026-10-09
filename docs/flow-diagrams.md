@@ -117,7 +117,7 @@ aap-snapshot-{version}-{timestamp}.tar
  |    +-- gateway.pgc
  +-- hub/
       +-- hub.pgc
-      +-- hub_content.tar              <-- when artifact_export_hub_content=true
+      +-- hub_content.tar              <-- when export_hub_content=true
 ```
 
 ---

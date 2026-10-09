@@ -31,7 +31,7 @@ see [artifact-format.md](artifact-format.md).
   2. **Get secrets** - extracts Django SECRET_KEY and related credentials
   3. **Database export** - runs `pg_dump --format=custom` to create `.pgc` file
   4. **Custom configs** - controller on RPM only: copies configuration files
-  5. **Hub content** - hub only (when `artifact_export_hub_content: true`): creates a
+  5. **Hub content** - hub only (when `export_hub_content: true`): creates a
      tarball of the Pulp content directory
 
 **Platform differences:**

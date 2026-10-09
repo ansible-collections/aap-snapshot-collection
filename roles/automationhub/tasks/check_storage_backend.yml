@@ -40,7 +40,7 @@
       import currently only supports Pulp's local FileSystem storage.
       Importing hub content into an Azure Blob or AWS S3-backed hub is not
       implemented yet. Re-export with
-      artifact_export_hub_content=false, or set
+      export_hub_content=false, or set
       automationhub_import_hub_content=false to skip restoring the embedded
       content and handle it separately.
   when: "'filesystem' not in (_automationhub_storage_backend | lower)"

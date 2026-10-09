@@ -33,9 +33,7 @@ Control artifact creation and packaging.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `artifact_export_hub_content` | `true` | Role-prefixed control for including Pulp content data in the artifact. Set `false` to omit it. |
-| `export_hub_content` | Unset | Existing playbook-level input; when set, it supplies the default for `artifact_export_hub_content`. |
-| `automationhub_export_hub_content` | `true` | Existing Hub-role setting used when `export_hub_content` is unset. |
+| `export_hub_content` | `true` | Include Pulp content data in the artifact. Set `false` to omit it. |
 | `postgresql_db_type` | `managed` | Database topology: `managed` (co-located) or `external` |
 
 ### Hub Content Export
