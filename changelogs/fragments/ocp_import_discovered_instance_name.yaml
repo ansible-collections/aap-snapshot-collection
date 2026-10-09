@@ -1,4 +1,6 @@
 ---
 bugfixes:
-  - Use the discovered OCP AAP instance name when resolving PostgreSQL configuration secrets for import.
+  - >-
+    Resolve OCP database secret, preflight, and component resource lookups from
+    the discovered AAP instance during import.
 ...

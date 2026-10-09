@@ -22,7 +22,7 @@
 
 - name: Set gateway API URL (OCP)
   ansible.builtin.set_fact:
-    _automationhub_gw_api_url: "http://{{ aap_instance_name | default('aap') }}.{{ automationhub_ocp_namespace }}.svc.cluster.local"
+    _automationhub_gw_api_url: "http://{{ automationhub_aap_instance_name }}.{{ automationhub_ocp_namespace }}.svc.cluster.local"
   when: aap_platform == 'operator'
 
 - name: Set gateway credentials (containerized)
@@ -74,7 +74,7 @@
   kubernetes.core.k8s_info:
     kind: Secret
     namespace: "{{ automationhub_ocp_namespace }}"
-    name: "{{ aap_instance_name | default('aap') }}-gateway-oauth2-token-secret"
+    name: "{{ automationhub_aap_instance_name }}-gateway-oauth2-token-secret"
   environment: "{{ automationhub_ocp_environment }}"
   register: _automationhub_gw_oauth2_secret
   no_log: "{{ not (disable_no_log | default(false) | bool) }}"

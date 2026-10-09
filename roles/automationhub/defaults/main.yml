@@ -1,5 +1,8 @@
 ---
 automationhub_ocp_namespace: "{{ ocp_namespace | default('aap') }}"
+automationhub_aap_instance_name: >-
+  {{ aap_instance_name
+     | default(ocp_utils_aap_instance_name | default('aap')) }}
 automationhub_gateway_admin_user: "admin"
 
 automationhub_pulp_data_dir: "/var/lib/pulp/media"

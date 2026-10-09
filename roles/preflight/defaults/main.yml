@@ -2,7 +2,9 @@
 __preflight_no_log: "{{ not (disable_no_log | default(false) | bool) }}"
 
 preflight_ocp_namespace: "{{ ocp_namespace | default('aap') }}"
-preflight_aap_instance_name: "{{ aap_instance_name | default('aap') }}"
+preflight_aap_instance_name: >-
+  {{ aap_instance_name
+     | default(ocp_utils_aap_instance_name | default('aap')) }}
 preflight_aap_cr_kind: "AnsibleAutomationPlatform"
 preflight_operator_namespace: "{{ preflight_ocp_namespace }}"
 preflight_aap_cr_api_version: "aap.ansible.com/v1alpha1"
