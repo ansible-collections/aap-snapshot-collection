@@ -60,7 +60,7 @@
         kind: Pod
         namespace: "{{ preflight_ocp_namespace }}"
         label_selectors:
-          - "app.kubernetes.io/managed-by={{ preflight_aap_instance_name }}"
+          - "app.kubernetes.io/part-of"
       register: _preflight_all_pods
 
     - name: Assert no pods in CrashLoopBackOff or Error
