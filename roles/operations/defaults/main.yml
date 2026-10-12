@@ -4,7 +4,9 @@ __operations_no_log: "{{ not (disable_no_log | default(false) | bool) }}"
 __operations_artifact_extract_dir: "{{ artifact_dir }}/artifact"
 
 operations_ocp_namespace: "{{ ocp_namespace | default('aap') }}"
-operations_aap_instance_name: "{{ aap_instance_name | default('aap') }}"
+operations_aap_instance_name: >-
+  {{ aap_instance_name
+     | default(ocp_utils_aap_instance_name | default('aap')) }}
 
 operations_gateway_admin_user: "admin"
 operations_validate_certs: false
