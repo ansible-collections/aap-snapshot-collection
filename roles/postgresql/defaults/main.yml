@@ -11,6 +11,7 @@ postgresql_django_manage_get_cmd: "from django.conf import settings; print(setti
 postgresql_export_dir: "/tmp/backups/automation-platform"
 postgresql_export_dest: "{{ lookup('env', 'PWD') }}/db_export"
 postgresql_export_extension: "pgc"
+postgresql_export_rsync_opts: []
 
 # Import variables
 postgresql_restore_timeout: 3600
