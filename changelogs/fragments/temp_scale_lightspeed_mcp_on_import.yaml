@@ -1,0 +1,4 @@
+---
+bugfixes:
+  - Temporarily scale Lightspeed and MCP workloads around the OCP snapshot import idle transition.
+...

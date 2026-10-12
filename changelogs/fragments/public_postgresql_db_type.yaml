@@ -1,0 +1,4 @@
+---
+bugfixes:
+  - Honor the public postgresql_db_type input when writing artifact database metadata.
+...
