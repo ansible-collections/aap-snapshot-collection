@@ -14,7 +14,7 @@ aap-snapshot-<version>-<date>.tar
   │   └── custom_configs/            # RPM-only: configuration files
   ├── hub/
   │   ├── hub.pgc                    # PostgreSQL custom-format dump
-  │   └── hub-content.tar.gz         # Optional: Pulp content data
+  │   └── hub_content.tar             # Optional: Pulp content data
   ├── gateway/
   │   └── gateway.pgc               # PostgreSQL custom-format dump
   ├── eda/
@@ -151,9 +151,14 @@ installation.
 ### Hub Content Data (Optional)
 
 When `export_hub_content: true` (the default), the hub directory includes
-`hub-content.tar.gz` - a tarball of the Pulp content directory
-(`/var/lib/pulp/`). This preserves collection and execution environment
-artifacts stored on disk outside the database.
+`hub_content.tar` - a tarball of the Pulp media directory
+(`/var/lib/pulp/media/`). This preserves collection and execution environment
+artifact bytes stored outside the database. Set `export_hub_content: false` to
+omit the content tar; the manifest then records `has_content_data: false`.
+
+For schema 1.0 artifacts, `has_content_data: true` means `embedded`; a false or
+missing value means `omitted`. It never means that the artifact
+expects a shared external storage namespace. This flag is authoritative.
 
 ## Integrity
 
@@ -164,7 +169,7 @@ output:
 ```
 <hash>  controller/controller.pgc
 <hash>  hub/hub.pgc
-<hash>  hub/hub-content.tar.gz
+<hash>  hub/hub_content.tar
 <hash>  gateway/gateway.pgc
 <hash>  eda/eda.pgc
 <hash>  manifest.yml

@@ -154,8 +154,11 @@ def _build_report(manifest, component_results, hub_content_ok, checksum_ok, secr
         pgc_status = "OK" if component_results.get(name, False) else "MISSING"
         entry = f"    - {name:<16} v{version:<12} {db_name}  [pgc: {pgc_status}]"
 
-        if comp.get("has_content_data", False):
-            content_status = "OK" if hub_content_ok else "MISSING"
+        if name == "hub":
+            if comp.get("has_content_data", False):
+                content_status = "OK" if hub_content_ok else "MISSING"
+            else:
+                content_status = "OMITTED"
             entry += f" [content: {content_status}]"
 
         lines.append(entry)
@@ -228,11 +231,8 @@ def main():
             if target_version:
                 artifact_version = manifest.get("aap_version", "")
                 if artifact_version != target_version:
-                    errors.append(
-                        f"Artifact from AAP {artifact_version} but target is "
-                        f"AAP {target_version}. Migrate to same version first, "
-                        f"then upgrade in place."
-                    )
+                    error_message = "Artifact from AAP {} but target is AAP {}. Migrate to same version first, then upgrade in place."
+                    errors.append(error_message.format(artifact_version, target_version))
 
     exists, _path = _check_file_exists(artifact_dir, "secrets.yml")
     if not exists:
@@ -265,11 +265,18 @@ def main():
         if not pgc_exists:
             errors.append(f"Component '{name}' listed in manifest but {name}.pgc not found")
 
-        if name == "hub" and comp.get("has_content_data", False):
+        if name == "hub":
+            has_content_data = comp.get("has_content_data", False)
             content_path = os.path.join(artifact_dir, "hub", "hub_content.tar")
-            hub_content_ok = os.path.isfile(content_path)
-            if not hub_content_ok:
-                errors.append("Hub content data flagged in manifest but hub_content.tar not found")
+            content_exists = os.path.isfile(content_path)
+            if not isinstance(has_content_data, bool):
+                errors.append("Hub has_content_data must be a boolean")
+            elif has_content_data:
+                hub_content_ok = content_exists
+                if not content_exists:
+                    errors.append("Hub has_content_data is true but hub_content.tar was not found")
+            elif content_exists:
+                errors.append("Hub has_content_data is false but hub_content.tar is present")
 
     report = _build_report(manifest, component_results, hub_content_ok, checksum_ok, secrets_ok, errors)
 

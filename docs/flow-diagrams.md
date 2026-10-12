@@ -65,7 +65,7 @@ flowchart TD
             F3[postgresql/db_auth.yml]
             F4["pg_dump -> hub.pgc"]
             F5[Checksum + fetch]
-            F6["Export hub content (RPM ONLY)<br/>archive /var/lib/pulp/media/<br/>-> hub_content.tar"]
+            F6["Export embedded hub content<br/>archive /var/lib/pulp/media/<br/>-> hub_content.tar"]
             F7[Checksum + fetch content tar]
 
             F1 --> F2 --> F3 --> F4 --> F5 --> F6 --> F7

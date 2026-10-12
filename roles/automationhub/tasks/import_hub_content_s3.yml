@@ -1,0 +1,147 @@
+---
+- name: Delete temporary PostgreSQL deployment before S3 content restore
+  kubernetes.core.k8s:
+    kind: Deployment
+    name: "{{ automationhub_temp_deployment_name }}"
+    namespace: "{{ automationhub_ocp_namespace }}"
+    state: absent
+    wait: true
+    wait_timeout: 120
+  environment: "{{ automationhub_ocp_environment }}"
+
+- name: Wait for previous temporary pod to terminate
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: "{{ automationhub_ocp_namespace }}"
+    label_selectors:
+      - "app={{ automationhub_temp_deployment_name }}"
+  environment: "{{ automationhub_ocp_environment }}"
+  register: _automationhub_old_temp_pods
+  until: _automationhub_old_temp_pods.resources | length == 0
+  retries: 30
+  delay: 10
+
+- name: Recreate temporary deployment with an S3-capable Ansible image
+  ansible.builtin.include_role:
+    name: ansible.aap_snapshot.ocp_utils
+    tasks_from: create_temp_resources.yml
+  vars:
+    _ocp_utils_temp_service_account: "{{ automationhub_aap_instance_name }}-hub"
+    ocp_utils_temp_pod_image: "{{ automationhub_s3_import_image }}"
+
+- name: Wait for the temporary S3 pod to become ready
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: "{{ automationhub_ocp_namespace }}"
+    name: "{{ ocp_utils_temp_pod_name }}"
+  environment: "{{ automationhub_ocp_environment }}"
+  register: _automationhub_s3_temp_pod
+  until: >-
+    (_automationhub_s3_temp_pod.resources | length) > 0
+    and (_automationhub_s3_temp_pod.resources[0].status.conditions | default([])
+         | selectattr('type', 'equalto', 'Ready')
+         | selectattr('status', 'equalto', 'True') | list | length) > 0
+  retries: 30
+  delay: 10
+
+- name: Register temporary S3 pod as an Ansible execution host
+  ansible.builtin.add_host:
+    name: automationhub_s3_import
+    ansible_connection: kubernetes.core.kubectl
+    ansible_kubectl_kubeconfig: "{{ __automationhub_resolved_kubeconfig }}"
+    ansible_kubectl_namespace: "{{ automationhub_ocp_namespace }}"
+    ansible_kubectl_pod: "{{ ocp_utils_temp_pod_name }}"
+    ansible_kubectl_container: postgres
+    ansible_python_interpreter: /usr/bin/python3
+    ansible_remote_tmp: /tmp/.ansible/tmp
+  no_log: "{{ not (disable_no_log | default(false) | bool) }}"
+
+- name: Remove any previous Hub content extraction directory
+  ansible.builtin.file:
+    path: /tmp/migration/hub-content-s3
+    state: absent
+  delegate_to: automationhub_s3_import
+
+- name: Create Hub content extraction directory
+  ansible.builtin.file:
+    path: /tmp/migration/hub-content-s3
+    state: directory
+    mode: '0700'
+  delegate_to: automationhub_s3_import
+
+- name: Extract embedded Hub content archive in the temporary pod
+  ansible.builtin.unarchive:
+    src: "/tmp/migration/artifact/hub/{{ automationhub_content_tar_name }}"
+    dest: /tmp/migration/hub-content-s3
+    remote_src: true
+  delegate_to: automationhub_s3_import
+
+- name: Find extracted Hub content objects
+  ansible.builtin.find:
+    paths: /tmp/migration/hub-content-s3
+    recurse: true
+    file_type: file
+  delegate_to: automationhub_s3_import
+  register: _automationhub_s3_files
+
+- name: Validate extracted Hub content objects are present
+  ansible.builtin.assert:
+    that:
+      - _automationhub_s3_files.matched | int > 0
+    fail_msg: >-
+      The embedded Hub content archive contained no content-addressed files.
+      Refusing to upload.
+
+- name: Calculate SHA256 checksums for extracted Hub content objects
+  ansible.builtin.stat:
+    path: "{{ item.path }}"
+    get_checksum: true
+    checksum_algorithm: sha256
+  delegate_to: automationhub_s3_import
+  loop: "{{ _automationhub_s3_files.files }}"
+  loop_control:
+    label: "{{ item.path | basename }}"
+  register: _automationhub_s3_file_stats
+
+- name: Validate extracted Hub content checksums against their storage keys
+  ansible.builtin.assert:
+    that:
+      - item.item.path is match('^/tmp/migration/hub-content-s3/artifact/[0-9a-f]{2}/[0-9a-f]{62}$')
+      - (item.stat.checksum | default('')) == ((item.item.path | dirname | basename) ~ (item.item.path | basename))
+    fail_msg: >-
+      An extracted Hub content object does not match the expected Pulp artifact
+      SHA256 storage key. Refusing to upload it.
+  loop: "{{ _automationhub_s3_file_stats.results }}"
+  loop_control:
+    label: "{{ item.item.path | basename }}"
+
+- name: Upload embedded Hub content to the target S3-compatible backend
+  community.aws.s3_sync:
+    bucket: "{{ _automationhub_s3_bucket_name }}"
+    file_root: /tmp/migration/hub-content-s3
+    key_prefix: "{{ _automationhub_s3_storage_location | trim('/') }}"
+    endpoint_url: "{{ _automationhub_s3_endpoint_url | default(omit, true) }}"
+    region: "{{ _automationhub_s3_region_name | default('us-east-1', true) }}"
+    access_key: "{{ _automationhub_s3_secret.resources[0].data['s3-access-key-id'] | b64decode }}"
+    secret_key: "{{ _automationhub_s3_secret.resources[0].data['s3-secret-access-key'] | b64decode }}"
+    aws_config: >-
+      {{ {'s3': {'addressing_style': _automationhub_s3_addressing_style}}
+         if _automationhub_s3_addressing_style in ['auto', 'path', 'virtual']
+         else omit }}
+    validate_certs: "{{ automationhub_s3_validate_certs | bool }}"
+    file_change_strategy: force
+    delete: false
+  delegate_to: automationhub_s3_import
+  register: _automationhub_s3_upload_result
+  no_log: "{{ not (disable_no_log | default(false) | bool) }}"
+
+- name: Remove extracted Hub content staging directory
+  ansible.builtin.file:
+    path: /tmp/migration/hub-content-s3
+    state: absent
+  delegate_to: automationhub_s3_import
+
+- name: Record that Hub content was restored to S3
+  ansible.builtin.set_fact:
+    _automationhub_content_restored: true
+...

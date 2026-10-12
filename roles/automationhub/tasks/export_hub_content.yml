@@ -1,6 +1,6 @@
 ---
 - name: Hub content export
-  when: automationhub_export_hub_content | default(true) | bool
+  when: artifact_export_hub_content | bool
   block:
     - name: Create hub content tarball (RPM)
       community.general.archive:
