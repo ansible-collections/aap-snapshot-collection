@@ -34,9 +34,59 @@
             format: tar
             mode: '0640'
 
+    - name: Check OCP Hub storage backend
+      ansible.builtin.include_tasks: check_storage_backend_ocp.yml
+      when: aap_platform == 'operator'
+
+    - name: Export Hub content from OCP pod
+      when: aap_platform == 'operator'
+      environment: "{{ automationhub_ocp_environment }}"
+      block:
+        - name: Require a discovered Hub pod for OCP content export
+          ansible.builtin.assert:
+            that: _ocp_utils_hub_pod_name is defined
+            fail_msg: >-
+              No running Hub pod found in namespace {{ automationhub_ocp_namespace }}
+              for Hub CR '{{ _hub_cr_name }}'.
+
+        - name: Create OCP Hub content tarball in the Hub pod
+          kubernetes.core.k8s_exec:
+            namespace: "{{ automationhub_ocp_namespace }}"
+            pod: "{{ _ocp_utils_hub_pod_name }}"
+            container: "{{ _ocp_utils_hub_container_name }}"
+            command: >-
+              sh -c 'tar -cf /tmp/aap-snapshot-hub-content.tar
+              -C "{{ automationhub_pulp_data_dir }}" .'
+          register: _automationhub_ocp_content_tar
+          failed_when: _automationhub_ocp_content_tar.rc != 0
+          changed_when: _automationhub_ocp_content_tar.rc == 0
+
+        - name: Copy OCP Hub content tarball to the artifact
+          kubernetes.core.k8s_cp:
+            namespace: "{{ automationhub_ocp_namespace }}"
+            pod: "{{ _ocp_utils_hub_pod_name }}"
+            container: "{{ _ocp_utils_hub_container_name }}"
+            remote_path: /tmp/aap-snapshot-hub-content.tar
+            local_path: "{{ __artifact_build_dir }}/hub/{{ automationhub_content_tar_name }}"
+            state: from_pod
+
+      always:
+        - name: Remove temporary OCP Hub content tarball
+          kubernetes.core.k8s_exec:
+            namespace: "{{ automationhub_ocp_namespace }}"
+            pod: "{{ _ocp_utils_hub_pod_name }}"
+            container: "{{ _ocp_utils_hub_container_name }}"
+            command: "rm -f /tmp/aap-snapshot-hub-content.tar"
+          failed_when: false
+          changed_when: false
+          when: _ocp_utils_hub_pod_name is defined
+
     - name: Get hub content tarball checksum
       ansible.builtin.stat:
-        path: "{{ automationhub_content_staging_dir }}/{{ automationhub_content_tar_name }}"
+        path: >-
+          {{ (__artifact_build_dir ~ '/hub/' ~ automationhub_content_tar_name)
+             if aap_platform == 'operator'
+             else (automationhub_content_staging_dir ~ '/' ~ automationhub_content_tar_name) }}
         checksum_algorithm: sha256
       register: _automationhub_content_stat
 
@@ -60,12 +110,16 @@
         mode: pull
         src: "{{ automationhub_content_staging_dir }}/{{ automationhub_content_tar_name }}"
         dest: "{{ __artifact_build_dir }}/hub/{{ automationhub_content_tar_name }}"
-      when: _automationhub_content_stat.stat.exists | default(false)
+      when:
+        - _automationhub_content_stat.stat.exists | default(false)
+        - aap_platform != 'operator'
 
     - name: Clean up remote hub content tarball
       ansible.builtin.file:
         path: "{{ automationhub_content_staging_dir }}/{{ automationhub_content_tar_name }}"
         state: absent
       become: true
-      when: _automationhub_content_stat.stat.exists | default(false)
+      when:
+        - _automationhub_content_stat.stat.exists | default(false)
+        - aap_platform != 'operator'
 ...
