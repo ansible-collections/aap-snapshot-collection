@@ -54,7 +54,7 @@
         name: ansible.aap_snapshot.ocp_utils
         tasks_from: create_temp_resources.yml
       vars:
-        _ocp_utils_temp_service_account: "{{ aap_instance_name | default('aap') }}-hub"
+        _ocp_utils_temp_service_account: "{{ automationhub_aap_instance_name }}-hub"
         _ocp_utils_temp_volume_mounts:
           - name: migration-data
             mountPath: /tmp/migration
