@@ -9,6 +9,12 @@ description: Conventions for contributing to the ansible.aap_snapshot collection
 
 Conventions for contributing to the `ansible.aap_snapshot` collection.
 
+## Collection Dependencies
+
+When adding, removing, or changing collection dependencies, follow the
+dependency update requirements in
+[CONTRIBUTING.md](../../../CONTRIBUTING.md#install-dependencies).
+
 ## Changelog Fragments
 
 This project uses [antsibull-changelog](https://github.com/ansible-community/antsibull-changelog) to generate release notes.

@@ -32,6 +32,13 @@ pip install ansible-core ansible-lint black flake8 antsibull-changelog
 ansible-galaxy collection install -r requirements.yml
 ```
 
+When adding, removing, or changing a collection dependency, update both the root
+`galaxy.yml` and `requirements.yml` in the same change. Keep the dependency's
+fully qualified collection name and version requirement aligned across both
+files. If `requirements.yml` uses a vendored archive, make sure it provides the
+fully qualified collection named by the corresponding dependency entry in
+`galaxy.yml`. Do not update only one file.
+
 ## Testing
 
 ### Linting
