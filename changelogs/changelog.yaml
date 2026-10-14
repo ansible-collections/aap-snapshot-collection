@@ -593,3 +593,31 @@ releases:
     - lower-ansible-core-requirement-to-2.14.yaml
     - rpm-hub-secret-collection.yaml
     release_date: '2026-09-17'
+  1.1.2:
+    changes:
+      bugfixes:
+      - Fix containerized import/export failing when the PostgreSQL container image
+        is not available on the target host by discovering and transferring the image
+        from the database host before creating the temp container.
+      - Honor the public postgresql_db_type input when writing artifact database metadata.
+      - Include localhost in import preflight so OCP target checks run with pod-only
+        inventories.
+      - Temporarily scale Lightspeed and MCP workloads around the OCP snapshot import
+        idle transition.
+      - Try rsync before Ansible fetch for PostgreSQL dump transfers and fail the
+        play if both methods fail.
+      - ocp_utils check_aap_cr - fail early with a clear message when ``aap_instance_name``
+        is explicitly provided but no ``AnsibleAutomationPlatform`` CR with that name
+        exists in the namespace; previously the collection silently continued with
+        the wrong name, causing operations such as ``idle_aap`` to no-op without error.
+      minor_changes:
+      - Allow custom rsync options for PostgreSQL dump transfers with `postgresql_export_rsync_opts`.
+    fragments:
+    - fix-containerized-postgres-image-pull.yaml
+    - fix-readme-dependency-and-changelog-link.yaml
+    - fix_import_preflight_localhost.yaml
+    - postgresql-export-rsync-fallback.yaml
+    - preflight-aap-instance-name-validation.yaml
+    - public_postgresql_db_type.yaml
+    - temp_scale_lightspeed_mcp_on_import.yaml
+    release_date: '2026-10-14'

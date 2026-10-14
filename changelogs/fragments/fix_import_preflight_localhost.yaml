@@ -1,4 +1,0 @@
----
-bugfixes:
-  - Include localhost in import preflight so OCP target checks run with pod-only inventories.
-...

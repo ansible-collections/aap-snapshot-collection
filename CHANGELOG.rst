@@ -4,6 +4,24 @@ ansible.aap\_snapshot Release Notes
 
 .. contents:: Topics
 
+v1.1.2
+======
+
+Minor Changes
+-------------
+
+- Allow custom rsync options for PostgreSQL dump transfers with `postgresql_export_rsync_opts`.
+
+Bugfixes
+--------
+
+- Fix containerized import/export failing when the PostgreSQL container image is not available on the target host by discovering and transferring the image from the database host before creating the temp container.
+- Honor the public postgresql_db_type input when writing artifact database metadata.
+- Include localhost in import preflight so OCP target checks run with pod-only inventories.
+- Temporarily scale Lightspeed and MCP workloads around the OCP snapshot import idle transition.
+- Try rsync before Ansible fetch for PostgreSQL dump transfers and fail the play if both methods fail.
+- ocp_utils check_aap_cr - fail early with a clear message when ``aap_instance_name`` is explicitly provided but no ``AnsibleAutomationPlatform`` CR with that name exists in the namespace; previously the collection silently continued with the wrong name, causing operations such as ``idle_aap`` to no-op without error.
+
 v1.1.1
 ======
 
