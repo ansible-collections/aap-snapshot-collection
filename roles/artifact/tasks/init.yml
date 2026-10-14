@@ -81,6 +81,16 @@
     mode: '0750'
   when: groups.get('eda_groups', []) | length > 0
 
+- name: Initialize component directories for OCP export
+  ansible.builtin.file:
+    path: "{{ __artifact_build_dir }}/{{ item }}/"
+    state: directory
+    mode: '0750'
+  loop: "{{ _artifact_export_components | default([]) }}"
+  loop_control:
+    label: "{{ item }}"
+  when: aap_platform == 'operator'
+
 # Component export tasks reference __artifact_build_dir on their own
 # remote hosts several include_role levels deep - broadcast it as a fact
 # rather than relying on each host re-deriving the role default.

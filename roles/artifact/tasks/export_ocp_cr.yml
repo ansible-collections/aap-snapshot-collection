@@ -1,0 +1,47 @@
+---
+- name: Read source AAP CR for artifact reference
+  kubernetes.core.k8s_info:
+    kind: AnsibleAutomationPlatform
+    api_version: aap.ansible.com/v1alpha1
+    name: "{{ aap_instance_name }}"
+    namespace: "{{ ocp_namespace | default('aap') }}"
+  environment: "{{ artifact_ocp_environment }}"
+  register: _artifact_source_aap_cr
+  no_log: "{{ __artifact_no_log }}"
+
+- name: Verify source AAP CR is available
+  ansible.builtin.assert:
+    that:
+      - _artifact_source_aap_cr.resources | length == 1
+    fail_msg: >-
+      Unable to read AAP CR '{{ aap_instance_name }}' from
+      namespace '{{ ocp_namespace | default('aap') }}' for the artifact reference.
+
+- name: Build sanitized AAP CR reference
+  ansible.builtin.set_fact:
+    _artifact_source_aap_cr_definition:
+      apiVersion: "{{ _artifact_source_aap_cr.resources[0].apiVersion }}"
+      kind: "{{ _artifact_source_aap_cr.resources[0].kind }}"
+      metadata:
+        name: "{{ _artifact_source_aap_cr.resources[0].metadata.name }}"
+        namespace: "{{ _artifact_source_aap_cr.resources[0].metadata.namespace }}"
+      spec: "{{ _artifact_source_aap_cr.resources[0].spec | default({}) }}"
+  no_log: "{{ __artifact_no_log }}"
+
+- name: Write sanitized AAP CR reference
+  ansible.builtin.copy:
+    content: "{{ _artifact_source_aap_cr_definition | to_nice_yaml }}"
+    dest: "{{ __artifact_build_dir }}/aap_cr.yml"
+    mode: '0640'
+  no_log: "{{ __artifact_no_log }}"
+
+- name: Get AAP CR reference checksum
+  ansible.builtin.stat:
+    path: "{{ __artifact_build_dir }}/aap_cr.yml"
+    checksum_algorithm: sha256
+  register: _artifact_source_aap_cr_stat
+
+- name: Record AAP CR reference checksum
+  ansible.builtin.set_fact:
+    _artifact_aap_cr_checksum: "{{ _artifact_source_aap_cr_stat.stat.checksum }}  aap_cr.yml"
+...

@@ -149,6 +149,52 @@ class TestValidateChecksums:
         assert "eda/eda.pgc" in failures[0]
 
 
+class TestValidateSourceAAPCR:
+    def _make_operator_source(self, artifact_dir):
+        cr_definition = {
+            "apiVersion": "aap.ansible.com/v1alpha1",
+            "kind": "AnsibleAutomationPlatform",
+            "metadata": {"name": "aap", "namespace": "aap"},
+            "spec": {"controller": {}, "hub": {}},
+        }
+        cr_path = os.path.join(artifact_dir, "aap_cr.yml")
+        with open(cr_path, "w") as f:
+            yaml.safe_dump(cr_definition, f)
+
+        with open(cr_path, "rb") as f:
+            cr_checksum = hashlib.sha256(f.read()).hexdigest()
+        with open(os.path.join(artifact_dir, "sha256sum.txt"), "a") as f:
+            f.write(f"{cr_checksum}  aap_cr.yml\n")
+
+        return cr_path
+
+    def test_valid_operator_cr_reference_and_checksum(self, artifact_dir):
+        self._make_operator_source(artifact_dir)
+        assert validate_mod._validate_source_aap_cr(artifact_dir, "operator") == []
+
+    def test_missing_operator_cr_reference(self, artifact_dir):
+        failures = validate_mod._validate_source_aap_cr(artifact_dir, "operator")
+        assert failures == ["OCP-source artifact is missing aap_cr.yml"]
+
+    def test_operator_cr_must_be_listed_in_checksums(self, artifact_dir):
+        cr_path = os.path.join(artifact_dir, "aap_cr.yml")
+        with open(cr_path, "w") as f:
+            yaml.safe_dump(
+                {
+                    "apiVersion": "aap.ansible.com/v1alpha1",
+                    "kind": "AnsibleAutomationPlatform",
+                    "metadata": {"name": "aap"},
+                    "spec": {},
+                },
+                f,
+            )
+        failures = validate_mod._validate_source_aap_cr(artifact_dir, "operator")
+        assert "aap_cr.yml is not listed in sha256sum.txt" in failures
+
+    def test_non_operator_artifact_does_not_require_cr_reference(self, artifact_dir):
+        assert validate_mod._validate_source_aap_cr(artifact_dir, "rpm") == []
+
+
 class TestBuildReport:
     def test_valid_report(self, artifact_dir):
         with open(os.path.join(artifact_dir, "manifest.yml")) as f:
