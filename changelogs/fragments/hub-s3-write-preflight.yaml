@@ -1,0 +1,4 @@
+---
+bugfixes:
+  - Check Hub S3 write and cleanup access before idling AAP for OCP content import.
+...

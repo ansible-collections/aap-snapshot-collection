@@ -20,6 +20,8 @@ dependencies:
   "community.postgresql": ">=3.0.0"
   "containers.podman": ">=1.14.0"
   "community.general": ">=10.7.0"
+  "amazon.aws": ">=9.0.0,<10.0.0"
+  "community.aws": ">=9.3.0,<10.0.0"
   "kubernetes.core": ">=3.0.0"
 repository: https://github.com/ansible-collections/aap-snapshot-collection
 documentation: https://github.com/ansible-collections/aap-snapshot-collection
@@ -27,6 +29,7 @@ homepage: https://github.com/ansible-collections/aap-snapshot-collection
 issues: https://github.com/ansible-collections/aap-snapshot-collection/issues
 build_ignore:
   - .agents
+  - .ansible
   - .ansible-lint
   - .black.cfg
   - .claude
@@ -41,6 +44,7 @@ build_ignore:
   - CODE_OF_CONDUCT.md
   - CODEOWNERS
   - .yamllint.yml
+  - .pytest_cache
   - changelogs/.plugin-cache.yaml
   - collections
   - CONTRIBUTING.md
