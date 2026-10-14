@@ -33,15 +33,15 @@ Control artifact creation and packaging.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `export_hub_content` | `true` | Include Pulp content data (`/var/lib/pulp/`) in artifact |
+| `artifact_export_hub_content` | `true` | Include Pulp content data in artifact; OCP export supports file-storage PVCs |
 | `postgresql_db_type` | `managed` | Database topology: `managed` (co-located) or `external` |
 
 ### Hub Content Export
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `hub_pulp_data_dir` | `/var/lib/pulp/` | Pulp content directory on hub host |
-| `hub_content_tar_name` | `hub-content.tar.gz` | Filename for the content tarball |
+| `automationhub_pulp_data_dir` | `/var/lib/pulp/media` | Pulp content directory on source Hub |
+| `automationhub_content_tar_name` | `hub_content.tar` | Filename for the content tarball |
 
 ### Database Export
 
@@ -69,6 +69,12 @@ Control artifact restoration to the target platform.
 
 Apply when `aap_platform: operator`. Control interaction with the OpenShift
 cluster and AAP operator.
+
+For export, use a localhost inventory and provide kubeconfig access to inspect
+the AAP/component CRs and secrets, execute commands in component pods, and copy
+files from pods. OCP-source artifacts include a sanitized `aap_cr.yml`
+reference. Hub content is supported only on file-storage PVCs; set
+`artifact_export_hub_content: false` to omit it when Hub uses S3 or Azure Blob.
 
 ### Namespace and Instance
 

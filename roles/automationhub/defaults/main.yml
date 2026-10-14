@@ -7,7 +7,7 @@ automationhub_content_tar_name: "hub_content.tar"
 # Staging directory for the hub content tarball on the remote host.
 # Set this to a larger filesystem if /tmp is too small for your hub data.
 automationhub_content_staging_dir: "/tmp"
-automationhub_export_hub_content: true
+automationhub_export_hub_content: "{{ artifact_export_hub_content | default(export_hub_content | default(true)) }}"
 automationhub_import_hub_content: true
 
 # Pulp repair task polling configuration (OCP only).
