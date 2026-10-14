@@ -1,0 +1,22 @@
+---
+- name: Require the source AAP CR to exist
+  ansible.builtin.assert:
+    that:
+      - _ocp_utils_aap_cr_exists | default(false) | bool
+    fail_msg: >-
+      OCP export requires an AnsibleAutomationPlatform CR in namespace
+      '{{ ocp_utils_ocp_namespace }}'. Set aap_instance_name if the namespace
+      contains multiple AAP CRs.
+
+- name: Use the discovered AAP instance name for OCP export
+  ansible.builtin.set_fact:
+    aap_instance_name: "{{ ocp_utils_aap_instance_name }}"
+
+- name: Set OCP export component list
+  ansible.builtin.set_fact:
+    _artifact_export_components: >-
+      {{ (['controller'] if _controller_cr_name is defined else [])
+         + (['eda'] if _eda_cr_name is defined else [])
+         + ['gateway']
+         + (['hub'] if _hub_cr_name is defined else []) }}
+...

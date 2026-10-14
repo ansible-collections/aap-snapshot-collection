@@ -20,6 +20,7 @@ aap-snapshot-<version>-<date>.tar
   ├── eda/
   │   └── eda.pgc                   # PostgreSQL custom-format dump
   ├── manifest.yml                   # Artifact metadata and component list
+  ├── aap_cr.yml                     # Sanitized source AAP CR reference (OCP only)
   ├── secrets.yml                    # Base64-encoded secrets
   └── sha256sum.txt                  # File integrity checksums
 ```
@@ -113,10 +114,13 @@ source deployment. Secret keys vary by component:
 | Key | Component | Description |
 |-----|-----------|-------------|
 | `controller_secret_key` | Controller | Django SECRET_KEY |
+| `controller_resource_key` | Controller | Gateway resource-server key |
 | `hub_secret` | Hub | Django SECRET_KEY |
 | `hub_db_fields_encryption_key` | Hub | Database field encryption key |
+| `hub_resource_key` | Hub | Gateway resource-server key |
 | `gateway_secret_key` | Gateway | Django SECRET_KEY |
 | `eda_secret_key` | EDA | Django SECRET_KEY |
+| `eda_resource_key` | EDA | Gateway resource-server key |
 | `controller_db_password` | Controller | Database password |
 | `hub_db_password` | Hub | Database password |
 | `gateway_db_password` | Gateway | Database password |
@@ -124,6 +128,11 @@ source deployment. Secret keys vary by component:
 
 During import, secrets are restored to the target platform's secret store
 (Kubernetes Secrets for OCP, podman secrets for containerized).
+
+OCP-source artifacts also include `aap_cr.yml`, a reference containing the
+source CR's API version, kind, name, namespace, and spec. Runtime status and
+Kubernetes-generated metadata are omitted. The file is not used to create or
+configure the target CR.
 
 ## Component Data
 
@@ -150,10 +159,11 @@ installation.
 
 ### Hub Content Data (Optional)
 
-When `export_hub_content: true` (the default), the hub directory includes
-`hub-content.tar.gz` - a tarball of the Pulp content directory
-(`/var/lib/pulp/`). This preserves collection and execution environment
-artifacts stored on disk outside the database.
+When `artifact_export_hub_content: true` (the default), the hub directory
+includes `hub_content.tar` - a tarball of Pulp's media directory. OCP export
+supports Hub content stored on a file-storage PVC. OCP Hub content stored in
+S3 or Azure Blob must be omitted by setting
+`artifact_export_hub_content: false`.
 
 ## Integrity
 
