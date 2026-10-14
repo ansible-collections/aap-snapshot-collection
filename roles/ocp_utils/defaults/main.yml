@@ -34,6 +34,17 @@ ocp_utils_idle_wait_delay: 10
 ocp_utils_scale_wait_retries: 30
 ocp_utils_scale_wait_delay: 10
 
+# Temporary workaround for AAP operators that do not scale these workloads
+# when the AnsibleAutomationPlatform idle_aap field is set.
+__ocp_utils_lightspeed_mcp_components:
+  - suffix: 'lightspeed'
+    managed_by: 'ansible-lightspeed-operator'
+  - suffix: 'mcp'
+    managed_by: 'ansible-mcp-server-operator'
+__ocp_utils_lightspeed_mcp_operator_deployments:
+  - 'ansible-lightspeed-operator-controller-manager'
+  - 'ansible-mcp-server-operator-controller-manager'
+
 __ocp_utils_component_postgres_secrets:
   controller: "{{ ocp_utils_aap_instance_name }}-controller-postgres-configuration"
   hub: "{{ ocp_utils_aap_instance_name }}-hub-postgres-configuration"
