@@ -1,0 +1,5 @@
+---
+bugfixes:
+  - postgresql - Emit exit status from OCP PostgreSQL permission and cleanup commands to avoid empty-output k8s_exec failures.
+  - postgresql - Emit the OCP pg_dump exit status to avoid empty-output k8s_exec failures.
+...

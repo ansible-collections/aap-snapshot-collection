@@ -1,0 +1,4 @@
+---
+bugfixes:
+  - automationeda - Scope EDA API pod discovery to the selected EDA CR's exact app.kubernetes.io/name label.
+...

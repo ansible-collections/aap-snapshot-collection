@@ -45,6 +45,20 @@
       when: not (item.disabled | bool)
       no_log: "{{ __ocp_utils_no_log }}"
 
+    - name: Require a CR for every enabled AAP component
+      ansible.builtin.assert:
+        that:
+          - item.resources | default([]) | length == 1
+        fail_msg: >-
+          The selected AAP CR enables {{ item.item.kind }} component
+          '{{ item.item.name }}', but that CR was not found in namespace
+          '{{ ocp_utils_ocp_namespace }}'.
+      loop: "{{ _ocp_utils_component_crs.results }}"
+      loop_control:
+        label: "{{ item.item.kind }}"
+      when:
+        - not (item.item.disabled | default(false) | bool)
+
     - name: Set component CR name facts
       ansible.builtin.set_fact:
         "{{ item.item.fact }}": "{{ item.resources[0].metadata.name }}"
@@ -202,13 +216,12 @@
         namespace: "{{ ocp_utils_ocp_namespace }}"
         label_selectors:
           - "app.kubernetes.io/component=eda-api"
+          - "app.kubernetes.io/name={{ _eda_cr_name }}"
         field_selectors:
           - "status.phase=Running"
       register: _ocp_utils_found_eda_pods
       until: >-
-        _ocp_utils_found_eda_pods.resources
-        | selectattr('metadata.name', 'match', '^' ~ (_eda_cr_name | regex_escape) ~ '-')
-        | list | length > 0
+        _ocp_utils_found_eda_pods.resources | length > 0
       retries: "{{ _discover_retries | default(60) }}"
       delay: "{{ _discover_delay | default(10) }}"
       when:
@@ -221,6 +234,7 @@
         namespace: "{{ ocp_utils_ocp_namespace }}"
         label_selectors:
           - "app.kubernetes.io/component=eda-api"
+          - "app.kubernetes.io/name={{ _eda_cr_name }}"
         field_selectors:
           - "status.phase=Running"
       register: _ocp_utils_found_eda_pods
@@ -228,67 +242,15 @@
         - _eda_cr_name is defined
         - not (_wait_for_running | default(false) | bool)
 
-    - name: Select EDA pods for the selected component CR
-      ansible.builtin.set_fact:
-        _ocp_utils_selected_eda_pods: >-
-          {{ _ocp_utils_found_eda_pods.resources | default([])
-             | selectattr('metadata.name', 'match', '^' ~ (_eda_cr_name | regex_escape) ~ '-')
-             | list }}
-      when: _eda_cr_name is defined
-
     - name: Set EDA pod facts
       ansible.builtin.set_fact:
-        _ocp_utils_eda_pod_name: "{{ _ocp_utils_selected_eda_pods[0].metadata.name }}"
+        _ocp_utils_eda_pod_name: "{{ _ocp_utils_found_eda_pods.resources[0].metadata.name }}"
         _ocp_utils_eda_container_name: "eda-api"
       when:
         - _eda_cr_name is defined
-        - _ocp_utils_selected_eda_pods | default([]) | length > 0
+        - _ocp_utils_found_eda_pods.resources | default([]) | length > 0
 
-    - name: Wait for hub pod to be running
-      kubernetes.core.k8s_info:
-        kind: Pod
-        namespace: "{{ ocp_utils_ocp_namespace }}"
-        label_selectors:
-          - "app.kubernetes.io/name=automationhub-api"
-        field_selectors:
-          - "status.phase=Running"
-      register: _ocp_utils_found_hub_pods
-      until: >-
-        _ocp_utils_found_hub_pods.resources
-        | selectattr('metadata.name', 'match', '^' ~ (_hub_cr_name | regex_escape) ~ '-')
-        | list | length > 0
-      retries: "{{ _discover_retries | default(60) }}"
-      delay: "{{ _discover_delay | default(10) }}"
-      when:
-        - _hub_cr_name is defined
-        - _wait_for_running | default(false) | bool
-
-    - name: Discover hub pod
-      kubernetes.core.k8s_info:
-        kind: Pod
-        namespace: "{{ ocp_utils_ocp_namespace }}"
-        label_selectors:
-          - "app.kubernetes.io/name=automationhub-api"
-        field_selectors:
-          - "status.phase=Running"
-      register: _ocp_utils_found_hub_pods
-      when:
-        - _hub_cr_name is defined
-        - not (_wait_for_running | default(false) | bool)
-
-    - name: Select Hub pods for the selected component CR
-      ansible.builtin.set_fact:
-        _ocp_utils_selected_hub_pods: >-
-          {{ _ocp_utils_found_hub_pods.resources | default([])
-             | selectattr('metadata.name', 'match', '^' ~ (_hub_cr_name | regex_escape) ~ '-')
-             | list }}
+    - name: Discover Hub pod contexts for the selected component CR
+      ansible.builtin.include_tasks: discover_hub_pods.yml
       when: _hub_cr_name is defined
-
-    - name: Set hub pod facts
-      ansible.builtin.set_fact:
-        _ocp_utils_hub_pod_name: "{{ _ocp_utils_selected_hub_pods[0].metadata.name }}"
-        _ocp_utils_hub_container_name: "api"
-      when:
-        - _hub_cr_name is defined
-        - _ocp_utils_selected_hub_pods | default([]) | length > 0
 ...
