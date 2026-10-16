@@ -17,6 +17,8 @@ automationhub_pulp_repair_delay: 30
 
 automationhub_temp_deployment_name: "{{ ocp_utils_temp_deployment_name | default('aap-snapshot-temp-postgres') }}"
 automationhub_temp_pvc_name: "{{ ocp_utils_temp_pvc_name | default('aap-snapshot-temp') }}"
+automationhub_temp_export_deployment_name: "aap-snapshot-temp-hub-export"
+automationhub_temp_export_mount_path: "/mnt/hub-storage"
 
 # Kubeconfig resolution for this role's own OCP tasks (import_hub_content.yml,
 # reconcile.yml), which cannot rely on ocp_utils_ocp_environment being loaded

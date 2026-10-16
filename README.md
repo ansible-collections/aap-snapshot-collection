@@ -146,7 +146,7 @@ ansible-playbook -i inventory ansible.aap_snapshot.artifact_export -e aap_platfo
 Export from an OCP operator deployment using a localhost inventory:
 
 ```bash
-ansible-playbook -i localhost, ansible.aap_snapshot.artifact_export \
+ansible-playbook -i localhost, -c local ansible.aap_snapshot.artifact_export \
   -e aap_platform=operator \
   -e ocp_namespace=aap \
   -e aap_instance_name=aap

@@ -18,4 +18,5 @@
     wait: true
     wait_timeout: 120
   environment: "{{ ocp_utils_ocp_environment }}"
+  when: _ocp_utils_create_temp_pvc | default(true) | bool
 ...
