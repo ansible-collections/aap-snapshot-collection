@@ -97,7 +97,7 @@ database restores. These are cleaned up after import completes.
 | `temp_pvc_size` | `60Gi` | Size of the temporary PVC (see sizing guidance below) |
 | `temp_pvc_access_mode` | `ReadWriteOnce` | PVC access mode |
 | `temp_deployment_name` | `aap-snapshot-temp-postgres` | Name for the temporary PostgreSQL deployment |
-| `temp_postgres_image` | `registry.redhat.io/rhel9/postgresql-15:latest` | Container image for the temporary PostgreSQL pod |
+| `temp_postgres_image` | `registry.redhat.io/rhel9/postgresql-15:latest` | Container image for the temporary PostgreSQL client pod used during OCP import or when OCP export has no managed PostgreSQL pod |
 
 **Sizing `temp_pvc_size`:** The PVC must hold the artifact tarball and its extracted contents
 simultaneously, so set it to at least **2x your artifact file size**. The 60Gi default is

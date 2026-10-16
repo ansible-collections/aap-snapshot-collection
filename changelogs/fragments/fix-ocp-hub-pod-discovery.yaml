@@ -1,0 +1,5 @@
+---
+bugfixes:
+  - automationhub - Discover OCP Hub containers by selected-instance labels and verify required commands instead of relying on fixed API or webserver labels.
+  - automationhub - Wait for the selected Hub CR API to be ready before discovering its pods in multi-instance namespaces.
+...
