@@ -1,0 +1,4 @@
+---
+bugfixes:
+  - postgresql - Pass the configured database name to the OCP PostgreSQL version probe.
+...
