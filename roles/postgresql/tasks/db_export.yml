@@ -231,7 +231,9 @@
         namespace: "{{ postgresql_ocp_namespace }}"
         pod: "{{ _pg_pod_name }}"
         container: postgres
-        command: "rm -f /tmp/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+        command: >-
+          sh -c 'rm -f /tmp/{{ postgresql_component_name }}.{{ postgresql_export_extension }};
+          result=$?; printf "cleanup exit code: %s\n" "$result"; exit "$result"'
 
     - name: Get local file checksum
       ansible.builtin.stat:
