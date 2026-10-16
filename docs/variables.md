@@ -33,15 +33,15 @@ Control artifact creation and packaging.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `export_hub_content` | `true` | Include Pulp content data (`/var/lib/pulp/`) in artifact |
+| `artifact_export_hub_content` | `true` | Include Pulp content data in artifact; OCP export supports file-storage PVCs |
 | `postgresql_db_type` | `managed` | Database topology: `managed` (co-located) or `external` |
 
 ### Hub Content Export
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `hub_pulp_data_dir` | `/var/lib/pulp/` | Pulp content directory on hub host |
-| `hub_content_tar_name` | `hub-content.tar.gz` | Filename for the content tarball |
+| `automationhub_pulp_data_dir` | `/var/lib/pulp/media` | Pulp content directory on source Hub |
+| `automationhub_content_tar_name` | `hub_content.tar` | Filename for the content tarball |
 
 ### Database Export
 
@@ -70,6 +70,12 @@ Control artifact restoration to the target platform.
 Apply when `aap_platform: operator`. Control interaction with the OpenShift
 cluster and AAP operator.
 
+For export, use a localhost inventory and provide kubeconfig access to inspect
+the AAP/component CRs and secrets, execute commands in component pods, and copy
+files from pods. OCP-source artifacts include a sanitized `aap_cr.yml`
+reference. Hub content is supported only on file-storage PVCs; set
+`artifact_export_hub_content: false` to omit it when Hub uses S3 or Azure Blob.
+
 ### Namespace and Instance
 
 | Variable | Default | Description |
@@ -91,7 +97,7 @@ database restores. These are cleaned up after import completes.
 | `temp_pvc_size` | `60Gi` | Size of the temporary PVC (see sizing guidance below) |
 | `temp_pvc_access_mode` | `ReadWriteOnce` | PVC access mode |
 | `temp_deployment_name` | `aap-snapshot-temp-postgres` | Name for the temporary PostgreSQL deployment |
-| `temp_postgres_image` | `registry.redhat.io/rhel9/postgresql-15:latest` | Container image for the temporary PostgreSQL pod |
+| `temp_postgres_image` | `registry.redhat.io/rhel9/postgresql-15:latest` | Container image for the temporary PostgreSQL client pod used during OCP import or when OCP export has no managed PostgreSQL pod |
 
 **Sizing `temp_pvc_size`:** The PVC must hold the artifact tarball and its extracted contents
 simultaneously, so set it to at least **2x your artifact file size**. The 60Gi default is

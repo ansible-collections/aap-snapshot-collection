@@ -132,6 +132,45 @@ def _validate_checksums(artifact_dir):
     return failures
 
 
+def _validate_source_aap_cr(artifact_dir, source_topology):
+    if source_topology != "operator":
+        return []
+
+    failures = []
+    cr_path = os.path.join(artifact_dir, "aap_cr.yml")
+    if not os.path.isfile(cr_path):
+        return ["OCP-source artifact is missing aap_cr.yml"]
+
+    try:
+        with open(cr_path, "r") as f:
+            cr_definition = yaml.safe_load(f)
+    except yaml.YAMLError as e:
+        failures.append(f"aap_cr.yml contains invalid YAML: {e}")
+        cr_definition = None
+
+    if not isinstance(cr_definition, dict):
+        failures.append("aap_cr.yml must contain a YAML mapping")
+    else:
+        for field in ("apiVersion", "kind", "metadata", "spec"):
+            if field not in cr_definition:
+                failures.append(f"aap_cr.yml is missing required field '{field}'")
+
+    checksum_path = os.path.join(artifact_dir, "sha256sum.txt")
+    if not os.path.isfile(checksum_path):
+        failures.append("OCP-source artifact is missing the aap_cr.yml checksum")
+    else:
+        with open(checksum_path, "r") as f:
+            checksum_entries = {
+                line.strip().split("  ", 1)[1]
+                for line in f
+                if "  " in line.strip()
+            }
+        if "aap_cr.yml" not in checksum_entries:
+            failures.append("aap_cr.yml is not listed in sha256sum.txt")
+
+    return failures
+
+
 def _build_report(manifest, component_results, hub_content_ok, checksum_ok, secrets_ok, errors):
     lines = [
         "",
@@ -249,6 +288,8 @@ def main():
             errors.extend(checksum_failures)
         else:
             checksum_ok = True
+
+    errors.extend(_validate_source_aap_cr(artifact_dir, manifest.get("source_topology")))
 
     for comp in manifest.get("components", []):
         name = comp.get("name", "")

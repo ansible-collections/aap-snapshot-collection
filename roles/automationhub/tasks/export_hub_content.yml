@@ -34,9 +34,149 @@
             format: tar
             mode: '0640'
 
+    - name: Check OCP Hub storage backend
+      ansible.builtin.include_tasks: check_storage_backend_ocp.yml
+      when: aap_platform == 'operator'
+
+    - name: Export Hub content from OCP pod
+      when: aap_platform == 'operator'
+      environment: "{{ automationhub_ocp_environment }}"
+      block:
+        - name: Discover Hub file-storage PVC
+          ansible.builtin.include_tasks: discover_file_storage_pvc.yml
+
+        - name: Initialize Hub file-storage tar candidates
+          ansible.builtin.set_fact:
+            _automationhub_file_storage_tar_candidates: []
+
+        - name: Select Hub containers that mount file storage and have tar
+          ansible.builtin.set_fact:
+            _automationhub_file_storage_tar_candidates: "{{ _automationhub_file_storage_tar_candidates + [item] }}"
+          loop: "{{ _ocp_utils_hub_capability_probes.results | default([]) }}"
+          loop_control:
+            label: "{{ item.item[0].metadata.name }}/{{ item.item[1].name }}"
+          when:
+            - item.stdout is defined
+            - item.stdout is search('tar=/')
+            - >-
+              ((item.item[0].spec.volumes | default([])
+                | selectattr('persistentVolumeClaim.claimName', 'defined')
+                | selectattr('persistentVolumeClaim.claimName', 'equalto', _automationhub_file_storage_pvc)
+                | map(attribute='name') | list)
+                | intersect(item.item[1].volumeMounts | default([]) | map(attribute='name') | list)
+                | length) > 0
+
+        - name: Require a Hub container with tar
+          ansible.builtin.assert:
+            that:
+              - _automationhub_file_storage_tar_candidates | length > 0
+            fail_msg: >-
+              No running container for Hub CR '{{ _hub_cr_name }}' in namespace
+              '{{ automationhub_ocp_namespace }}' mounts file-storage PVC
+              '{{ _automationhub_file_storage_pvc }}' and contains tar. The Hub
+              content archive cannot be created.
+
+        - name: Select a Hub container with tar
+          ansible.builtin.set_fact:
+            _automationhub_tar_source_pod: "{{ (_automationhub_file_storage_tar_candidates | first).item[0] }}"
+            _automationhub_tar_source_container: "{{ (_automationhub_file_storage_tar_candidates | first).item[1] }}"
+
+        - name: Delete previous temporary Hub export deployment
+          kubernetes.core.k8s:
+            kind: Deployment
+            name: "{{ automationhub_temp_export_deployment_name }}"
+            namespace: "{{ automationhub_ocp_namespace }}"
+            state: absent
+            wait: true
+            wait_timeout: 120
+
+        - name: Wait for previous temporary Hub export pod to terminate
+          kubernetes.core.k8s_info:
+            kind: Pod
+            namespace: "{{ automationhub_ocp_namespace }}"
+            label_selectors:
+              - "app={{ automationhub_temp_export_deployment_name }}"
+          register: _automationhub_old_export_pods
+          until: _automationhub_old_export_pods.resources | length == 0
+          retries: 30
+          delay: 10
+
+        - name: Create temporary Hub pod with file-storage PVC
+          ansible.builtin.include_role:
+            name: ansible.aap_snapshot.ocp_utils
+            tasks_from: create_temp_resources.yml
+          vars:
+            ocp_utils_temp_deployment_name: "{{ automationhub_temp_export_deployment_name }}"
+            _ocp_utils_create_temp_pvc: false
+            _ocp_utils_temp_container_name: "{{ _automationhub_tar_source_container.name }}"
+            ocp_utils_temp_pod_image: "{{ _automationhub_tar_source_container.image }}"
+            _ocp_utils_temp_image_pull_policy: "{{ _automationhub_tar_source_container.imagePullPolicy | default('IfNotPresent') }}"
+            _ocp_utils_temp_service_account: "{{ _automationhub_tar_source_pod.spec.serviceAccountName | default('default') }}"
+            _ocp_utils_temp_pod_security_context: "{{ _automationhub_tar_source_pod.spec.securityContext | default({}) }}"
+            _ocp_utils_temp_image_pull_secrets: "{{ _automationhub_tar_source_pod.spec.imagePullSecrets | default([]) }}"
+            _ocp_utils_temp_security_context: "{{ _automationhub_tar_source_container.securityContext | default({}) }}"
+            _ocp_utils_temp_volume_mounts:
+              - name: temporary-data
+                mountPath: /tmp
+              - name: hub-file-storage
+                mountPath: "{{ automationhub_temp_export_mount_path }}"
+                readOnly: true
+            _ocp_utils_temp_volumes:
+              - name: temporary-data
+                emptyDir: {}
+              - name: hub-file-storage
+                persistentVolumeClaim:
+                  claimName: "{{ _automationhub_file_storage_pvc }}"
+
+        - name: Create OCP Hub content tarball in temporary Hub pod
+          kubernetes.core.k8s_exec:
+            namespace: "{{ automationhub_ocp_namespace }}"
+            pod: "{{ ocp_utils_temp_pod_name }}"
+            container: "{{ _automationhub_tar_source_container.name }}"
+            command: >-
+              sh -c 'tar -cf /tmp/aap-snapshot-hub-content.tar
+              -C "{{ automationhub_temp_export_mount_path }}/media" .;
+              result=$?; printf "archive exit code: %s\n" "$result"; exit "$result"'
+          register: _automationhub_ocp_content_tar
+          failed_when: _automationhub_ocp_content_tar.rc != 0
+          changed_when: _automationhub_ocp_content_tar.rc == 0
+
+        - name: Copy OCP Hub content tarball from temporary Hub pod
+          kubernetes.core.k8s_cp:
+            namespace: "{{ automationhub_ocp_namespace }}"
+            pod: "{{ ocp_utils_temp_pod_name }}"
+            container: "{{ _automationhub_tar_source_container.name }}"
+            remote_path: /tmp/aap-snapshot-hub-content.tar
+            local_path: "{{ __artifact_build_dir }}/hub/{{ automationhub_content_tar_name }}"
+            state: from_pod
+
+      always:
+        - name: Remove temporary OCP Hub content tarball
+          kubernetes.core.k8s_exec:
+            namespace: "{{ automationhub_ocp_namespace }}"
+            pod: "{{ ocp_utils_temp_pod_name }}"
+            container: "{{ _automationhub_tar_source_container.name }}"
+            command: >-
+              sh -c 'rm -f /tmp/aap-snapshot-hub-content.tar;
+              result=$?; printf "cleanup exit code: %s\n" "$result"; exit "$result"'
+          failed_when: false
+          changed_when: false
+          when: ocp_utils_temp_pod_name is defined
+
+        - name: Remove temporary Hub pod and deployment
+          ansible.builtin.include_role:
+            name: ansible.aap_snapshot.ocp_utils
+            tasks_from: cleanup_temp_resources.yml
+          vars:
+            ocp_utils_temp_deployment_name: "{{ automationhub_temp_export_deployment_name }}"
+            _ocp_utils_create_temp_pvc: false
+
     - name: Get hub content tarball checksum
       ansible.builtin.stat:
-        path: "{{ automationhub_content_staging_dir }}/{{ automationhub_content_tar_name }}"
+        path: >-
+          {{ (__artifact_build_dir ~ '/hub/' ~ automationhub_content_tar_name)
+             if aap_platform == 'operator'
+             else (automationhub_content_staging_dir ~ '/' ~ automationhub_content_tar_name) }}
         checksum_algorithm: sha256
       register: _automationhub_content_stat
 
@@ -60,12 +200,16 @@
         mode: pull
         src: "{{ automationhub_content_staging_dir }}/{{ automationhub_content_tar_name }}"
         dest: "{{ __artifact_build_dir }}/hub/{{ automationhub_content_tar_name }}"
-      when: _automationhub_content_stat.stat.exists | default(false)
+      when:
+        - _automationhub_content_stat.stat.exists | default(false)
+        - aap_platform != 'operator'
 
     - name: Clean up remote hub content tarball
       ansible.builtin.file:
         path: "{{ automationhub_content_staging_dir }}/{{ automationhub_content_tar_name }}"
         state: absent
       become: true
-      when: _automationhub_content_stat.stat.exists | default(false)
+      when:
+        - _automationhub_content_stat.stat.exists | default(false)
+        - aap_platform != 'operator'
 ...

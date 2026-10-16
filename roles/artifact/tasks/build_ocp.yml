@@ -1,0 +1,25 @@
+---
+- name: Export OCP controller
+  ansible.builtin.include_role:
+    name: ansible.aap_snapshot.automationcontroller
+    tasks_from: export.yml
+  when: "'controller' in _artifact_export_components"
+
+- name: Export OCP EDA
+  ansible.builtin.include_role:
+    name: ansible.aap_snapshot.automationeda
+    tasks_from: export.yml
+  when: "'eda' in _artifact_export_components"
+
+- name: Export OCP gateway
+  ansible.builtin.include_role:
+    name: ansible.aap_snapshot.automationgateway
+    tasks_from: export.yml
+  when: "'gateway' in _artifact_export_components"
+
+- name: Export OCP Hub
+  ansible.builtin.include_role:
+    name: ansible.aap_snapshot.automationhub
+    tasks_from: export.yml
+  when: "'hub' in _artifact_export_components"
+...
