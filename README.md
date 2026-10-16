@@ -65,6 +65,35 @@ The target environment must be installed and configured **before** running an im
 - Network and firewall configuration
 - Any other environment-specific customization
 
+### Automation Hub Content Storage
+
+**The collection does not currently support importing Automation Hub content
+into S3-compatible or Azure Blob object storage.** Hub content import supports
+Pulp's FileSystem storage, including NFS-backed storage and filesystem-backed
+PVCs on OpenShift.
+
+If the target Hub uses S3-compatible or Azure Blob object storage:
+
+1. Pre-populate the target bucket or container with the source Hub content
+   outside the collection before running the import. Preserve the content paths
+   referenced by the source Hub database so the imported database can locate
+   those resources.
+2. Export an artifact without Hub content by setting
+   `automationhub_export_hub_content=false` on `artifact_export`. If an existing
+   artifact includes Hub content, re-export it with this setting.
+3. Run `artifact_import` with that artifact to migrate the database and other
+   platform data into the configured target environment.
+
+Pre-populating object storage does not allow an artifact containing Hub content
+to be imported into that backend; the collection rejects that combination.
+Customers are responsible for transferring the content and ensuring it matches
+the imported Hub database. The collection does not populate the bucket or
+container for them.
+
+Automating Hub content import into object storage is a
+[feature for consideration](ROADMAP.md#features-for-consideration), with no
+currently scoped work or committed delivery timeline.
+
 ### Version Matching Requirement
 
 **The target AAP version must match the source AAP version exactly (major.minor).** For example:
