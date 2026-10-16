@@ -186,6 +186,7 @@
           sh -c 'PGPASSWORD="{{ postgresql_auth_settings.default.PASSWORD }}"
           psql -h {{ postgresql_auth_settings.default.HOST }}
           -U {{ postgresql_auth_settings.default.USER }}
+          -d "{{ postgresql_auth_settings.default.NAME }}"
           -t -A -c "SHOW server_version"'
       register: _postgresql_version_ocp
       failed_when: _postgresql_version_ocp.rc != 0
@@ -201,39 +202,52 @@
         - _postgresql_version_ocp is not skipped
         - _postgresql_version_ocp.stdout is defined
 
-    - name: Perform PostgreSQL dump via pod
-      kubernetes.core.k8s_exec:
-        namespace: "{{ postgresql_ocp_namespace }}"
-        pod: "{{ _pg_pod_name }}"
-        container: postgres
-        command: >-
-          sh -c 'PGPASSWORD="{{ postgresql_auth_settings.default.PASSWORD }}"
-          pg_dump --clean --create -Fc
-          -h {{ postgresql_auth_settings.default.HOST }}
-          -U {{ postgresql_auth_settings.default.USER }}
-          -d {{ postgresql_auth_settings.default.NAME }}
-          -f /tmp/{{ postgresql_component_name }}.{{ postgresql_export_extension }}'
-      register: _postgresql_dump_export_result
-      failed_when: _postgresql_dump_export_result.rc != 0
-      no_log: "{{ __postgresql_no_log }}"
+    - name: Dump and transfer database from PostgreSQL pod
+      block:
+        - name: Perform PostgreSQL dump via pod
+          kubernetes.core.k8s_exec:
+            namespace: "{{ postgresql_ocp_namespace }}"
+            pod: "{{ _pg_pod_name }}"
+            container: postgres
+            command: >-
+              sh -c 'PGPASSWORD="{{ postgresql_auth_settings.default.PASSWORD }}"
+              pg_dump --clean --create -Fc
+              -h {{ postgresql_auth_settings.default.HOST }}
+              -U {{ postgresql_auth_settings.default.USER }}
+              -d {{ postgresql_auth_settings.default.NAME }}
+              -f /tmp/{{ postgresql_component_name }}.{{ postgresql_export_extension }}'
+          register: _postgresql_dump_export_result
+          failed_when: _postgresql_dump_export_result.rc != 0
+          no_log: "{{ __postgresql_no_log }}"
 
-    - name: Copy dump file from pod to localhost
-      kubernetes.core.k8s_cp:
-        namespace: "{{ postgresql_ocp_namespace }}"
-        pod: "{{ _pg_pod_name }}"
-        container: postgres
-        remote_path: "/tmp/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
-        local_path: "{{ postgresql_export_dest }}/{{ postgresql_component_name }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
-        state: from_pod
+        - name: Copy dump file from pod to localhost
+          kubernetes.core.k8s_cp:
+            namespace: "{{ postgresql_ocp_namespace }}"
+            pod: "{{ _pg_pod_name }}"
+            container: postgres
+            remote_path: "/tmp/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+            local_path: "{{ postgresql_export_dest }}/{{ postgresql_component_name }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+            state: from_pod
 
-    - name: Clean up dump file in pod
-      kubernetes.core.k8s_exec:
-        namespace: "{{ postgresql_ocp_namespace }}"
-        pod: "{{ _pg_pod_name }}"
-        container: postgres
-        command: >-
-          sh -c 'rm -f /tmp/{{ postgresql_component_name }}.{{ postgresql_export_extension }};
-          result=$?; printf "cleanup exit code: %s\n" "$result"; exit "$result"'
+      always:
+        - name: Clean up dump file in pod
+          kubernetes.core.k8s_exec:
+            namespace: "{{ postgresql_ocp_namespace }}"
+            pod: "{{ _pg_pod_name }}"
+            container: postgres
+            command: >-
+              sh -c 'rm -f /tmp/{{ postgresql_component_name }}.{{ postgresql_export_extension }};
+              result=$?; printf "cleanup exit code: %s\n" "$result"; exit "$result"'
+          register: _postgresql_dump_cleanup_result
+          failed_when: false
+          changed_when: false
+
+    - name: Fail when PostgreSQL dump cleanup fails
+      ansible.builtin.fail:
+        msg: >-
+          Failed to remove the temporary {{ postgresql_component_name }} database dump
+          from PostgreSQL pod {{ _pg_pod_name }}.
+      when: (_postgresql_dump_cleanup_result.rc | default(1) | int) != 0
 
     - name: Get local file checksum
       ansible.builtin.stat:
