@@ -42,30 +42,105 @@
       when: aap_platform == 'operator'
       environment: "{{ automationhub_ocp_environment }}"
       block:
-        - name: Require a discovered Hub pod for OCP content export
-          ansible.builtin.assert:
-            that: _ocp_utils_hub_pod_name is defined
-            fail_msg: >-
-              No running Hub pod found in namespace {{ automationhub_ocp_namespace }}
-              for Hub CR '{{ _hub_cr_name }}'.
+        - name: Discover Hub file-storage PVC
+          ansible.builtin.include_tasks: discover_file_storage_pvc.yml
 
-        - name: Create OCP Hub content tarball in the Hub pod
+        - name: Discover running Hub webserver pod
+          kubernetes.core.k8s_info:
+            kind: Pod
+            namespace: "{{ automationhub_ocp_namespace }}"
+            label_selectors:
+              - "app.kubernetes.io/component=webserver"
+              - "app.kubernetes.io/instance=nginx-{{ _hub_cr_name }}"
+              - "app.kubernetes.io/managed-by=automationhub-operator"
+              - "app.kubernetes.io/name=nginx"
+            field_selectors:
+              - "status.phase=Running"
+          register: _automationhub_web_pods
+          until: _automationhub_web_pods.resources | length > 0
+          retries: 30
+          delay: 10
+
+        - name: Select Hub web pod
+          ansible.builtin.set_fact:
+            _automationhub_web_pod: "{{ _automationhub_web_pods.resources[0] }}"
+
+        - name: Require a container in the Hub webserver pod
+          ansible.builtin.assert:
+            that: _automationhub_web_pod.spec.containers | length > 0
+            fail_msg: >-
+              No container found in the running Hub webserver pod for Hub CR
+              '{{ _hub_cr_name }}' in namespace {{ automationhub_ocp_namespace }}.
+
+        - name: Set Hub webserver container fact
+          ansible.builtin.set_fact:
+            _automationhub_web_container: "{{ _automationhub_web_pod.spec.containers[0] }}"
+
+        - name: Delete previous temporary Hub export deployment
+          kubernetes.core.k8s:
+            kind: Deployment
+            name: "{{ automationhub_temp_export_deployment_name }}"
+            namespace: "{{ automationhub_ocp_namespace }}"
+            state: absent
+            wait: true
+            wait_timeout: 120
+
+        - name: Wait for previous temporary Hub export pod to terminate
+          kubernetes.core.k8s_info:
+            kind: Pod
+            namespace: "{{ automationhub_ocp_namespace }}"
+            label_selectors:
+              - "app={{ automationhub_temp_export_deployment_name }}"
+          register: _automationhub_old_export_pods
+          until: _automationhub_old_export_pods.resources | length == 0
+          retries: 30
+          delay: 10
+
+        - name: Create temporary Hub web pod with file-storage PVC
+          ansible.builtin.include_role:
+            name: ansible.aap_snapshot.ocp_utils
+            tasks_from: create_temp_resources.yml
+          vars:
+            ocp_utils_temp_deployment_name: "{{ automationhub_temp_export_deployment_name }}"
+            _ocp_utils_create_temp_pvc: false
+            _ocp_utils_temp_container_name: "{{ _automationhub_web_container.name }}"
+            _ocp_utils_temp_pod_image: "{{ _automationhub_web_container.image }}"
+            _ocp_utils_temp_image_pull_policy: "{{ _automationhub_web_container.imagePullPolicy | default('IfNotPresent') }}"
+            _ocp_utils_temp_service_account: "{{ _automationhub_web_pod.spec.serviceAccountName | default('default') }}"
+            _ocp_utils_temp_pod_security_context: "{{ _automationhub_web_pod.spec.securityContext | default({}) }}"
+            _ocp_utils_temp_image_pull_secrets: "{{ _automationhub_web_pod.spec.imagePullSecrets | default([]) }}"
+            _ocp_utils_temp_security_context: "{{ _automationhub_web_container.securityContext | default({}) }}"
+            _ocp_utils_temp_volume_mounts:
+              - name: temporary-data
+                mountPath: /tmp
+              - name: hub-file-storage
+                mountPath: "{{ automationhub_temp_export_mount_path }}"
+                readOnly: true
+            _ocp_utils_temp_volumes:
+              - name: temporary-data
+                emptyDir: {}
+              - name: hub-file-storage
+                persistentVolumeClaim:
+                  claimName: "{{ _automationhub_file_storage_pvc }}"
+
+        - name: Create OCP Hub content tarball in temporary web pod
           kubernetes.core.k8s_exec:
             namespace: "{{ automationhub_ocp_namespace }}"
-            pod: "{{ _ocp_utils_hub_pod_name }}"
-            container: "{{ _ocp_utils_hub_container_name }}"
+            pod: "{{ ocp_utils_temp_pod_name }}"
+            container: "{{ _automationhub_web_container.name }}"
             command: >-
               sh -c 'tar -cf /tmp/aap-snapshot-hub-content.tar
-              -C "{{ automationhub_pulp_data_dir }}" .'
+              -C "{{ automationhub_temp_export_mount_path }}/media" .;
+              result=$?; printf "archive exit code: %s\n" "$result"; exit "$result"'
           register: _automationhub_ocp_content_tar
           failed_when: _automationhub_ocp_content_tar.rc != 0
           changed_when: _automationhub_ocp_content_tar.rc == 0
 
-        - name: Copy OCP Hub content tarball to the artifact
+        - name: Copy OCP Hub content tarball from temporary web pod
           kubernetes.core.k8s_cp:
             namespace: "{{ automationhub_ocp_namespace }}"
-            pod: "{{ _ocp_utils_hub_pod_name }}"
-            container: "{{ _ocp_utils_hub_container_name }}"
+            pod: "{{ ocp_utils_temp_pod_name }}"
+            container: "{{ _automationhub_web_container.name }}"
             remote_path: /tmp/aap-snapshot-hub-content.tar
             local_path: "{{ __artifact_build_dir }}/hub/{{ automationhub_content_tar_name }}"
             state: from_pod
@@ -74,12 +149,22 @@
         - name: Remove temporary OCP Hub content tarball
           kubernetes.core.k8s_exec:
             namespace: "{{ automationhub_ocp_namespace }}"
-            pod: "{{ _ocp_utils_hub_pod_name }}"
-            container: "{{ _ocp_utils_hub_container_name }}"
-            command: "rm -f /tmp/aap-snapshot-hub-content.tar"
+            pod: "{{ ocp_utils_temp_pod_name }}"
+            container: "{{ _automationhub_web_container.name }}"
+            command: >-
+              sh -c 'rm -f /tmp/aap-snapshot-hub-content.tar;
+              result=$?; printf "cleanup exit code: %s\n" "$result"; exit "$result"'
           failed_when: false
           changed_when: false
-          when: _ocp_utils_hub_pod_name is defined
+          when: ocp_utils_temp_pod_name is defined
+
+        - name: Remove temporary Hub web pod and deployment
+          ansible.builtin.include_role:
+            name: ansible.aap_snapshot.ocp_utils
+            tasks_from: cleanup_temp_resources.yml
+          vars:
+            ocp_utils_temp_deployment_name: "{{ automationhub_temp_export_deployment_name }}"
+            _ocp_utils_create_temp_pvc: false
 
     - name: Get hub content tarball checksum
       ansible.builtin.stat:
