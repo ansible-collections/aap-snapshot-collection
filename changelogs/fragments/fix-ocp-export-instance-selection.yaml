@@ -1,0 +1,4 @@
+---
+bugfixes:
+  - ocp_utils - Scope OCP export discovery to the selected AAP instance when a namespace contains multiple AAP CRs.
+...
