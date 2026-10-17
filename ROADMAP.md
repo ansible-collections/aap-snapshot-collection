@@ -1,7 +1,7 @@
 # Roadmap
 
-This document tracks planned features and enhancements for the
-`ansible.aap_snapshot` collection.
+This document tracks supported migration paths, planned enhancements, and
+features for consideration for the `ansible.aap_snapshot` collection.
 
 ## Current
 
@@ -31,3 +31,21 @@ paths.
 - Configurable bucket/container, prefix, and credentials
 - Optional integration with `artifact_import` to pull directly from a remote
   URI instead of a local `artifact_file` path
+
+## Features for consideration
+
+### Import Automation Hub content into object storage
+
+Importing Automation Hub content into S3-compatible or Azure Blob object
+storage is a feature for consideration. **This work is not currently scoped,
+and there is no committed delivery timeline.** The collection does not
+currently support importing Hub content into these storage backends.
+
+Customers whose target Hub uses S3-compatible or Azure Blob object storage
+must pre-populate that storage with the source Hub content outside the
+collection, then run the collection using an artifact exported without Hub
+content. See [Automation Hub Content Storage](README.md#automation-hub-content-storage)
+for the required preparation.
+
+This feature concerns Hub's content storage backend, separately from storing
+the migration artifact archive in cloud object storage as described above.
