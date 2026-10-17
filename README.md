@@ -16,9 +16,14 @@ imports it into a new deployment.
 | Containerized Installer | Containerized Installer | Supported |
 | OCP Operator | OCP Operator | Planned |
 
-The collection handles four AAP components: Controller, Hub (with Pulp
-content), Gateway, and EDA. Components are processed conditionally based on
-what is present in the inventory and artifact.
+The collection handles four AAP components: Controller, Hub, Gateway, and
+EDA. Hub (Pulp) content can only be imported into file-based storage; importing
+that content into S3-compatible or Azure Blob object storage is not supported
+for any of the migration paths above. See
+[Automation Hub Content Storage](#automation-hub-content-storage) for target
+storage requirements and preparation for object-storage targets. Components
+are processed conditionally based on what is present in the inventory and
+artifact.
 
 ## Requirements
 
@@ -105,7 +110,14 @@ Cross-version database restores cause migration failures due to schema mismatche
 
 ### Target Configuration Independence
 
-**Important:** The import process transfers data (objects, content, configurations) from the source environment but does **not** override target environment configuration. The target must be set up according to your deployment patterns and requirements *before* import runs. This ensures:
+**Important:** The import process transfers data (objects, configurations, and
+Hub content when the target uses supported file-based storage) from the source
+environment but does **not** override target environment configuration. Hub
+content for S3-compatible or Azure Blob targets must be transferred separately
+before import, as described in
+[Automation Hub Content Storage](#automation-hub-content-storage). The target
+must be set up according to your deployment patterns and requirements *before*
+import runs. This ensures:
 
 - Customer-configured settings are preserved
 - Target environment follows the intended design
@@ -173,6 +185,13 @@ ansible-playbook -i inventory ansible.aap_snapshot.artifact_export -e aap_platfo
 
 ### Import a migration artifact
 
+If the artifact includes Hub content, the target Hub must use file-based
+storage, such as NFS or a filesystem-backed PVC. For S3-compatible or Azure
+Blob targets, pre-populate the object storage and use an artifact exported
+without Hub content, as described in
+[Automation Hub Content Storage](#automation-hub-content-storage), before
+running either import command below.
+
 Restore into an OCP operator deployment:
 
 ```bash
@@ -210,7 +229,7 @@ ansible-playbook ansible.aap_snapshot.artifact_verify \
 | `artifact_file` | Import/Verify | - | Path to the artifact archive |
 | `ocp_namespace` | OCP | `aap` | OpenShift namespace |
 | `aap_instance_name` | OCP | `aap` | AAP CR instance name |
-| `artifact_export_hub_content` | No | `true` | Include Pulp content data in artifact |
+| `automationhub_export_hub_content` | No | `true` | Include Hub (Pulp) content in the export. Set to `false` for S3-compatible or Azure Blob targets and pre-populate their content separately; see [storage prerequisites](#automation-hub-content-storage). |
 | `artifact_postgresql_db_type` | No | `managed` | Database topology: `managed` or `external` |
 
 See the [variables reference](https://github.com/ansible-collections/aap-snapshot-collection/blob/main/docs/variables.md) for the complete list.
