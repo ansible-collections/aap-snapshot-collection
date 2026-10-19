@@ -18,7 +18,7 @@
   block:
     - name: Check if hub content tarball was staged on this host
       ansible.builtin.stat:
-        path: "{{ preflight_containerized_staging_dir }}/artifact/hub/{{ automationhub_content_tar_name }}"
+        path: "{{ preflight_containerized_staging_dir }}/artifact/hub/{{ artifact_hub_content_filename | default('hub_content.tar') }}"
       register: _automationhub_staged_content_stat
 
     - name: Extract hub content tarball on this host
@@ -79,7 +79,7 @@
         # the container can't read.
         - name: Extract hub content tarball into Pulp media directory
           ansible.builtin.unarchive:
-            src: "{{ preflight_containerized_staging_dir }}/artifact/hub/{{ automationhub_content_tar_name }}"
+            src: "{{ preflight_containerized_staging_dir }}/artifact/hub/{{ artifact_hub_content_filename | default('hub_content.tar') }}"
             dest: "{{ _automationhub_content_data_path }}/media/"
             remote_src: true
 
@@ -91,6 +91,6 @@
 
         - name: Remove staged hub content tarball
           ansible.builtin.file:
-            path: "{{ preflight_containerized_staging_dir }}/artifact/hub/{{ automationhub_content_tar_name }}"
+            path: "{{ preflight_containerized_staging_dir }}/artifact/hub/{{ artifact_hub_content_filename | default('hub_content.tar') }}"
             state: absent
 ...

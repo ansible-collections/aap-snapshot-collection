@@ -1,4 +1,10 @@
 ---
+- name: Record PostgreSQL dump extension for artifact manifest
+  ansible.builtin.set_fact:
+    _artifact_postgresql_dump_extension: "{{ postgresql_export_extension }}"
+  delegate_to: localhost
+  delegate_facts: true
+
 - name: DB Export (RPM)
   when: aap_platform == 'rpm'
   become: true
@@ -296,7 +302,8 @@
                 pod: "{{ _pg_pod_name }}"
                 container: postgres
                 command: >-
-                  sh -c 'env PGPASSFILE="$1" pg_dump --clean --create -Fc
+                  sh -c 'umask 077;
+                  env PGPASSFILE="$1" pg_dump --clean --create -Fc
                   -h "$2" -p "$3" -U "$4" -d "$5" -f "$6";
                   result=$?; printf "pg_dump exit code: %s\n" "$result"; exit "$result"'
                   sh {{ _postgresql_pgpass_remote_path | quote }}
@@ -309,6 +316,24 @@
               failed_when: _postgresql_dump_export_result.rc != 0
               no_log: "{{ __postgresql_no_log }}"
 
+            - name: Restrict PostgreSQL dump file permissions in pod
+              kubernetes.core.k8s_exec:
+                namespace: "{{ postgresql_ocp_namespace }}"
+                pod: "{{ _pg_pod_name }}"
+                container: postgres
+                command: >-
+                  sh -c 'chmod 0600 "$1";
+                  result=$?; printf "chmod exit code: %s\n" "$result"; exit "$result"'
+                  sh {{ _postgresql_dump_remote_path | quote }}
+              register: _postgresql_dump_chmod_result
+              failed_when: _postgresql_dump_chmod_result.rc != 0
+
+            - name: Prepare restricted local PostgreSQL dump file
+              ansible.builtin.file:
+                path: "{{ postgresql_export_dest }}/{{ postgresql_component_name }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+                state: touch
+                mode: "0600"
+
             - name: Copy dump file from pod to localhost
               kubernetes.core.k8s_cp:
                 namespace: "{{ postgresql_ocp_namespace }}"
@@ -317,6 +342,12 @@
                 remote_path: "{{ _postgresql_dump_remote_path }}"
                 local_path: "{{ postgresql_export_dest }}/{{ postgresql_component_name }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
                 state: from_pod
+
+            - name: Restrict copied PostgreSQL dump permissions
+              ansible.builtin.file:
+                path: "{{ postgresql_export_dest }}/{{ postgresql_component_name }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+                state: file
+                mode: "0600"
 
           always:
             - name: Clean up dump file in pod

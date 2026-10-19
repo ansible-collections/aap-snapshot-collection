@@ -1,4 +1,4 @@
-# Artifact Format (SDP v1.0)
+# Artifact Format (SDP v1.1)
 
 The migration artifact is a portable tar archive containing database dumps,
 secrets, and metadata from an AAP deployment. It is produced by the export
@@ -27,7 +27,9 @@ aap-snapshot-<version>-<date>.tar
 
 Component directories are only present if the source deployment includes that
 component. The artifact is self-describing - the manifest lists which
-components were exported.
+components were exported. The tree below shows default filenames; schema 1.1
+records configured database dump extensions and Hub content filenames in the
+manifest so validation and import can use the names stored in the artifact.
 
 ## manifest.yml
 
@@ -35,7 +37,7 @@ The manifest describes the artifact contents and source environment.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `schema_version` | string | Always `"1.0"` for this format |
+| `schema_version` | string | `"1.1"` for newly exported artifacts; `"1.0"` artifacts remain supported |
 | `aap_version` | string | Major.minor version (e.g. `"2.6"`) |
 | `aap_version_patch` | string | Patch version (e.g. `"3"`) |
 | `source_topology` | string | Source platform: `rpm`, `containerized`, or `operator` |
@@ -53,6 +55,7 @@ Array of exported components. Each entry:
 | `database_name` | string | PostgreSQL database name (e.g. `awx`, `automationhub`) |
 | `has_custom_configs` | boolean | Whether custom configuration files are included |
 | `has_content_data` | boolean | Hub only: whether Pulp content tarball is included |
+| `content_filename` | string | Hub only: configured content archive filename when `has_content_data` is true |
 
 ### database
 
@@ -60,6 +63,7 @@ Array of exported components. Each entry:
 |-------|------|-------------|
 | `type` | string | `managed` (co-located) or `external` (remote database) |
 | `postgresql_version` | string | PostgreSQL major version (e.g. `"15"`) |
+| `dump_extension` | string | Database dump filename extension (default: `pgc`) |
 
 ### checksums
 
@@ -71,7 +75,7 @@ Array of exported components. Each entry:
 ### Example
 
 ```yaml
-schema_version: "1.0"
+schema_version: "1.1"
 aap_version: "2.6"
 aap_version_patch: "3"
 source_topology: "rpm"
@@ -88,6 +92,7 @@ components:
     database_name: "automationhub"
     has_custom_configs: false
     has_content_data: true
+    content_filename: "hub_content.tar"
   - name: gateway
     version: "1.1.3"
     database_name: "gateway"
@@ -100,6 +105,7 @@ components:
 database:
   type: "managed"
   postgresql_version: "15"
+  dump_extension: "pgc"
 
 checksums:
   algorithm: sha256
@@ -138,13 +144,15 @@ configure the target CR.
 
 ### Database Dumps
 
-Each component directory contains a PostgreSQL custom-format dump (`.pgc`)
-created with `pg_dump --format=custom`. These are restored with `pg_restore`
-during import using `--clean --if-exists` flags to handle existing schemas.
+Each component directory contains a PostgreSQL custom-format dump (`.pgc` by
+default) created with `pg_dump --format=custom`. These are restored with
+`pg_restore` during import using `--clean --if-exists` flags to handle existing
+schemas. Schema 1.1 records a configured extension in
+`database.dump_extension`.
 
-Default database names:
+Component databases and default dump filenames:
 
-| Component | Database | Default Name |
+| Component | Default database dump | Database name |
 |-----------|----------|-------------|
 | Controller | `controller.pgc` | `awx` |
 | Hub | `hub.pgc` | `automationhub` |
@@ -160,10 +168,11 @@ installation.
 ### Hub Content Data (Optional)
 
 When `artifact_export_hub_content: true` (the default), the hub directory
-includes `hub_content.tar` - a tarball of Pulp's media directory. OCP export
-supports Hub content stored on a file-storage PVC. OCP Hub content stored in
-S3 or Azure Blob must be omitted by setting
-`artifact_export_hub_content: false`.
+includes a tarball of Pulp's media directory. Its default filename is
+`hub_content.tar`; schema 1.1 records the configured name in the Hub
+component's `content_filename` field. OCP export supports Hub content stored
+on a file-storage PVC. OCP Hub content stored in S3 or Azure Blob must be
+omitted by setting `artifact_export_hub_content: false`.
 
 ## Integrity
 
@@ -186,9 +195,12 @@ validation phase of both export and import workflows.
 
 ## Versioning
 
-The `schema_version` field identifies the artifact format version. The
-`artifact` role maintains an internal list of supported schema versions.
-Artifacts with unrecognized schema versions are rejected during validation.
+The `schema_version` field identifies the artifact format version. Version
+1.1 records configured database and Hub content filenames; consumers also
+support version 1.0 artifacts, which use the canonical `pgc` and
+`hub_content.tar` filenames. The `artifact` role maintains an internal list of
+supported schema versions. Artifacts with unrecognized schema versions are
+rejected during validation.
 
 The `aap_version` and `aap_version_patch` fields record the source platform
 version. These can be used to enforce version compatibility policies during

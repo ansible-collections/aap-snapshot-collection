@@ -18,6 +18,7 @@ artifact_dir: '{{ lookup("env", "PWD") }}'
 ### validate variables
 __artifact_supported_schema_versions:
   - "1.0"
+  - "1.1"
 
 ### export control
 artifact_export_hub_content: "{{ export_hub_content | default(automationhub_export_hub_content | default(true)) }}"

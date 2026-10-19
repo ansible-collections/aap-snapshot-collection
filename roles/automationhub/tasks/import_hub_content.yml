@@ -53,8 +53,9 @@
         pod: "{{ ocp_utils_temp_pod_name }}"
         container: postgres
         command: >-
-          tar xf /tmp/migration/artifact/hub/{{ automationhub_content_tar_name }}
-          -C /mnt/hub-storage/media/
+          sh -c 'tar xf "$1" -C "$2"' sh
+          {{ ('/tmp/migration/artifact/hub/' ~ (artifact_hub_content_filename | default('hub_content.tar'))) | quote }}
+          /mnt/hub-storage/media/
       register: _automationhub_content_extract
       failed_when: _automationhub_content_extract.rc != 0
       changed_when: _automationhub_content_extract.rc == 0
