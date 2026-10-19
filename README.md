@@ -233,7 +233,7 @@ ansible-playbook ansible.aap_snapshot.artifact_verify \
 | `automationhub_import_hub_content` | No | `true` | Restore Hub (Pulp) content on containerized targets. Set to `false` to skip content restoration. This does not bypass the [storage prerequisites](#automation-hub-content-storage) or enable S3-compatible or Azure Blob content import. |
 | `artifact_postgresql_db_type` | No | `managed` | Database topology: `managed` or `external` |
 
-See the [variables reference](https://github.com/ansible-collections/aap-snapshot-collection/blob/main/docs/variables.md) for the complete list.
+See the [variables reference](docs/variables.md) for the complete list.
 
 ## Testing
 
@@ -273,7 +273,7 @@ See the [changelog](https://github.com/ansible-collections/aap-snapshot-collecti
 
 - [Architecture](https://github.com/ansible-collections/aap-snapshot-collection/blob/main/docs/architecture.md) - collection structure, role hierarchy, plugin catalog
 - [Artifact Format](https://github.com/ansible-collections/aap-snapshot-collection/blob/main/docs/artifact-format.md) - SDP v1.0 artifact specification
-- [Variables](https://github.com/ansible-collections/aap-snapshot-collection/blob/main/docs/variables.md) - complete variable reference
+- [Variables](docs/variables.md) - complete variable reference
 - [Workflows](https://github.com/ansible-collections/aap-snapshot-collection/blob/main/docs/workflows.md) - step-by-step export, import, and reconcile workflows
 - [Debugging](https://github.com/ansible-collections/aap-snapshot-collection/blob/main/docs/debugging.md) - failure recovery procedures for import and export
 - [Red Hat Ansible Automation Platform Life Cycle](https://access.redhat.com/support/policy/updates/ansible-automation-platform)

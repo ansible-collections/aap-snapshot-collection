@@ -33,15 +33,16 @@ Control artifact creation and packaging.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `export_hub_content` | `true` | Include Pulp content data (`/var/lib/pulp/`) in artifact |
+| `automationhub_export_hub_content` | `true` | Include Hub (Pulp) content in the exported artifact. Set to `false` to export without Hub content when transferring that content separately. This controls export, not restoration during import. |
 | `postgresql_db_type` | `managed` | Database topology: `managed` (co-located) or `external` |
 
 ### Hub Content Export
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `hub_pulp_data_dir` | `/var/lib/pulp/` | Pulp content directory on hub host |
-| `hub_content_tar_name` | `hub-content.tar.gz` | Filename for the content tarball |
+| `automationhub_pulp_data_dir` | `/var/lib/pulp/media` | Source content directory for RPM Hub export. Containerized export discovers the Pulp media directory from the Hub container's mounts instead. |
+| `automationhub_content_tar_name` | `hub_content.tar` | Filename of the uncompressed Hub content tar archive used during export and restoration. |
+| `automationhub_content_staging_dir` | `/tmp` | Directory on the source Hub host where the content archive is staged during export. Set to a larger filesystem if `/tmp` is too small for the Hub content. |
 
 ### Database Export
 
@@ -64,6 +65,23 @@ Control artifact restoration to the target platform.
 | `postgresql_restore_admin_user` | `postgres` | PostgreSQL superuser for database restore operations |
 | `postgresql_restore_timeout` | `3600` | Async timeout in seconds for `pg_restore` |
 | `postgresql_temp_container_image` | `registry.redhat.io/rhel9/postgresql-15:latest` | Image used for the throwaway postgres client container that runs `pg_dump`/`pg_restore` on containerized targets. Override if your target's PostgreSQL server version differs |
+
+### Hub Content Import
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `automationhub_import_hub_content` | `true` | Restore Hub (Pulp) content on containerized targets. Set to `false` to skip content restoration when content is transferred separately. This variable does not control operator content restoration or disable the storage-backend check. |
+
+Hub content restoration supports only file-based target storage. For
+S3-compatible or Azure Blob targets, transfer the content separately and
+pre-populate the target storage before importing an artifact exported with
+`automationhub_export_hub_content=false`. If the artifact includes Hub content,
+both containerized and operator imports reject object-storage targets; setting
+`automationhub_import_hub_content=false` does not prevent that rejection.
+Operator content restoration is controlled by whether the artifact contains Hub
+content, rather than by this import toggle. See
+[Automation Hub Content Storage](../README.md#automation-hub-content-storage)
+for the preparation steps.
 
 ## OCP (Operator) Variables
 
