@@ -68,13 +68,13 @@
         pod: '{{ ocp_utils_temp_pod_name }}'
         container: postgres
         command: >-
-          sh -c 'PGPASSWORD="{{ postgresql_auth_settings.default.PASSWORD }}"
-          pg_restore --clean --if-exists --no-owner
+          sh -c 'PGPASSWORD="$1" pg_restore --clean --if-exists --no-owner
           -h {{ postgresql_auth_settings.default.HOST }}
           -p {{ postgresql_auth_settings.default.PORT }}
           -U {{ postgresql_auth_settings.default.USER }}
-          -d {{ postgresql_auth_settings.default.NAME }}
-          /tmp/migration/artifact/{{ postgresql_component_name }}/{{ postgresql_component_name }}.pgc'
+          -d {{ postgresql_auth_settings.default.NAME }} "$2"' sh
+          {{ postgresql_auth_settings.default.PASSWORD | quote }}
+          {{ ('/tmp/migration/artifact/' ~ postgresql_component_name ~ '/' ~ postgresql_component_name ~ '.' ~ (artifact_database_dump_extension | default('pgc'))) | quote }}
       failed_when: _postgresql_restore_result.rc != 0 and 'FATAL' in (_postgresql_restore_result.stderr | default(''))
       no_log: "{{ __postgresql_no_log }}"
       register: _postgresql_restore_result

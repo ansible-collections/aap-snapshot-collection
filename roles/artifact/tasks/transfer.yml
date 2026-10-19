@@ -9,7 +9,7 @@
   block:
     - name: Check if {{ _transfer_component_name }} dump exists in extracted artifact
       ansible.builtin.stat:
-        path: "{{ _preflight_resolved_artifact | dirname }}/artifact/{{ _transfer_component_name }}/{{ _transfer_component_name }}.pgc"
+        path: "{{ _preflight_resolved_artifact | dirname }}/artifact/{{ _transfer_component_name }}/{{ _transfer_component_name }}.{{ artifact_database_dump_extension | default('pgc') }}"
       delegate_to: localhost
       register: _artifact_transfer_source_stat
 
@@ -39,8 +39,8 @@
         - name: Transfer {{ _transfer_component_name }} database dump from control node (remote)
           ansible.posix.synchronize:
             mode: push
-            src: "{{ _preflight_resolved_artifact | dirname }}/artifact/{{ _transfer_component_name }}/{{ _transfer_component_name }}.pgc"
-            dest: "{{ preflight_containerized_staging_dir }}/artifact/{{ _transfer_component_name }}/{{ _transfer_component_name }}.pgc"
+            src: "{{ _preflight_resolved_artifact | dirname }}/artifact/{{ _transfer_component_name }}/{{ _transfer_component_name }}.{{ artifact_database_dump_extension | default('pgc') }}"
+            dest: "{{ preflight_containerized_staging_dir }}/artifact/{{ _transfer_component_name }}/{{ _transfer_component_name }}.{{ artifact_database_dump_extension | default('pgc') }}"
             rsync_opts:
               - "--chmod=F600"
               - "--no-perms"
@@ -51,8 +51,8 @@
 
         - name: Transfer {{ _transfer_component_name }} database dump from control node (local)
           ansible.builtin.copy:
-            src: "{{ _preflight_resolved_artifact | dirname }}/artifact/{{ _transfer_component_name }}/{{ _transfer_component_name }}.pgc"
-            dest: "{{ preflight_containerized_staging_dir }}/artifact/{{ _transfer_component_name }}/{{ _transfer_component_name }}.pgc"
+            src: "{{ _preflight_resolved_artifact | dirname }}/artifact/{{ _transfer_component_name }}/{{ _transfer_component_name }}.{{ artifact_database_dump_extension | default('pgc') }}"
+            dest: "{{ preflight_containerized_staging_dir }}/artifact/{{ _transfer_component_name }}/{{ _transfer_component_name }}.{{ artifact_database_dump_extension | default('pgc') }}"
             mode: '0600'
             owner: "{{ ansible_user_id }}"
           delegate_to: localhost
@@ -60,7 +60,7 @@
 
         - name: Set ownership on transferred {{ _transfer_component_name }} dump
           ansible.builtin.file:
-            path: "{{ preflight_containerized_staging_dir }}/artifact/{{ _transfer_component_name }}/{{ _transfer_component_name }}.pgc"
+            path: "{{ preflight_containerized_staging_dir }}/artifact/{{ _transfer_component_name }}/{{ _transfer_component_name }}.{{ artifact_database_dump_extension | default('pgc') }}"
             owner: "{{ ansible_user_id }}"
             mode: '0600'
 

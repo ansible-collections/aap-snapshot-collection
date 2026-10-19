@@ -17,7 +17,7 @@
 {% set _artifact_manifest_components = _artifact_manifest_components + ['hub'] %}
 {% endif %}
 {% endif %}
-schema_version: "1.0"
+schema_version: "1.1"
 aap_version: "{{ _parsed_version.major_minor }}"
 aap_version_patch: "{{ _parsed_version.patch }}"
 source_topology: "{{ aap_platform }}"
@@ -47,6 +47,9 @@ components:
     database_name: "{{ _hub_db_name | default('automationhub') }}"
     has_custom_configs: false
     has_content_data: {{ (_automationhub_content_exported | default(false)) | lower }}
+{% if _automationhub_content_exported | default(false) %}
+    content_filename: {{ hostvars['localhost'].artifact_hub_content_filename | default('hub_content.tar') | to_json }}
+{% endif %}
 {% endif %}
 {% if 'gateway' in _artifact_manifest_components %}
   - name: gateway
@@ -64,6 +67,7 @@ components:
 database:
   type: "{{ artifact_postgresql_db_type | default('managed') }}"
   postgresql_version: "{{ _postgresql_version | default('15') }}"
+  dump_extension: {{ hostvars['localhost']._artifact_postgresql_dump_extension | default('pgc') | to_json }}
 
 checksums:
   algorithm: sha256
