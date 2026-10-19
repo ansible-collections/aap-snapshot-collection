@@ -230,6 +230,7 @@ ansible-playbook ansible.aap_snapshot.artifact_verify \
 | `ocp_namespace` | OCP | `aap` | OpenShift namespace |
 | `aap_instance_name` | OCP | `aap` | AAP CR instance name |
 | `automationhub_export_hub_content` | No | `true` | Include Hub (Pulp) content in the export. Set to `false` for S3-compatible or Azure Blob targets and pre-populate their content separately; see [storage prerequisites](#automation-hub-content-storage). |
+| `automationhub_import_hub_content` | No | `true` | Restore Hub (Pulp) content on containerized targets. Set to `false` to skip content restoration. This does not bypass the [storage prerequisites](#automation-hub-content-storage) or enable S3-compatible or Azure Blob content import. |
 | `artifact_postgresql_db_type` | No | `managed` | Database topology: `managed` or `external` |
 
 See the [variables reference](https://github.com/ansible-collections/aap-snapshot-collection/blob/main/docs/variables.md) for the complete list.
