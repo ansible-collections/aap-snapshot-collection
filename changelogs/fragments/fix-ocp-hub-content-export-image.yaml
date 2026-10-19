@@ -1,4 +1,0 @@
----
-bugfixes:
-  - automationhub - Export OCP Hub content from a temporary pod using the Hub web image and mounted file-storage PVC.
-...

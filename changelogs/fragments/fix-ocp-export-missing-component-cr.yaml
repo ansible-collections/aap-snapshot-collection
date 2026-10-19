@@ -1,4 +1,0 @@
----
-bugfixes:
-  - ocp_utils - Fail OCP export when an enabled AAP component CR is missing instead of silently omitting it from the artifact.
-...

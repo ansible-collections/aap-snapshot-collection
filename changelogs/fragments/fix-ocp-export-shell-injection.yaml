@@ -1,4 +1,0 @@
----
-security_fixes:
-  - postgresql - Avoid shell interpolation of OCP database connection values and keep the password in a temporary permission-restricted pgpass file.
-...

@@ -1,4 +1,0 @@
----
-bugfixes:
-  - postgresql - Remove OCP database dump files from the PostgreSQL pod even when transfer fails.
-...
