@@ -1,4 +1,0 @@
----
-bugfixes:
-  - postgresql - Use a temporary client pod to export OCP databases when no managed PostgreSQL pod is available.
-...

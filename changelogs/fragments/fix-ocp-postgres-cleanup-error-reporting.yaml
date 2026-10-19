@@ -1,4 +1,0 @@
----
-bugfixes:
-  - postgresql - Report temporary OCP database file cleanup failures even when the export itself fails.
-...
