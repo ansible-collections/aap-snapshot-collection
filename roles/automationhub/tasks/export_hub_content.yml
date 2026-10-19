@@ -191,6 +191,7 @@
     - name: Propagate hub content flag to localhost
       ansible.builtin.set_fact:
         _automationhub_content_exported: true
+        artifact_hub_content_filename: "{{ automationhub_content_tar_name }}"
       delegate_to: localhost
       delegate_facts: true
       when: _automationhub_content_stat.stat.exists | default(false)

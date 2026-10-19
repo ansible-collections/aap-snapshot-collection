@@ -1,4 +1,4 @@
 ---
 minor_changes:
-  - Add artifact export support for OCP operator-based AAP deployments, including component databases, secrets, source CR metadata, and optional Hub content.
+  - Add artifact export support for OCP operator-based AAP deployments, including component databases, secrets, source CR metadata, optional Hub content, and configured artifact filenames.
 ...

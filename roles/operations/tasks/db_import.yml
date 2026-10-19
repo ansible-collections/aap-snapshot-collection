@@ -9,5 +9,5 @@
     tasks_from: db_import.yml
   vars:
     postgresql_component_name: "{{ component_name }}"
-    postgresql_restore_source: "{{ __operations_artifact_extract_dir }}/{{ component_name }}/{{ component_name }}.pgc"
+    postgresql_restore_source: "{{ __operations_artifact_extract_dir }}/{{ component_name }}/{{ component_name }}.{{ artifact_database_dump_extension | default('pgc') }}"
 ...

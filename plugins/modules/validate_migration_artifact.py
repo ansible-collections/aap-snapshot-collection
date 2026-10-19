@@ -30,7 +30,7 @@ options:
       - List of schema versions this collection supports.
     type: list
     elements: str
-    default: ["1.0"]
+    default: ["1.0", "1.1"]
   target_aap_version:
     description:
       - If set, validates that the artifact's AAP version (X.Y) matches this value.
@@ -76,6 +76,7 @@ errors:
 
 import hashlib
 import os
+import re
 import traceback
 
 YAML_IMP_ERR = None
@@ -93,6 +94,16 @@ from ansible.module_utils.basic import AnsibleModule, missing_required_lib
 def _check_file_exists(artifact_dir, filename):
     path = os.path.join(artifact_dir, filename)
     return os.path.isfile(path), path
+
+
+def _is_safe_artifact_filename(filename):
+    return (
+        isinstance(filename, str)
+        and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", filename) is not None
+        and os.path.basename(filename) == filename
+        and "/" not in filename
+        and "\\" not in filename
+    )
 
 
 def _validate_checksums(artifact_dir):
@@ -190,8 +201,8 @@ def _build_report(manifest, component_results, hub_content_ok, checksum_ok, secr
         name = comp.get("name", "?")
         version = comp.get("version", "?")
         db_name = comp.get("database_name", "?")
-        pgc_status = "OK" if component_results.get(name, False) else "MISSING"
-        entry = f"    - {name:<16} v{version:<12} {db_name}  [pgc: {pgc_status}]"
+        dump_status = "OK" if component_results.get(name, False) else "MISSING"
+        entry = f"    - {name:<16} v{version:<12} {db_name}  [dump: {dump_status}]"
 
         if comp.get("has_content_data", False):
             content_status = "OK" if hub_content_ok else "MISSING"
@@ -200,6 +211,8 @@ def _build_report(manifest, component_results, hub_content_ok, checksum_ok, secr
         lines.append(entry)
 
     db_info = manifest.get("database", {})
+    if not isinstance(db_info, dict):
+        db_info = {}
     lines.extend(
         [
             "-" * 63,
@@ -225,7 +238,7 @@ def main():
     module = AnsibleModule(
         argument_spec=dict(
             artifact_dir=dict(type="str", required=True),
-            supported_schema_versions=dict(type="list", elements="str", default=["1.0"]),
+            supported_schema_versions=dict(type="list", elements="str", default=["1.0", "1.1"]),
             target_aap_version=dict(type="str", default=None),
         ),
         supports_check_mode=True,
@@ -291,26 +304,40 @@ def main():
 
     errors.extend(_validate_source_aap_cr(artifact_dir, manifest.get("source_topology")))
 
+    database_metadata = manifest.get("database", {})
+    if not isinstance(database_metadata, dict):
+        errors.append("Artifact database metadata must be a mapping")
+        database_metadata = {}
+    dump_extension = database_metadata.get("dump_extension", "pgc")
+    if not _is_safe_artifact_filename(dump_extension):
+        errors.append("Database dump extension in manifest is not a simple filename extension")
+        dump_extension = "pgc"
+
     for comp in manifest.get("components", []):
         name = comp.get("name", "")
-        pgc_path = os.path.join(artifact_dir, name, f"{name}.pgc")
+        dump_path = os.path.join(artifact_dir, name, f"{name}.{dump_extension}")
 
-        if not os.path.realpath(pgc_path).startswith(os.path.realpath(artifact_dir)):
+        if not os.path.realpath(dump_path).startswith(os.path.realpath(artifact_dir)):
             errors.append(f"Component name '{name}' would escape artifact directory")
             component_results[name] = False
             continue
 
-        pgc_exists = os.path.isfile(pgc_path)
-        component_results[name] = pgc_exists
+        dump_exists = os.path.isfile(dump_path)
+        component_results[name] = dump_exists
 
-        if not pgc_exists:
-            errors.append(f"Component '{name}' listed in manifest but {name}.pgc not found")
+        if not dump_exists:
+            errors.append(f"Component '{name}' listed in manifest but {name}.{dump_extension} not found")
 
         if name == "hub" and comp.get("has_content_data", False):
-            content_path = os.path.join(artifact_dir, "hub", "hub_content.tar")
-            hub_content_ok = os.path.isfile(content_path)
-            if not hub_content_ok:
-                errors.append("Hub content data flagged in manifest but hub_content.tar not found")
+            content_filename = comp.get("content_filename", "hub_content.tar")
+            if not _is_safe_artifact_filename(content_filename):
+                errors.append("Hub content filename in manifest must be a simple filename")
+                hub_content_ok = False
+            else:
+                content_path = os.path.join(artifact_dir, "hub", content_filename)
+                hub_content_ok = os.path.isfile(content_path)
+                if not hub_content_ok:
+                    errors.append(f"Hub content data flagged in manifest but {content_filename} not found")
 
     report = _build_report(manifest, component_results, hub_content_ok, checksum_ok, secrets_ok, errors)
 
