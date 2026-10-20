@@ -25,49 +25,42 @@
   max_fail_percentage: 0
   environment: "{{ ocp_utils_ocp_environment | default({}) }}"
   tasks:
-    - name: Run OCP source preflight
-      ansible.builtin.include_role:
-        name: ansible.aap_snapshot.preflight
-        tasks_from: main.yml
+    - name: Run OCP source preflight and component checks
       when: aap_platform == 'operator'
+      block:
+        - name: Run OCP source preflight
+          ansible.builtin.include_role:
+            name: ansible.aap_snapshot.preflight
+            tasks_from: main.yml
 
-    - name: Set OCP export components
-      ansible.builtin.include_role:
-        name: ansible.aap_snapshot.ocp_utils
-        tasks_from: set_export_components.yml
-      when: aap_platform == 'operator'
+        - name: Set OCP export components
+          ansible.builtin.include_role:
+            name: ansible.aap_snapshot.ocp_utils
+            tasks_from: set_export_components.yml
 
-    - name: Pre-flight Automation Controller on OCP source
-      ansible.builtin.include_role:
-        name: ansible.aap_snapshot.automationcontroller
-        tasks_from: preflight.yml
-      when:
-        - aap_platform == 'operator'
-        - "'controller' in _artifact_export_components"
+        - name: Pre-flight Automation Controller on OCP source
+          ansible.builtin.include_role:
+            name: ansible.aap_snapshot.automationcontroller
+            tasks_from: preflight.yml
+          when: "'controller' in _artifact_export_components"
 
-    - name: Pre-flight Automation EDA on OCP source
-      ansible.builtin.include_role:
-        name: ansible.aap_snapshot.automationeda
-        tasks_from: preflight.yml
-      when:
-        - aap_platform == 'operator'
-        - "'eda' in _artifact_export_components"
+        - name: Pre-flight Automation EDA on OCP source
+          ansible.builtin.include_role:
+            name: ansible.aap_snapshot.automationeda
+            tasks_from: preflight.yml
+          when: "'eda' in _artifact_export_components"
 
-    - name: Pre-flight Automation Gateway on OCP source
-      ansible.builtin.include_role:
-        name: ansible.aap_snapshot.automationgateway
-        tasks_from: preflight.yml
-      when:
-        - aap_platform == 'operator'
-        - "'gateway' in _artifact_export_components"
+        - name: Pre-flight Automation Gateway on OCP source
+          ansible.builtin.include_role:
+            name: ansible.aap_snapshot.automationgateway
+            tasks_from: preflight.yml
+          when: "'gateway' in _artifact_export_components"
 
-    - name: Pre-flight Automation Hub on OCP source
-      ansible.builtin.include_role:
-        name: ansible.aap_snapshot.automationhub
-        tasks_from: preflight.yml
-      when:
-        - aap_platform == 'operator'
-        - "'hub' in _artifact_export_components"
+        - name: Pre-flight Automation Hub on OCP source
+          ansible.builtin.include_role:
+            name: ansible.aap_snapshot.automationhub
+            tasks_from: preflight.yml
+          when: "'hub' in _artifact_export_components"
 
 - name: Initialize artifact
   hosts: localhost
