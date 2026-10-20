@@ -208,6 +208,7 @@
             _ocp_utils_temp_container_name: postgres
             _ocp_utils_temp_volume_mounts: []
             _ocp_utils_temp_volumes: []
+            _ocp_utils_temp_pod_image: "{{ postgresql_temp_container_image }}"
 
         - name: Use temporary PostgreSQL client pod for export
           ansible.builtin.set_fact:

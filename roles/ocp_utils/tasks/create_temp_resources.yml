@@ -41,7 +41,7 @@
             imagePullSecrets: "{{ _ocp_utils_temp_image_pull_secrets | default(omit) }}"
             containers:
               - name: "{{ _ocp_utils_temp_container_name | default('postgres') }}"
-                image: "{{ ocp_utils_temp_pod_image | default(ocp_utils_temp_postgres_image) }}"
+                image: "{{ _ocp_utils_temp_pod_image | default(ocp_utils_temp_postgres_image) }}"
                 imagePullPolicy: "{{ _ocp_utils_temp_image_pull_policy | default(omit) }}"
                 command: ["sleep", "infinity"]
                 securityContext: "{{ _ocp_utils_temp_security_context | default(omit) }}"

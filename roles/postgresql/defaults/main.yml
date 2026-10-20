@@ -27,11 +27,10 @@ postgresql_temp_container_name: "aap-snapshot-{{ postgresql_component_name }}"
 postgresql_temp_container_volumes: []
 postgresql_discover_container_name: "postgresql"
 
-# Image used for the temporary postgres client container on containerized
-# targets. Matches the image the OCP path's own temporary migration pod
-# defaults to (ocp_utils_temp_postgres_image). Override this directly if
-# your target's PostgreSQL server version differs.
-postgresql_temp_container_image: "registry.redhat.io/rhel9/postgresql-15:latest"
+# Shared image for temporary PostgreSQL clients on containerized and OCP paths.
+# OCP utilities map this setting internally. The old temp_postgres_image input
+# remains a fallback during its deprecation period.
+postgresql_temp_container_image: "{{ temp_postgres_image | default('registry.redhat.io/rhel9/postgresql-15:latest', true) }}"
 
 # Kubeconfig resolution for this role's own OCP tasks (db_export.yml,
 # db_import.yml), which cannot rely on ocp_utils_ocp_environment being loaded
