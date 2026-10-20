@@ -27,9 +27,9 @@ aap-snapshot-<version>-<date>.tar
 
 Component directories are only present if the source deployment includes that
 component. The artifact is self-describing - the manifest lists which
-components were exported. The tree below shows default filenames; schema 1.1
-records configured database dump extensions and Hub content filenames in the
-manifest so validation and import can use the names stored in the artifact.
+components were exported. Database dumps always use the `.pgc` suffix. Schema
+1.1 records the configured Hub content filename so validation and import can
+use the name stored in the artifact.
 
 ## manifest.yml
 
@@ -63,7 +63,6 @@ Array of exported components. Each entry:
 |-------|------|-------------|
 | `type` | string | `managed` (co-located) or `external` (remote database) |
 | `postgresql_version` | string | PostgreSQL major version (e.g. `"15"`) |
-| `dump_extension` | string | Database dump filename extension (default: `pgc`) |
 
 ### checksums
 
@@ -105,7 +104,6 @@ components:
 database:
   type: "managed"
   postgresql_version: "15"
-  dump_extension: "pgc"
 
 checksums:
   algorithm: sha256
@@ -144,11 +142,9 @@ configure the target CR.
 
 ### Database Dumps
 
-Each component directory contains a PostgreSQL custom-format dump (`.pgc` by
-default) created with `pg_dump --format=custom`. These are restored with
-`pg_restore` during import using `--clean --if-exists` flags to handle existing
-schemas. Schema 1.1 records a configured extension in
-`database.dump_extension`.
+Each component directory contains a PostgreSQL custom-format dump (`.pgc`)
+created with `pg_dump --format=custom`. These are restored with `pg_restore`
+during import using `--clean --if-exists` flags to handle existing schemas.
 
 Component databases and default dump filenames:
 
@@ -196,9 +192,10 @@ validation phase of both export and import workflows.
 ## Versioning
 
 The `schema_version` field identifies the artifact format version. Version
-1.1 records configured database and Hub content filenames; consumers also
-support version 1.0 artifacts, which use the canonical `pgc` and
-`hub_content.tar` filenames. The `artifact` role maintains an internal list of
+1.1 records the configured Hub content filename; consumers also support
+version 1.0 artifacts. Both versions use the canonical `.pgc` database dump
+suffix and `hub_content.tar` content filename unless the Hub filename is
+recorded in a 1.1 manifest. The `artifact` role maintains an internal list of
 supported schema versions. Artifacts with unrecognized schema versions are
 rejected during validation.
 

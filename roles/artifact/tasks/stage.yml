@@ -10,7 +10,6 @@
       ansible.builtin.set_fact:
         artifact_secrets: "{{ hostvars['localhost']['artifact_secrets'] }}"
         artifact_manifest: "{{ hostvars['localhost']['artifact_manifest'] }}"
-        artifact_database_dump_extension: "{{ hostvars['localhost']['artifact_database_dump_extension'] }}"
         artifact_hub_content_filename: "{{ hostvars['localhost']['artifact_hub_content_filename'] }}"
       no_log: "{{ __artifact_no_log }}"
 

@@ -14,7 +14,6 @@ postgresql_django_manage_get_cmd: "from django.conf import settings; print(setti
 # Export directory variables
 postgresql_export_dir: "/tmp/backups/automation-platform"
 postgresql_export_dest: "{{ lookup('env', 'PWD') }}/db_export"
-postgresql_export_extension: "pgc"
 postgresql_export_rsync_opts: []
 postgresql_ocp_export_temp_deployment_name: "aap-snapshot-temp-postgres-export"
 

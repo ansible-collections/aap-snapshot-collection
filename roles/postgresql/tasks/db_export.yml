@@ -1,10 +1,4 @@
 ---
-- name: Record PostgreSQL dump extension for artifact manifest
-  ansible.builtin.set_fact:
-    _artifact_postgresql_dump_extension: "{{ postgresql_export_extension }}"
-  delegate_to: localhost
-  delegate_facts: true
-
 - name: DB Export (RPM)
   when: aap_platform == 'rpm'
   become: true
@@ -49,14 +43,14 @@
         login_port: "{{ postgresql_auth_settings.default.PORT }}"
         login_user: "{{ postgresql_auth_settings.default.USER }}"
         login_password: "{{ postgresql_auth_settings.default.PASSWORD | default(omit) }}"
-        target: "{{ postgresql_export_dir }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+        target: "{{ postgresql_export_dir }}/{{ postgresql_component_name }}.pgc"
         target_opts: "--clean --create"
         state: dump
       environment: "{{ postgresql_pg_dump_env | default({}) }}"
 
     - name: Get file checksum
       ansible.builtin.stat:
-        path: "{{ postgresql_export_dir }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+        path: "{{ postgresql_export_dir }}/{{ postgresql_component_name }}.pgc"
         checksum_algorithm: "{{ postgresql_checksum_algo | default('sha256') }}"
       register: _postgresql_db_file_stat
 
@@ -137,7 +131,7 @@
           - -d
           - "{{ postgresql_auth_settings.default.NAME }}"
           - -f
-          - "{{ postgresql_export_dir }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+          - "{{ postgresql_export_dir }}/{{ postgresql_component_name }}.pgc"
         env: "{{ postgresql_pg_dump_env | default({}) | combine({'PGPASSWORD': postgresql_auth_settings.default.PASSWORD | default('')}) }}"
       register: _postgresql_dump_result
       failed_when: _postgresql_dump_result.rc != 0
@@ -148,7 +142,7 @@
 
     - name: Get file checksum
       ansible.builtin.stat:
-        path: "{{ postgresql_export_dir }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+        path: "{{ postgresql_export_dir }}/{{ postgresql_component_name }}.pgc"
         checksum_algorithm: "{{ postgresql_checksum_algo | default('sha256') }}"
       register: _postgresql_db_file_stat
 
@@ -232,7 +226,7 @@
 
     - name: Export database from PostgreSQL pod
       vars:
-        _postgresql_dump_remote_path: "/tmp/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+        _postgresql_dump_remote_path: "/tmp/{{ postgresql_component_name }}.pgc"
       block:
         - name: Get PostgreSQL server version via pod
           kubernetes.core.k8s_exec:
@@ -299,7 +293,7 @@
 
             - name: Prepare restricted local PostgreSQL dump file
               ansible.builtin.file:
-                path: "{{ postgresql_export_dest }}/{{ postgresql_component_name }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+                path: "{{ postgresql_export_dest }}/{{ postgresql_component_name }}/{{ postgresql_component_name }}.pgc"
                 state: touch
                 mode: "0600"
 
@@ -309,12 +303,12 @@
                 pod: "{{ _pg_pod_name }}"
                 container: postgres
                 remote_path: "{{ _postgresql_dump_remote_path }}"
-                local_path: "{{ postgresql_export_dest }}/{{ postgresql_component_name }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+                local_path: "{{ postgresql_export_dest }}/{{ postgresql_component_name }}/{{ postgresql_component_name }}.pgc"
                 state: from_pod
 
             - name: Restrict copied PostgreSQL dump permissions
               ansible.builtin.file:
-                path: "{{ postgresql_export_dest }}/{{ postgresql_component_name }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+                path: "{{ postgresql_export_dest }}/{{ postgresql_component_name }}/{{ postgresql_component_name }}.pgc"
                 state: file
                 mode: "0600"
 
@@ -372,7 +366,7 @@
 
     - name: Get local file checksum
       ansible.builtin.stat:
-        path: "{{ postgresql_export_dest }}/{{ postgresql_component_name }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+        path: "{{ postgresql_export_dest }}/{{ postgresql_component_name }}/{{ postgresql_component_name }}.pgc"
         checksum_algorithm: "{{ postgresql_checksum_algo | default('sha256') }}"
       register: _postgresql_db_file_stat
       delegate_to: localhost
