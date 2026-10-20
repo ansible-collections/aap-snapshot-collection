@@ -2,6 +2,11 @@
 - name: Hub content export
   when: automationhub_export_hub_content | default(true) | bool
   block:
+    - name: Set OCP Hub content staging directory
+      ansible.builtin.set_fact:
+        automationhub_content_staging_dir: "{{ __artifact_build_dir }}/hub"
+      when: aap_platform == 'operator'
+
     - name: Create hub content tarball (RPM)
       community.general.archive:
         path: "{{ automationhub_pulp_data_dir }}/."
@@ -126,7 +131,7 @@
             pod: "{{ ocp_utils_temp_pod_name }}"
             container: "{{ _automationhub_tar_source_container.name }}"
             remote_path: /tmp/aap-snapshot-hub-content.tar
-            local_path: "{{ __artifact_build_dir }}/hub/{{ automationhub_content_tar_name }}"
+            local_path: "{{ automationhub_content_staging_dir }}/{{ automationhub_content_tar_name }}"
             state: from_pod
 
       always:
@@ -152,10 +157,7 @@
 
     - name: Get hub content tarball checksum
       ansible.builtin.stat:
-        path: >-
-          {{ (__artifact_build_dir ~ '/hub/' ~ automationhub_content_tar_name)
-             if aap_platform == 'operator'
-             else (automationhub_content_staging_dir ~ '/' ~ automationhub_content_tar_name) }}
+        path: "{{ automationhub_content_staging_dir }}/{{ automationhub_content_tar_name }}"
         checksum_algorithm: sha256
       register: _automationhub_content_stat
 
