@@ -13,6 +13,23 @@
       play completed successfully before packaging the artifact.
   when: aap_platform == 'operator'
 
+- name: Set component list for the artifact manifest
+  ansible.builtin.set_fact:
+    _artifact_manifest_components: >-
+      {{ _artifact_export_components
+         if aap_platform == 'operator'
+         else (
+           [
+             {'name': 'controller', 'enabled': groups.get('controller_groups', []) | length > 0},
+             {'name': 'eda', 'enabled': groups.get('eda_groups', []) | length > 0},
+             {'name': 'gateway', 'enabled': groups.get('gateway_groups', []) | length > 0},
+             {'name': 'hub', 'enabled': groups.get('hub_groups', []) | length > 0}
+           ]
+           | selectattr('enabled')
+           | map(attribute='name')
+           | list
+         ) }}
+
 - name: Create manifest.yml
   ansible.builtin.template:
     dest: '{{ __artifact_build_dir }}/manifest.yml'
