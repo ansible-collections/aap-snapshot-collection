@@ -45,41 +45,20 @@
         - name: Discover Hub file-storage PVC
           ansible.builtin.include_tasks: discover_file_storage_pvc.yml
 
-        - name: Initialize Hub file-storage tar candidates
-          ansible.builtin.set_fact:
-            _automationhub_file_storage_tar_candidates: []
-
-        - name: Select Hub containers that mount file storage and have tar
-          ansible.builtin.set_fact:
-            _automationhub_file_storage_tar_candidates: "{{ _automationhub_file_storage_tar_candidates + [item] }}"
-          loop: "{{ _ocp_utils_hub_capability_probes.results | default([]) }}"
-          loop_control:
-            label: "{{ item.item[0].metadata.name }}/{{ item.item[1].name }}"
-          when:
-            - item.stdout is defined
-            - item.stdout is search('tar=/')
-            - >-
-              ((item.item[0].spec.volumes | default([])
-                | selectattr('persistentVolumeClaim.claimName', 'defined')
-                | selectattr('persistentVolumeClaim.claimName', 'equalto', _automationhub_file_storage_pvc)
-                | map(attribute='name') | list)
-                | intersect(item.item[1].volumeMounts | default([]) | map(attribute='name') | list)
-                | length) > 0
-
-        - name: Require a Hub container with tar
+        - name: Require the selected Hub web pod
           ansible.builtin.assert:
             that:
-              - _automationhub_file_storage_tar_candidates | length > 0
+              - _ocp_utils_hub_export_pod | length > 0
+              - _ocp_utils_hub_export_pod.spec.containers | default([]) | length > 0
             fail_msg: >-
-              No running container for Hub CR '{{ _hub_cr_name }}' in namespace
-              '{{ automationhub_ocp_namespace }}' mounts file-storage PVC
-              '{{ _automationhub_file_storage_pvc }}' and contains tar. The Hub
-              content archive cannot be created.
+              No running web pod was found for Hub CR '{{ _hub_cr_name }}' in
+              namespace '{{ automationhub_ocp_namespace }}'. The Hub content
+              archive cannot be created.
 
-        - name: Select a Hub container with tar
+        - name: Use the selected Hub web pod and its container
           ansible.builtin.set_fact:
-            _automationhub_tar_source_pod: "{{ (_automationhub_file_storage_tar_candidates | first).item[0] }}"
-            _automationhub_tar_source_container: "{{ (_automationhub_file_storage_tar_candidates | first).item[1] }}"
+            _automationhub_tar_source_pod: "{{ _ocp_utils_hub_export_pod }}"
+            _automationhub_tar_source_container: "{{ _ocp_utils_hub_export_pod.spec.containers | first }}"
 
         - name: Delete previous temporary Hub export deployment
           kubernetes.core.k8s:

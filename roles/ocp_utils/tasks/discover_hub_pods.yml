@@ -1,6 +1,5 @@
 ---
-# Hub workloads have different name/component labels across versions. Scope the
-# candidate set to the Hub operator and selected CR, then probe actual commands.
+# Hub content and management commands use the selected instance's web pod.
 - name: Wait for the selected Hub API to be ready
   kubernetes.core.k8s_info:
     kind: AutomationHub
@@ -20,26 +19,28 @@
   delay: "{{ _discover_delay | default(10) }}"
   when: _wait_for_running | default(false) | bool
 
-- name: Discover Hub operator pods
+- name: Discover running Hub web pods
   kubernetes.core.k8s_info:
     kind: Pod
     namespace: "{{ ocp_utils_ocp_namespace }}"
     label_selectors:
       - "app.kubernetes.io/part-of=automationhub"
       - "app.kubernetes.io/managed-by=automationhub-operator"
+      - "app.kubernetes.io/component=webserver"
+      - "app.kubernetes.io/name=nginx"
     field_selectors:
       - "status.phase=Running"
   environment: "{{ ocp_utils_ocp_environment }}"
-  register: _ocp_utils_found_hub_pods
+  register: _ocp_utils_found_hub_web_pods
 
-- name: Initialize Hub pod candidates for the selected component CR
+- name: Initialize web pod candidates for the selected Hub CR
   ansible.builtin.set_fact:
-    _ocp_utils_selected_hub_pods: []
+    _ocp_utils_selected_hub_web_pods: []
 
-- name: Select Hub pods for the selected component CR
+- name: Select web pods for the selected Hub CR
   ansible.builtin.set_fact:
-    _ocp_utils_selected_hub_pods: "{{ _ocp_utils_selected_hub_pods + [item] }}"
-  loop: "{{ _ocp_utils_found_hub_pods.resources | default([]) }}"
+    _ocp_utils_selected_hub_web_pods: "{{ _ocp_utils_selected_hub_web_pods + [item] }}"
+  loop: "{{ _ocp_utils_found_hub_web_pods.resources | default([]) }}"
   loop_control:
     label: "{{ item.metadata.name }}"
   when:
@@ -49,54 +50,15 @@
       | regex_search('(^|-)'
           ~ (_hub_cr_name | regex_escape) ~ '$')
 
-- name: Check Hub containers for required commands
-  kubernetes.core.k8s_exec:
-    namespace: "{{ ocp_utils_ocp_namespace }}"
-    pod: "{{ item.0.metadata.name }}"
-    container: "{{ item.1.name }}"
-    command: >-
-      sh -c 'manager="$(command -v pulpcore-manager 2>/dev/null || true)";
-      tar_path="$(command -v tar 2>/dev/null || true)";
-      curl_path="$(command -v curl 2>/dev/null || true)";
-      printf "manager=%s tar=%s curl=%s\n"
-      "${manager:-missing}" "${tar_path:-missing}" "${curl_path:-missing}"'
-  environment: "{{ ocp_utils_ocp_environment }}"
-  loop: "{{ query('ansible.builtin.subelements', _ocp_utils_selected_hub_pods, 'spec.containers') }}"
-  loop_control:
-    label: "{{ item.0.metadata.name }}/{{ item.1.name }}"
-  register: _ocp_utils_hub_capability_probes
-  failed_when: false
-  changed_when: false
-
-- name: Select Hub containers with required commands
+- name: Set the selected Hub export pod
   ansible.builtin.set_fact:
-    _ocp_utils_hub_manage_candidates: >-
-      {{ _ocp_utils_hub_capability_probes.results | default([])
-         | selectattr('stdout', 'defined')
-         | selectattr('stdout', 'search', 'manager=/')
-         | list }}
-    _ocp_utils_hub_tar_candidates: >-
-      {{ _ocp_utils_hub_capability_probes.results | default([])
-         | selectattr('stdout', 'defined')
-         | selectattr('stdout', 'search', 'tar=/')
-         | list }}
-    _ocp_utils_hub_curl_candidates: >-
-      {{ _ocp_utils_hub_capability_probes.results | default([])
-         | selectattr('stdout', 'defined')
-         | selectattr('stdout', 'search', 'curl=/')
-         | list }}
+    _ocp_utils_hub_export_pod: "{{ _ocp_utils_selected_hub_web_pods | first | default({}) }}"
 
-- name: Require a Hub container with the management command
-  ansible.builtin.assert:
-    that:
-      - _ocp_utils_hub_manage_candidates | length > 0
-    fail_msg: >-
-      No running pod for Hub CR '{{ _hub_cr_name }}' in namespace
-      '{{ ocp_utils_ocp_namespace }}' contains pulpcore-manager.
-      Check the selected Hub instance and its running pods.
-
-- name: Set Hub management pod facts
+- name: Set Hub pod context for existing callers
   ansible.builtin.set_fact:
-    _ocp_utils_hub_pod_name: "{{ (_ocp_utils_hub_manage_candidates | first).item[0].metadata.name }}"
-    _ocp_utils_hub_container_name: "{{ (_ocp_utils_hub_manage_candidates | first).item[1].name }}"
+    _ocp_utils_hub_pod_name: "{{ _ocp_utils_hub_export_pod.metadata.name }}"
+    _ocp_utils_hub_container_name: "{{ (_ocp_utils_hub_export_pod.spec.containers | first).name }}"
+  when:
+    - _ocp_utils_hub_export_pod | length > 0
+    - _ocp_utils_hub_export_pod.spec.containers | default([]) | length > 0
 ...

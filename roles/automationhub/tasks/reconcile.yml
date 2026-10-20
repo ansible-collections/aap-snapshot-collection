@@ -124,8 +124,8 @@
     - name: Fallback - run Pulp repair via curl from hub pod
       kubernetes.core.k8s_exec:
         namespace: "{{ automationhub_ocp_namespace }}"
-        pod: "{{ (_ocp_utils_hub_curl_candidates | first).item[0].metadata.name }}"
-        container: "{{ (_ocp_utils_hub_curl_candidates | first).item[1].name }}"
+        pod: "{{ _ocp_utils_hub_export_pod.metadata.name }}"
+        container: "{{ (_ocp_utils_hub_export_pod.spec.containers | first).name }}"
         command: >-
           curl -sf -X POST
           -H 'Content-Type: application/json'
@@ -138,7 +138,7 @@
       changed_when: false
       no_log: "{{ not (disable_no_log | default(false) | bool) }}"
       when:
-        - _ocp_utils_hub_curl_candidates | default([]) | length > 0
+        - _ocp_utils_hub_export_pod | default({}) | length > 0
         - _automationhub_operator_token is defined
 
     - name: Parse repair response from curl
@@ -151,8 +151,8 @@
     - name: Poll Pulp repair task via curl from hub pod
       kubernetes.core.k8s_exec:
         namespace: "{{ automationhub_ocp_namespace }}"
-        pod: "{{ (_ocp_utils_hub_curl_candidates | first).item[0].metadata.name }}"
-        container: "{{ (_ocp_utils_hub_curl_candidates | first).item[1].name }}"
+        pod: "{{ _ocp_utils_hub_export_pod.metadata.name }}"
+        container: "{{ (_ocp_utils_hub_export_pod.spec.containers | first).name }}"
         command: >-
           curl -sf
           -H {{ ('Authorization: Bearer ' ~ _automationhub_operator_token) | quote }}
@@ -168,7 +168,7 @@
       retries: "{{ automationhub_pulp_repair_retries | default(120) }}"
       delay: "{{ automationhub_pulp_repair_delay | default(30) }}"
       when:
-        - _ocp_utils_hub_curl_candidates | default([]) | length > 0
+        - _ocp_utils_hub_export_pod | default({}) | length > 0
         - _automationhub_repair_curl_task is defined
 
     - name: Report Pulp repair fallback result
