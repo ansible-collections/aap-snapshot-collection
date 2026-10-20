@@ -232,55 +232,23 @@
 
     - name: Export database from PostgreSQL pod
       vars:
-        _postgresql_pgpass_remote_path: "/tmp/.aap-snapshot-{{ postgresql_component_name }}.pgpass"
         _postgresql_dump_remote_path: "/tmp/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
       block:
-        - name: Copy temporary PostgreSQL password file to pod
-          kubernetes.core.k8s_cp:
-            namespace: "{{ postgresql_ocp_namespace }}"
-            pod: "{{ _pg_pod_name }}"
-            container: postgres
-            remote_path: "{{ _postgresql_pgpass_remote_path }}"
-            content: >-
-              {{
-                [
-                  postgresql_auth_settings.default.HOST,
-                  postgresql_auth_settings.default.PORT | default('5432', true),
-                  postgresql_auth_settings.default.NAME,
-                  postgresql_auth_settings.default.USER,
-                  postgresql_auth_settings.default.PASSWORD | default('', true)
-                ]
-                | map('string')
-                | map('replace', '\\', '\\\\')
-                | map('replace', ':', '\\:')
-                | join(':')
-              }}
-          no_log: "{{ __postgresql_no_log }}"
-
-        - name: Restrict PostgreSQL password file permissions in pod
-          kubernetes.core.k8s_exec:
-            namespace: "{{ postgresql_ocp_namespace }}"
-            pod: "{{ _pg_pod_name }}"
-            container: postgres
-            command: >-
-              sh -c 'chmod 0600 "$1";
-              result=$?; printf "chmod exit code: %s\n" "$result"; exit "$result"'
-              sh {{ _postgresql_pgpass_remote_path | quote }}
-          register: _postgresql_pgpass_chmod_result
-          failed_when: _postgresql_pgpass_chmod_result.rc != 0
-
         - name: Get PostgreSQL server version via pod
           kubernetes.core.k8s_exec:
             namespace: "{{ postgresql_ocp_namespace }}"
             pod: "{{ _pg_pod_name }}"
             container: postgres
             command: >-
-              env PGPASSFILE={{ _postgresql_pgpass_remote_path | quote }}
-              psql -h {{ postgresql_auth_settings.default.HOST | quote }}
-              -p {{ postgresql_auth_settings.default.PORT | default('5432', true) | string | quote }}
-              -U {{ postgresql_auth_settings.default.USER | quote }}
-              -d {{ postgresql_auth_settings.default.NAME | quote }}
-              -t -A -c {{ 'SHOW server_version' | quote }}
+              sh -c 'PGPASSWORD="$1" psql -h "$2" -p "$3" -U "$4"
+              -d "$5" -t -A -c "$6";
+              result=$?; printf "psql exit code: %s\n" "$result"; exit "$result"'
+              sh {{ postgresql_auth_settings.default.PASSWORD | default('', true) | quote }}
+              {{ postgresql_auth_settings.default.HOST | quote }}
+              {{ postgresql_auth_settings.default.PORT | default('5432', true) | string | quote }}
+              {{ postgresql_auth_settings.default.USER | quote }}
+              {{ postgresql_auth_settings.default.NAME | quote }}
+              {{ 'SHOW server_version' | quote }}
           register: _postgresql_version_ocp
           failed_when: _postgresql_version_ocp.rc != 0
           no_log: "{{ __postgresql_no_log }}"
@@ -304,10 +272,10 @@
                 container: postgres
                 command: >-
                   sh -c 'umask 077;
-                  env PGPASSFILE="$1" pg_dump --clean --create -Fc
+                  PGPASSWORD="$1" pg_dump --clean --create -Fc
                   -h "$2" -p "$3" -U "$4" -d "$5" -f "$6";
                   result=$?; printf "pg_dump exit code: %s\n" "$result"; exit "$result"'
-                  sh {{ _postgresql_pgpass_remote_path | quote }}
+                  sh {{ postgresql_auth_settings.default.PASSWORD | default('', true) | quote }}
                   {{ postgresql_auth_settings.default.HOST | quote }}
                   {{ postgresql_auth_settings.default.PORT | default('5432', true) | string | quote }}
                   {{ postgresql_auth_settings.default.USER | quote }}
@@ -373,19 +341,6 @@
           no_log: "{{ __postgresql_no_log }}"
 
       always:
-        - name: Clean up PostgreSQL password file in pod
-          kubernetes.core.k8s_exec:
-            namespace: "{{ postgresql_ocp_namespace }}"
-            pod: "{{ _pg_pod_name }}"
-            container: postgres
-            command: >-
-              sh -c 'rm -f "$1";
-              result=$?; printf "cleanup exit code: %s\n" "$result"; exit "$result"'
-              sh {{ _postgresql_pgpass_remote_path | quote }}
-          register: _postgresql_pgpass_cleanup_result
-          failed_when: false
-          changed_when: false
-
         - name: Remove temporary PostgreSQL client pod after export
           ansible.builtin.include_role:
             name: ansible.aap_snapshot.ocp_utils
@@ -405,7 +360,6 @@
         - >-
           (_postgresql_dump_cleanup_result is defined
            and (_postgresql_dump_cleanup_result.rc | default(1) | int) != 0)
-          or (_postgresql_pgpass_cleanup_result.rc | default(1) | int) != 0
 
     - name: Re-raise OCP PostgreSQL export failure after cleanup
       ansible.builtin.fail:
