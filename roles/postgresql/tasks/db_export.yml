@@ -185,7 +185,7 @@
         kind: Pod
         namespace: "{{ postgresql_ocp_namespace }}"
         label_selectors:
-          - "statefulset.kubernetes.io/pod-name={{ ocp_utils_postgres_statefulset }}-0"
+          - "statefulset.kubernetes.io/pod-name={{ postgresql_ocp_postgres_statefulset }}-0"
         field_selectors:
           - "status.phase=Running"
       register: _postgresql_managed_export_pods
