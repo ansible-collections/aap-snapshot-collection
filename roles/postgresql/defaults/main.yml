@@ -6,6 +6,7 @@ postgresql_ocp_namespace: "{{ ocp_namespace | default('aap') }}"
 postgresql_aap_instance_name: >-
   {{ aap_instance_name
      | default(ocp_utils_aap_instance_name | default('aap')) }}
+postgresql_ocp_postgres_statefulset: "{{ postgresql_aap_instance_name }}-postgres-15"
 
 # Auth variables
 postgresql_django_manage_get_cmd: "from django.conf import settings; print(settings.DATABASES)"
