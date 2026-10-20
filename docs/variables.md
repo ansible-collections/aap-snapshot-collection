@@ -104,6 +104,7 @@ reference. Hub content is supported only on file-storage PVCs; set
 | `aap_instance_name` | `aap` | Name of the AnsibleAutomationPlatform CR |
 | `aap_cr_kind` | `AnsibleAutomationPlatform` | Kubernetes kind for the AAP CR |
 | `aap_cr_api_version` | `aap.ansible.com/v1alpha1` | API version for the AAP CR |
+| `postgresql_ocp_postgres_statefulset` | `{{ aap_instance_name }}-postgres-15` | Managed PostgreSQL StatefulSet name used to find the source pod during OCP export; when no running pod matches, export creates a temporary PostgreSQL client pod |
 
 ### Temporary Migration Resources
 
