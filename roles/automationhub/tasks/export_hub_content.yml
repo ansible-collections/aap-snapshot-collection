@@ -109,7 +109,7 @@
             ocp_utils_temp_deployment_name: "{{ automationhub_temp_export_deployment_name }}"
             _ocp_utils_create_temp_pvc: false
             _ocp_utils_temp_container_name: "{{ _automationhub_tar_source_container.name }}"
-            ocp_utils_temp_pod_image: "{{ _automationhub_tar_source_container.image }}"
+            _ocp_utils_temp_pod_image: "{{ _automationhub_tar_source_container.image }}"
             _ocp_utils_temp_image_pull_policy: "{{ _automationhub_tar_source_container.imagePullPolicy | default('IfNotPresent') }}"
             _ocp_utils_temp_service_account: "{{ _automationhub_tar_source_pod.spec.serviceAccountName | default('default') }}"
             _ocp_utils_temp_pod_security_context: "{{ _automationhub_tar_source_pod.spec.securityContext | default({}) }}"

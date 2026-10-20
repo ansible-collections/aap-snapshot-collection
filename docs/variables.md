@@ -65,7 +65,7 @@ Control artifact restoration to the target platform.
 | `keep_temp_on_failure` | `true` | Keep temporary OCP migration resources (PVC, pod) on failure for debugging. Set `false` to auto-cleanup |
 | `postgresql_restore_admin_user` | `postgres` | PostgreSQL superuser for database restore operations |
 | `postgresql_restore_timeout` | `3600` | Async timeout in seconds for `pg_restore` |
-| `postgresql_temp_container_image` | `registry.redhat.io/rhel9/postgresql-15:latest` | Image used for the throwaway postgres client container that runs `pg_dump`/`pg_restore` on containerized targets. Override if your target's PostgreSQL server version differs |
+| `postgresql_temp_container_image` | `registry.redhat.io/rhel9/postgresql-15:latest` | Shared image for temporary PostgreSQL clients on containerized and OCP paths. Override if the PostgreSQL server version differs |
 
 ### Hub Content Import
 
@@ -117,7 +117,7 @@ database restores. These are cleaned up after import completes.
 | `temp_pvc_size` | `60Gi` | Size of the temporary PVC (see sizing guidance below) |
 | `temp_pvc_access_mode` | `ReadWriteOnce` | PVC access mode |
 | `temp_deployment_name` | `aap-snapshot-temp-postgres` | Name for the temporary PostgreSQL deployment |
-| `temp_postgres_image` | `registry.redhat.io/rhel9/postgresql-15:latest` | Container image for the temporary PostgreSQL client pod used during OCP import or when OCP export has no managed PostgreSQL pod |
+| `temp_postgres_image` | Unset | Deprecated compatibility alias used to initialize `postgresql_temp_container_image` when the latter is unset |
 
 **Sizing `temp_pvc_size`:** The PVC must hold the artifact tarball and its extracted contents
 simultaneously, so set it to at least **2x your artifact file size**. The 60Gi default is
