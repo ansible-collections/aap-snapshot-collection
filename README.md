@@ -57,7 +57,7 @@ artifact.
 ### Platform Requirements
 
 - **RPM export:** SSH access to component hosts, `become` privileges
-- **OCP Operator export/import:** `kubeconfig` with permissions to inspect AAP resources and secrets, execute commands in component pods, and copy files from pods
+- **OCP Operator export/import:** `kubeconfig` with read/update access to AAP resources and secrets; permission to create/delete temporary Deployments and PVCs; and permission to inspect and execute commands in component and temporary pods and copy files to/from pods. Temporary pods are created by their Deployments.
 - **Containerized export:** SSH access to component hosts, podman access on component hosts
 - **Containerized import:** SSH access to component hosts, podman access on component hosts
 
