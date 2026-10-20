@@ -74,7 +74,7 @@
           -U {{ postgresql_auth_settings.default.USER }}
           -d {{ postgresql_auth_settings.default.NAME }} "$2"' sh
           {{ postgresql_auth_settings.default.PASSWORD | quote }}
-          {{ ('/tmp/migration/artifact/' ~ postgresql_component_name ~ '/' ~ postgresql_component_name ~ '.' ~ (artifact_database_dump_extension | default('pgc'))) | quote }}
+          {{ ('/tmp/migration/artifact/' ~ postgresql_component_name ~ '/' ~ postgresql_component_name ~ '.pgc') | quote }}
       failed_when: _postgresql_restore_result.rc != 0 and 'FATAL' in (_postgresql_restore_result.stderr | default(''))
       no_log: "{{ __postgresql_no_log }}"
       register: _postgresql_restore_result

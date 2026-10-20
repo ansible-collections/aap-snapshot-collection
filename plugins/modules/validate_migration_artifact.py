@@ -307,15 +307,10 @@ def main():
     database_metadata = manifest.get("database", {})
     if not isinstance(database_metadata, dict):
         errors.append("Artifact database metadata must be a mapping")
-        database_metadata = {}
-    dump_extension = database_metadata.get("dump_extension", "pgc")
-    if not _is_safe_artifact_filename(dump_extension):
-        errors.append("Database dump extension in manifest is not a simple filename extension")
-        dump_extension = "pgc"
 
     for comp in manifest.get("components", []):
         name = comp.get("name", "")
-        dump_path = os.path.join(artifact_dir, name, f"{name}.{dump_extension}")
+        dump_path = os.path.join(artifact_dir, name, f"{name}.pgc")
 
         if not os.path.realpath(dump_path).startswith(os.path.realpath(artifact_dir)):
             errors.append(f"Component name '{name}' would escape artifact directory")
@@ -326,7 +321,7 @@ def main():
         component_results[name] = dump_exists
 
         if not dump_exists:
-            errors.append(f"Component '{name}' listed in manifest but {name}.{dump_extension} not found")
+            errors.append(f"Component '{name}' listed in manifest but {name}.pgc not found")
 
         if name == "hub" and comp.get("has_content_data", False):
             content_filename = comp.get("content_filename", "hub_content.tar")
