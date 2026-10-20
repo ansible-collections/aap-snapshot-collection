@@ -1,22 +1,5 @@
 ---
 {% set _parsed_version = _operations_aap_version | ansible.aap_snapshot.parse_aap_version %}
-{% if aap_platform == 'operator' %}
-{% set _artifact_manifest_components = _artifact_export_components %}
-{% else %}
-{% set _artifact_manifest_components = [] %}
-{% if groups.get('controller_groups', []) | length > 0 %}
-{% set _artifact_manifest_components = _artifact_manifest_components + ['controller'] %}
-{% endif %}
-{% if groups.get('eda_groups', []) | length > 0 %}
-{% set _artifact_manifest_components = _artifact_manifest_components + ['eda'] %}
-{% endif %}
-{% if groups.get('gateway_groups', []) | length > 0 %}
-{% set _artifact_manifest_components = _artifact_manifest_components + ['gateway'] %}
-{% endif %}
-{% if groups.get('hub_groups', []) | length > 0 %}
-{% set _artifact_manifest_components = _artifact_manifest_components + ['hub'] %}
-{% endif %}
-{% endif %}
 schema_version: "1.1"
 aap_version: "{{ _parsed_version.major_minor }}"
 aap_version_patch: "{{ _parsed_version.patch }}"
