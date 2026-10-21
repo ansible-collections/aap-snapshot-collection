@@ -134,9 +134,11 @@ During import, secrets are restored to the target platform's secret store
 (Kubernetes Secrets for OCP, podman secrets for containerized).
 
 OCP-source artifacts also include `aap_cr.yml`, a reference containing the
-source CR's API version, kind, name, namespace, and spec. Runtime status and
-Kubernetes-generated metadata are omitted. The file is not used to create or
-configure the target CR.
+source CR's API version, kind, name, namespace, and the name/disabled fields
+for its controller, Hub, and EDA components. Other spec fields—including
+custom settings and secret references or values—are omitted. Runtime status
+and Kubernetes-generated metadata are also omitted. The file is not used to
+create or configure the target CR.
 
 ## Component Data
 
