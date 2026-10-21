@@ -16,9 +16,14 @@ imports it into a new deployment.
 | Containerized Installer | Containerized Installer | Supported |
 | OCP Operator | OCP Operator | Planned |
 
-The collection handles four AAP components: Controller, Hub (with Pulp
-content), Gateway, and EDA. Components are processed conditionally based on
-what is present in the inventory and artifact.
+The collection handles four AAP components: Controller, Hub, Gateway, and
+EDA. Hub (Pulp) content can only be imported into file-based storage; importing
+that content into S3-compatible or Azure Blob object storage is not supported
+for any of the migration paths above. See
+[Automation Hub Content Storage](#automation-hub-content-storage) for target
+storage requirements and preparation for object-storage targets. Components
+are processed conditionally based on what is present in the inventory and
+artifact.
 
 ## Requirements
 
@@ -65,6 +70,35 @@ The target environment must be installed and configured **before** running an im
 - Network and firewall configuration
 - Any other environment-specific customization
 
+### Automation Hub Content Storage
+
+**The collection does not currently support importing Automation Hub content
+into S3-compatible or Azure Blob object storage.** Hub content import supports
+Pulp's FileSystem storage, including NFS-backed storage and filesystem-backed
+PVCs on OpenShift.
+
+If the target Hub uses S3-compatible or Azure Blob object storage:
+
+1. Pre-populate the target bucket or container with the source Hub content
+   outside the collection before running the import. Preserve the content paths
+   referenced by the source Hub database so the imported database can locate
+   those resources.
+2. Export an artifact without Hub content by setting
+   `automationhub_export_hub_content=false` on `artifact_export`. If an existing
+   artifact includes Hub content, re-export it with this setting.
+3. Run `artifact_import` with that artifact to migrate the database and other
+   platform data into the configured target environment.
+
+Pre-populating object storage does not allow an artifact containing Hub content
+to be imported into that backend; the collection rejects that combination.
+Customers are responsible for transferring the content and ensuring it matches
+the imported Hub database. The collection does not populate the bucket or
+container for them.
+
+Automating Hub content import into object storage is a
+[feature for consideration](ROADMAP.md#features-for-consideration), with no
+currently scoped work or committed delivery timeline.
+
 ### Version Matching Requirement
 
 **The target AAP version must match the source AAP version exactly (major.minor).** For example:
@@ -76,7 +110,14 @@ Cross-version database restores cause migration failures due to schema mismatche
 
 ### Target Configuration Independence
 
-**Important:** The import process transfers data (objects, content, configurations) from the source environment but does **not** override target environment configuration. The target must be set up according to your deployment patterns and requirements *before* import runs. This ensures:
+**Important:** The import process transfers data (objects, configurations, and
+Hub content when the target uses supported file-based storage) from the source
+environment but does **not** override target environment configuration. Hub
+content for S3-compatible or Azure Blob targets must be transferred separately
+before import, as described in
+[Automation Hub Content Storage](#automation-hub-content-storage). The target
+must be set up according to your deployment patterns and requirements *before*
+import runs. This ensures:
 
 - Customer-configured settings are preserved
 - Target environment follows the intended design
@@ -144,6 +185,13 @@ ansible-playbook -i inventory ansible.aap_snapshot.artifact_export -e aap_platfo
 
 ### Import a migration artifact
 
+If the artifact includes Hub content, the target Hub must use file-based
+storage, such as NFS or a filesystem-backed PVC. For S3-compatible or Azure
+Blob targets, pre-populate the object storage and use an artifact exported
+without Hub content, as described in
+[Automation Hub Content Storage](#automation-hub-content-storage), before
+running either import command below.
+
 Restore into an OCP operator deployment:
 
 ```bash
@@ -181,10 +229,11 @@ ansible-playbook ansible.aap_snapshot.artifact_verify \
 | `artifact_file` | Import/Verify | - | Path to the artifact archive |
 | `ocp_namespace` | OCP | `aap` | OpenShift namespace |
 | `aap_instance_name` | OCP | `aap` | AAP CR instance name |
-| `artifact_export_hub_content` | No | `true` | Include Pulp content data in artifact |
+| `automationhub_export_hub_content` | No | `true` | Include Hub (Pulp) content in the export. Set to `false` for S3-compatible or Azure Blob targets and pre-populate their content separately; see [storage prerequisites](#automation-hub-content-storage). |
+| `automationhub_import_hub_content` | No | `true` | Restore Hub (Pulp) content on containerized targets. Set to `false` to skip content restoration. This does not bypass the [storage prerequisites](#automation-hub-content-storage) or enable S3-compatible or Azure Blob content import. |
 | `artifact_postgresql_db_type` | No | `managed` | Database topology: `managed` or `external` |
 
-See the [variables reference](https://github.com/ansible-collections/aap-snapshot-collection/blob/main/docs/variables.md) for the complete list.
+See the [variables reference](docs/variables.md) for the complete list.
 
 ## Testing
 
@@ -224,7 +273,7 @@ See the [changelog](https://github.com/ansible-collections/aap-snapshot-collecti
 
 - [Architecture](https://github.com/ansible-collections/aap-snapshot-collection/blob/main/docs/architecture.md) - collection structure, role hierarchy, plugin catalog
 - [Artifact Format](https://github.com/ansible-collections/aap-snapshot-collection/blob/main/docs/artifact-format.md) - SDP v1.0 artifact specification
-- [Variables](https://github.com/ansible-collections/aap-snapshot-collection/blob/main/docs/variables.md) - complete variable reference
+- [Variables](docs/variables.md) - complete variable reference
 - [Workflows](https://github.com/ansible-collections/aap-snapshot-collection/blob/main/docs/workflows.md) - step-by-step export, import, and reconcile workflows
 - [Debugging](https://github.com/ansible-collections/aap-snapshot-collection/blob/main/docs/debugging.md) - failure recovery procedures for import and export
 - [Red Hat Ansible Automation Platform Life Cycle](https://access.redhat.com/support/policy/updates/ansible-automation-platform)
