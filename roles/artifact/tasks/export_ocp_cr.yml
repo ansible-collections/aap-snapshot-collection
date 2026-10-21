@@ -17,6 +17,30 @@
       Unable to read AAP CR '{{ aap_instance_name }}' from
       namespace '{{ ocp_namespace | default('aap') }}' for the artifact reference.
 
+- name: Initialize sanitized AAP component spec
+  ansible.builtin.set_fact:
+    _artifact_source_aap_cr_spec: {}
+
+- name: Copy component names and enablement into sanitized spec
+  ansible.builtin.set_fact:
+    _artifact_source_aap_cr_spec: >-
+      {{ _artifact_source_aap_cr_spec
+         | combine({item: (
+             _artifact_source_aap_cr.resources[0].spec[item] | default({}, true)
+             | dict2items
+             | selectattr('key', 'in', ['name', 'disabled'])
+             | items2dict
+           )}) }}
+  loop:
+    - controller
+    - hub
+    - eda
+  loop_control:
+    label: "{{ item }}"
+  when:
+    - item in (_artifact_source_aap_cr.resources[0].spec | default({}))
+  no_log: "{{ __artifact_no_log }}"
+
 - name: Build sanitized AAP CR reference
   ansible.builtin.set_fact:
     _artifact_source_aap_cr_definition:
@@ -25,7 +49,7 @@
       metadata:
         name: "{{ _artifact_source_aap_cr.resources[0].metadata.name }}"
         namespace: "{{ _artifact_source_aap_cr.resources[0].metadata.namespace }}"
-      spec: "{{ _artifact_source_aap_cr.resources[0].spec | default({}) }}"
+      spec: "{{ _artifact_source_aap_cr_spec }}"
   no_log: "{{ __artifact_no_log }}"
 
 - name: Write sanitized AAP CR reference

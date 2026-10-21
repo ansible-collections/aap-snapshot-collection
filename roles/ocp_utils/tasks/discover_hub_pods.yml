@@ -1,5 +1,6 @@
 ---
-# Hub content and management commands use the selected instance's web pod.
+# Hub content export derives a temporary pod from the web pod and mounts the
+# file-storage PVC. Management commands use a container with pulpcore-manager.
 - name: Wait for the selected Hub API to be ready
   kubernetes.core.k8s_info:
     kind: AutomationHub
@@ -54,11 +55,31 @@
   ansible.builtin.set_fact:
     _ocp_utils_hub_export_pod: "{{ _ocp_utils_selected_hub_web_pods | first | default({}) }}"
 
-- name: Set Hub pod context for existing callers
+- name: Discover the selected Hub API pod for management commands
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: "{{ ocp_utils_ocp_namespace }}"
+    label_selectors:
+      - "app.kubernetes.io/part-of=automationhub"
+      - "app.kubernetes.io/managed-by=automationhub-operator"
+      - "app.kubernetes.io/component=api"
+      - "app.kubernetes.io/name=automationhub-api"
+      - "app.kubernetes.io/instance=automationhub-api-{{ _hub_cr_name }}"
+    field_selectors:
+      - "status.phase=Running"
+  environment: "{{ ocp_utils_ocp_environment }}"
+  register: _ocp_utils_found_hub_api_pods
+
+- name: Require the selected Hub API pod
+  ansible.builtin.assert:
+    that:
+      - _ocp_utils_found_hub_api_pods.resources | length > 0
+    fail_msg: >-
+      No running Hub API pod found for Hub CR '{{ _hub_cr_name }}' in
+      namespace '{{ ocp_utils_ocp_namespace }}'.
+
+- name: Set Hub management pod context
   ansible.builtin.set_fact:
-    _ocp_utils_hub_pod_name: "{{ _ocp_utils_hub_export_pod.metadata.name }}"
-    _ocp_utils_hub_container_name: "{{ (_ocp_utils_hub_export_pod.spec.containers | first).name }}"
-  when:
-    - _ocp_utils_hub_export_pod | length > 0
-    - _ocp_utils_hub_export_pod.spec.containers | default([]) | length > 0
+    _ocp_utils_hub_pod_name: "{{ _ocp_utils_found_hub_api_pods.resources[0].metadata.name }}"
+    _ocp_utils_hub_container_name: "api"
 ...
