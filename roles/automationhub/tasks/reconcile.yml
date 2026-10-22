@@ -6,20 +6,6 @@
   vars:
     component_name: "{{ automationhub_component_name }}"
 
-- name: Re-discover hub pod
-  ansible.builtin.include_role:
-    name: ansible.aap_snapshot.ocp_utils
-    tasks_from: discover_pod.yml
-  vars:
-    component_name: "{{ automationhub_component_name }}"
-    _discover_label: "hub API"
-    _discover_selectors:
-      - "app.kubernetes.io/name=automationhub-api"
-    _discover_pod_fact: "_ocp_utils_hub_pod_name"
-    _discover_container_fact: "_ocp_utils_hub_container_name"
-    _discover_container_name: "api"
-  when: aap_platform == 'operator'
-
 - name: Set gateway API URL (OCP)
   ansible.builtin.set_fact:
     _automationhub_gw_api_url: "http://{{ automationhub_aap_instance_name }}.{{ automationhub_ocp_namespace }}.svc.cluster.local"
@@ -48,6 +34,16 @@
          | list | length > 0)
   retries: 60
   delay: 15
+  when:
+    - aap_platform == 'operator'
+    - _hub_cr_name is defined
+
+- name: Re-discover Hub pod contexts after the API is ready
+  ansible.builtin.include_role:
+    name: ansible.aap_snapshot.ocp_utils
+    tasks_from: discover_hub_pods.yml
+  vars:
+    _wait_for_running: true
   when:
     - aap_platform == 'operator'
     - _hub_cr_name is defined
@@ -128,8 +124,8 @@
     - name: Fallback - run Pulp repair via curl from hub pod
       kubernetes.core.k8s_exec:
         namespace: "{{ automationhub_ocp_namespace }}"
-        pod: "{{ _ocp_utils_hub_pod_name }}"
-        container: "{{ _ocp_utils_hub_container_name }}"
+        pod: "{{ _ocp_utils_hub_export_pod.metadata.name }}"
+        container: "{{ (_ocp_utils_hub_export_pod.spec.containers | first).name }}"
         command: >-
           curl -sf -X POST
           -H 'Content-Type: application/json'
@@ -142,7 +138,7 @@
       changed_when: false
       no_log: "{{ not (disable_no_log | default(false) | bool) }}"
       when:
-        - _ocp_utils_hub_pod_name is defined
+        - _ocp_utils_hub_export_pod | default({}) | length > 0
         - _automationhub_operator_token is defined
 
     - name: Parse repair response from curl
@@ -155,8 +151,8 @@
     - name: Poll Pulp repair task via curl from hub pod
       kubernetes.core.k8s_exec:
         namespace: "{{ automationhub_ocp_namespace }}"
-        pod: "{{ _ocp_utils_hub_pod_name }}"
-        container: "{{ _ocp_utils_hub_container_name }}"
+        pod: "{{ _ocp_utils_hub_export_pod.metadata.name }}"
+        container: "{{ (_ocp_utils_hub_export_pod.spec.containers | first).name }}"
         command: >-
           curl -sf
           -H {{ ('Authorization: Bearer ' ~ _automationhub_operator_token) | quote }}
@@ -172,7 +168,7 @@
       retries: "{{ automationhub_pulp_repair_retries | default(120) }}"
       delay: "{{ automationhub_pulp_repair_delay | default(30) }}"
       when:
-        - _ocp_utils_hub_pod_name is defined
+        - _ocp_utils_hub_export_pod | default({}) | length > 0
         - _automationhub_repair_curl_task is defined
 
     - name: Report Pulp repair fallback result

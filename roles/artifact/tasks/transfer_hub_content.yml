@@ -11,14 +11,11 @@
     - groups.get('hub_groups', []) | length > 0
     - inventory_hostname in groups['hub_groups']
   block:
-    # automationhub_content_tar_name is a role default of automationhub, not
-    # artifact (this file runs via include_tasks from the artifact role, so
-    # automationhub's defaults were never loaded) - resolve it once here with
-    # the same literal default, rather than referencing it directly and
-    # getting an undefined-variable error on every hub host.
+    # The artifact manifest records the filename chosen by the exporting
+    # deployment. Version 1.0 artifacts use the historical default.
     - name: Resolve hub content tarball name
       ansible.builtin.set_fact:
-        _artifact_hub_content_tar_name: "{{ automationhub_content_tar_name | default('hub_content.tar') }}"
+        _artifact_hub_content_tar_name: "{{ artifact_hub_content_filename | default('hub_content.tar') }}"
 
     - name: Check if hub content tarball exists in extracted artifact
       ansible.builtin.stat:

@@ -1,4 +1,4 @@
-# Artifact Format (SDP v1.0)
+# Artifact Format (SDP v1.1)
 
 The migration artifact is a portable tar archive containing database dumps,
 secrets, and metadata from an AAP deployment. It is produced by the export
@@ -20,13 +20,16 @@ aap-snapshot-<version>-<date>.tar
   ├── eda/
   │   └── eda.pgc                   # PostgreSQL custom-format dump
   ├── manifest.yml                   # Artifact metadata and component list
+  ├── aap_cr.yml                     # Sanitized source AAP CR reference (OCP only)
   ├── secrets.yml                    # Base64-encoded secrets
   └── sha256sum.txt                  # File integrity checksums
 ```
 
 Component directories are only present if the source deployment includes that
 component. The artifact is self-describing - the manifest lists which
-components were exported.
+components were exported. Database dumps always use the `.pgc` suffix. Schema
+1.1 records the configured Hub content filename so validation and import can
+use the name stored in the artifact.
 
 ## manifest.yml
 
@@ -34,7 +37,7 @@ The manifest describes the artifact contents and source environment.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `schema_version` | string | Always `"1.0"` for this format |
+| `schema_version` | string | `"1.1"` for newly exported artifacts; `"1.0"` artifacts remain supported |
 | `aap_version` | string | Major.minor version (e.g. `"2.6"`) |
 | `aap_version_patch` | string | Patch version (e.g. `"3"`) |
 | `source_topology` | string | Source platform: `rpm`, `containerized`, or `operator` |
@@ -52,6 +55,7 @@ Array of exported components. Each entry:
 | `database_name` | string | PostgreSQL database name (e.g. `awx`, `automationhub`) |
 | `has_custom_configs` | boolean | Whether custom configuration files are included |
 | `has_content_data` | boolean | Hub only: whether Pulp content tarball is included |
+| `content_filename` | string | Hub only: configured content archive filename when `has_content_data` is true |
 
 ### database
 
@@ -70,7 +74,7 @@ Array of exported components. Each entry:
 ### Example
 
 ```yaml
-schema_version: "1.0"
+schema_version: "1.1"
 aap_version: "2.6"
 aap_version_patch: "3"
 source_topology: "rpm"
@@ -87,6 +91,7 @@ components:
     database_name: "automationhub"
     has_custom_configs: false
     has_content_data: true
+    content_filename: "hub_content.tar"
   - name: gateway
     version: "1.1.3"
     database_name: "gateway"
@@ -113,10 +118,13 @@ source deployment. Secret keys vary by component:
 | Key | Component | Description |
 |-----|-----------|-------------|
 | `controller_secret_key` | Controller | Django SECRET_KEY |
+| `controller_resource_key` | Controller | Gateway resource-server key |
 | `hub_secret` | Hub | Django SECRET_KEY |
 | `hub_db_fields_encryption_key` | Hub | Database field encryption key |
+| `hub_resource_key` | Hub | Gateway resource-server key |
 | `gateway_secret_key` | Gateway | Django SECRET_KEY |
 | `eda_secret_key` | EDA | Django SECRET_KEY |
+| `eda_resource_key` | EDA | Gateway resource-server key |
 | `controller_db_password` | Controller | Database password |
 | `hub_db_password` | Hub | Database password |
 | `gateway_db_password` | Gateway | Database password |
@@ -124,6 +132,13 @@ source deployment. Secret keys vary by component:
 
 During import, secrets are restored to the target platform's secret store
 (Kubernetes Secrets for OCP, podman secrets for containerized).
+
+OCP-source artifacts also include `aap_cr.yml`, a reference containing the
+source CR's API version, kind, name, namespace, and the name/disabled fields
+for its controller, Hub, and EDA components. Other spec fields—including
+custom settings and secret references or values—are omitted. Runtime status
+and Kubernetes-generated metadata are also omitted. The file is not used to
+create or configure the target CR.
 
 ## Component Data
 
@@ -133,9 +148,9 @@ Each component directory contains a PostgreSQL custom-format dump (`.pgc`)
 created with `pg_dump --format=custom`. These are restored with `pg_restore`
 during import using `--clean --if-exists` flags to handle existing schemas.
 
-Default database names:
+Component databases and default dump filenames:
 
-| Component | Database | Default Name |
+| Component | Default database dump | Database name |
 |-----------|----------|-------------|
 | Controller | `controller.pgc` | `awx` |
 | Hub | `hub.pgc` | `automationhub` |
@@ -150,10 +165,12 @@ installation.
 
 ### Hub Content Data (Optional)
 
-When `export_hub_content: true` (the default), the hub directory includes
-`hub-content.tar.gz` - a tarball of the Pulp content directory
-(`/var/lib/pulp/`). This preserves collection and execution environment
-artifacts stored on disk outside the database.
+When `artifact_export_hub_content: true` (the default), the hub directory
+includes a tarball of Pulp's media directory. Its default filename is
+`hub_content.tar`; schema 1.1 records the configured name in the Hub
+component's `content_filename` field. OCP export supports Hub content stored
+on a file-storage PVC. OCP Hub content stored in S3 or Azure Blob must be
+omitted by setting `artifact_export_hub_content: false`.
 
 ## Integrity
 
@@ -176,9 +193,13 @@ validation phase of both export and import workflows.
 
 ## Versioning
 
-The `schema_version` field identifies the artifact format version. The
-`artifact` role maintains an internal list of supported schema versions.
-Artifacts with unrecognized schema versions are rejected during validation.
+The `schema_version` field identifies the artifact format version. Version
+1.1 records the configured Hub content filename; consumers also support
+version 1.0 artifacts. Both versions use the canonical `.pgc` database dump
+suffix and `hub_content.tar` content filename unless the Hub filename is
+recorded in a 1.1 manifest. The `artifact` role maintains an internal list of
+supported schema versions. Artifacts with unrecognized schema versions are
+rejected during validation.
 
 The `aap_version` and `aap_version_patch` fields record the source platform
 version. These can be used to enforce version compatibility policies during

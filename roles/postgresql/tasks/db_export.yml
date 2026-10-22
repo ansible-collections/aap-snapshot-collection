@@ -43,14 +43,14 @@
         login_port: "{{ postgresql_auth_settings.default.PORT }}"
         login_user: "{{ postgresql_auth_settings.default.USER }}"
         login_password: "{{ postgresql_auth_settings.default.PASSWORD | default(omit) }}"
-        target: "{{ postgresql_export_dir }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+        target: "{{ postgresql_export_dir }}/{{ postgresql_component_name }}.pgc"
         target_opts: "--clean --create"
         state: dump
       environment: "{{ postgresql_pg_dump_env | default({}) }}"
 
     - name: Get file checksum
       ansible.builtin.stat:
-        path: "{{ postgresql_export_dir }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+        path: "{{ postgresql_export_dir }}/{{ postgresql_component_name }}.pgc"
         checksum_algorithm: "{{ postgresql_checksum_algo | default('sha256') }}"
       register: _postgresql_db_file_stat
 
@@ -131,7 +131,7 @@
           - -d
           - "{{ postgresql_auth_settings.default.NAME }}"
           - -f
-          - "{{ postgresql_export_dir }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+          - "{{ postgresql_export_dir }}/{{ postgresql_component_name }}.pgc"
         env: "{{ postgresql_pg_dump_env | default({}) | combine({'PGPASSWORD': postgresql_auth_settings.default.PASSWORD | default('')}) }}"
       register: _postgresql_dump_result
       failed_when: _postgresql_dump_result.rc != 0
@@ -142,7 +142,7 @@
 
     - name: Get file checksum
       ansible.builtin.stat:
-        path: "{{ postgresql_export_dir }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+        path: "{{ postgresql_export_dir }}/{{ postgresql_component_name }}.pgc"
         checksum_algorithm: "{{ postgresql_checksum_algo | default('sha256') }}"
       register: _postgresql_db_file_stat
 
@@ -168,74 +168,205 @@
     - name: Get postgres auth credentials
       ansible.builtin.include_tasks: db_auth.yml
 
-    - name: Find PostgreSQL pod
-      ansible.builtin.include_role:
-        name: ansible.aap_snapshot.ocp_utils
-        tasks_from: find_pod.yml
-      vars:
-        _ocp_pod_label: "{{ ocp_utils_postgres_statefulset }}-0"
-        _ocp_pod_label_key: "statefulset.kubernetes.io/pod-name"
-        _ocp_pod_fact: "_pg_pod_name"
-
-    - name: Get PostgreSQL server version via pod
-      kubernetes.core.k8s_exec:
-        namespace: "{{ postgresql_ocp_namespace }}"
-        pod: "{{ _pg_pod_name }}"
-        container: postgres
-        command: >-
-          sh -c 'PGPASSWORD="{{ postgresql_auth_settings.default.PASSWORD }}"
-          psql -h {{ postgresql_auth_settings.default.HOST }}
-          -U {{ postgresql_auth_settings.default.USER }}
-          -t -A -c "SHOW server_version"'
-      register: _postgresql_version_ocp
-      failed_when: _postgresql_version_ocp.rc != 0
-      no_log: "{{ __postgresql_no_log }}"
-      when: _postgresql_version is not defined
-
-    - name: Set PostgreSQL version fact
+    - name: Reset OCP PostgreSQL export failure details
       ansible.builtin.set_fact:
-        _postgresql_version: "{{ _postgresql_version_ocp.stdout.split('.')[0] | trim }}"
-      delegate_to: localhost
-      delegate_facts: true
+        _postgresql_ocp_export_failure: {}
+        _postgresql_ocp_export_temp_pod_created: false
+      changed_when: false
+
+    - name: Check for managed PostgreSQL pod
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: "{{ postgresql_ocp_namespace }}"
+        label_selectors:
+          - "statefulset.kubernetes.io/pod-name={{ postgresql_ocp_postgres_statefulset }}-0"
+        field_selectors:
+          - "status.phase=Running"
+      register: _postgresql_managed_export_pods
+
+    - name: Use managed PostgreSQL pod for export
+      ansible.builtin.set_fact:
+        _pg_pod_name: "{{ _postgresql_managed_export_pods.resources[0].metadata.name }}"
+      when: _postgresql_managed_export_pods.resources | default([]) | length > 0
+
+    - name: Create temporary PostgreSQL client pod for export
+      when: _postgresql_managed_export_pods.resources | default([]) | length == 0
+      block:
+        - name: Create temporary PostgreSQL client pod
+          ansible.builtin.include_role:
+            name: ansible.aap_snapshot.ocp_utils
+            tasks_from: create_temp_resources.yml
+          vars:
+            ocp_utils_temp_deployment_name: "{{ postgresql_ocp_export_temp_deployment_name }}"
+            _ocp_utils_create_temp_pvc: false
+            _ocp_utils_temp_container_name: postgres
+            _ocp_utils_temp_volume_mounts: []
+            _ocp_utils_temp_volumes: []
+            _ocp_utils_temp_pod_image: "{{ postgresql_temp_container_image }}"
+
+        - name: Use temporary PostgreSQL client pod for export
+          ansible.builtin.set_fact:
+            _pg_pod_name: "{{ ocp_utils_temp_pod_name }}"
+            _postgresql_ocp_export_temp_pod_created: true
+
+      rescue:
+        - name: Clean up temporary PostgreSQL client pod after creation failure
+          ansible.builtin.include_role:
+            name: ansible.aap_snapshot.ocp_utils
+            tasks_from: cleanup_temp_resources.yml
+          vars:
+            ocp_utils_temp_deployment_name: "{{ postgresql_ocp_export_temp_deployment_name }}"
+            _ocp_utils_create_temp_pvc: false
+
+        - name: Report temporary PostgreSQL client pod creation failure
+          ansible.builtin.fail:
+            msg: >-
+              Could not create a temporary PostgreSQL client pod for OCP export:
+              {{ ansible_failed_result.msg | default('No error message returned.') }}
+
+    - name: Export database from PostgreSQL pod
+      vars:
+        _postgresql_dump_remote_path: "/tmp/{{ postgresql_component_name }}.pgc"
+      block:
+        - name: Get PostgreSQL server version via pod
+          kubernetes.core.k8s_exec:
+            namespace: "{{ postgresql_ocp_namespace }}"
+            pod: "{{ _pg_pod_name }}"
+            container: postgres
+            command: >-
+              sh -c 'PGPASSWORD="$1" psql -h "$2" -p "$3" -U "$4"
+              -d "$5" -t -A -c "$6";
+              result=$?; printf "psql exit code: %s\n" "$result"; exit "$result"'
+              sh {{ postgresql_auth_settings.default.PASSWORD | default('', true) | quote }}
+              {{ postgresql_auth_settings.default.HOST | quote }}
+              {{ postgresql_auth_settings.default.PORT | default('5432', true) | string | quote }}
+              {{ postgresql_auth_settings.default.USER | quote }}
+              {{ postgresql_auth_settings.default.NAME | quote }}
+              {{ 'SHOW server_version' | quote }}
+          register: _postgresql_version_ocp
+          failed_when: _postgresql_version_ocp.rc != 0
+          no_log: "{{ __postgresql_no_log }}"
+          when: _postgresql_version is not defined
+
+        - name: Set PostgreSQL version fact
+          ansible.builtin.set_fact:
+            _postgresql_version: "{{ _postgresql_version_ocp.stdout.split('.')[0] | trim }}"
+          delegate_to: localhost
+          delegate_facts: true
+          when:
+            - _postgresql_version_ocp is not skipped
+            - _postgresql_version_ocp.stdout is defined
+
+        - name: Dump and transfer database from PostgreSQL pod
+          block:
+            - name: Perform PostgreSQL dump via pod
+              kubernetes.core.k8s_exec:
+                namespace: "{{ postgresql_ocp_namespace }}"
+                pod: "{{ _pg_pod_name }}"
+                container: postgres
+                command: >-
+                  sh -c 'umask 077;
+                  PGPASSWORD="$1" pg_dump --clean --create -Fc
+                  -h "$2" -p "$3" -U "$4" -d "$5" -f "$6";
+                  result=$?; printf "pg_dump exit code: %s\n" "$result"; exit "$result"'
+                  sh {{ postgresql_auth_settings.default.PASSWORD | default('', true) | quote }}
+                  {{ postgresql_auth_settings.default.HOST | quote }}
+                  {{ postgresql_auth_settings.default.PORT | default('5432', true) | string | quote }}
+                  {{ postgresql_auth_settings.default.USER | quote }}
+                  {{ postgresql_auth_settings.default.NAME | quote }}
+                  {{ _postgresql_dump_remote_path | quote }}
+              register: _postgresql_dump_export_result
+              failed_when: _postgresql_dump_export_result.rc != 0
+              no_log: "{{ __postgresql_no_log }}"
+
+            - name: Restrict PostgreSQL dump file permissions in pod
+              kubernetes.core.k8s_exec:
+                namespace: "{{ postgresql_ocp_namespace }}"
+                pod: "{{ _pg_pod_name }}"
+                container: postgres
+                command: >-
+                  sh -c 'chmod 0600 "$1";
+                  result=$?; printf "chmod exit code: %s\n" "$result"; exit "$result"'
+                  sh {{ _postgresql_dump_remote_path | quote }}
+              register: _postgresql_dump_chmod_result
+              failed_when: _postgresql_dump_chmod_result.rc != 0
+
+            - name: Prepare restricted local PostgreSQL dump file
+              ansible.builtin.file:
+                path: "{{ postgresql_export_dest }}/{{ postgresql_component_name }}/{{ postgresql_component_name }}.pgc"
+                state: touch
+                mode: "0600"
+
+            - name: Copy dump file from pod to localhost
+              kubernetes.core.k8s_cp:
+                namespace: "{{ postgresql_ocp_namespace }}"
+                pod: "{{ _pg_pod_name }}"
+                container: postgres
+                remote_path: "{{ _postgresql_dump_remote_path }}"
+                local_path: "{{ postgresql_export_dest }}/{{ postgresql_component_name }}/{{ postgresql_component_name }}.pgc"
+                state: from_pod
+
+            - name: Restrict copied PostgreSQL dump permissions
+              ansible.builtin.file:
+                path: "{{ postgresql_export_dest }}/{{ postgresql_component_name }}/{{ postgresql_component_name }}.pgc"
+                state: file
+                mode: "0600"
+
+          always:
+            - name: Clean up dump file in pod
+              kubernetes.core.k8s_exec:
+                namespace: "{{ postgresql_ocp_namespace }}"
+                pod: "{{ _pg_pod_name }}"
+                container: postgres
+                command: >-
+                  sh -c 'rm -f "$1";
+                  result=$?; printf "cleanup exit code: %s\n" "$result"; exit "$result"'
+                  sh {{ _postgresql_dump_remote_path | quote }}
+              register: _postgresql_dump_cleanup_result
+              failed_when: false
+              changed_when: false
+
+      rescue:
+        - name: Record OCP PostgreSQL export failure for reporting after cleanup
+          ansible.builtin.set_fact:
+            _postgresql_ocp_export_failure:
+              task: "{{ ansible_failed_task.name }}"
+              message: "{{ ansible_failed_result.msg | default('No error message returned.') }}"
+          no_log: "{{ __postgresql_no_log }}"
+
+      always:
+        - name: Remove temporary PostgreSQL client pod after export
+          ansible.builtin.include_role:
+            name: ansible.aap_snapshot.ocp_utils
+            tasks_from: cleanup_temp_resources.yml
+          vars:
+            ocp_utils_temp_deployment_name: "{{ postgresql_ocp_export_temp_deployment_name }}"
+            _ocp_utils_create_temp_pvc: false
+          when: _postgresql_ocp_export_temp_pod_created | default(false) | bool
+
+    - name: Fail when temporary PostgreSQL files cannot be cleaned up
+      ansible.builtin.fail:
+        msg: >-
+          Failed to remove a temporary database export file from PostgreSQL pod
+          {{ _pg_pod_name }} after export task
+          '{{ _postgresql_ocp_export_failure.task | default("completed") }}'.
       when:
-        - _postgresql_version_ocp is not skipped
-        - _postgresql_version_ocp.stdout is defined
+        - >-
+          (_postgresql_dump_cleanup_result is defined
+           and (_postgresql_dump_cleanup_result.rc | default(1) | int) != 0)
 
-    - name: Perform PostgreSQL dump via pod
-      kubernetes.core.k8s_exec:
-        namespace: "{{ postgresql_ocp_namespace }}"
-        pod: "{{ _pg_pod_name }}"
-        container: postgres
-        command: >-
-          sh -c 'PGPASSWORD="{{ postgresql_auth_settings.default.PASSWORD }}"
-          pg_dump --clean --create -Fc
-          -h {{ postgresql_auth_settings.default.HOST }}
-          -U {{ postgresql_auth_settings.default.USER }}
-          -d {{ postgresql_auth_settings.default.NAME }}
-          -f /tmp/{{ postgresql_component_name }}.{{ postgresql_export_extension }}'
-      register: _postgresql_dump_export_result
-      failed_when: _postgresql_dump_export_result.rc != 0
+    - name: Re-raise OCP PostgreSQL export failure after cleanup
+      ansible.builtin.fail:
+        msg: >-
+          OCP PostgreSQL export failed in task
+          '{{ _postgresql_ocp_export_failure.task }}':
+          {{ _postgresql_ocp_export_failure.message }}
       no_log: "{{ __postgresql_no_log }}"
-
-    - name: Copy dump file from pod to localhost
-      kubernetes.core.k8s_cp:
-        namespace: "{{ postgresql_ocp_namespace }}"
-        pod: "{{ _pg_pod_name }}"
-        container: postgres
-        remote_path: "/tmp/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
-        local_path: "{{ postgresql_export_dest }}/{{ postgresql_component_name }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
-        state: from_pod
-
-    - name: Clean up dump file in pod
-      kubernetes.core.k8s_exec:
-        namespace: "{{ postgresql_ocp_namespace }}"
-        pod: "{{ _pg_pod_name }}"
-        container: postgres
-        command: "rm -f /tmp/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+      when: _postgresql_ocp_export_failure | length > 0
 
     - name: Get local file checksum
       ansible.builtin.stat:
-        path: "{{ postgresql_export_dest }}/{{ postgresql_component_name }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+        path: "{{ postgresql_export_dest }}/{{ postgresql_component_name }}/{{ postgresql_component_name }}.pgc"
         checksum_algorithm: "{{ postgresql_checksum_algo | default('sha256') }}"
       register: _postgresql_db_file_stat
       delegate_to: localhost

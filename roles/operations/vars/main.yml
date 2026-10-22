@@ -25,6 +25,7 @@ _operations_component_config:
     django_environment: {}
     django_manage_get_cmd: null
     ocp_extra_secrets: []
+    ocp_resource_secrets: []
     multi_resource_keys: []
     static_services: []
     worker_service_pattern: ""
@@ -50,6 +51,7 @@ _operations_component_config:
     django_environment: {}
     django_manage_get_cmd: null
     ocp_extra_secrets: []
+    ocp_resource_secrets: []
     multi_resource_keys: []
     static_services:
       - automation-eda-scheduler
@@ -81,6 +83,13 @@ _operations_component_config:
     django_environment: {}
     django_manage_get_cmd: null
     ocp_extra_secrets: []
+    ocp_resource_secrets:
+      - field: controller_resource_server_secret
+        artifact_key: controller_resource_key
+      - field: eda_resource_server_secret
+        artifact_key: eda_resource_key
+      - field: galaxy_resource_server_secret
+        artifact_key: hub_resource_key
     multi_resource_keys:
       - controller
       - eda
@@ -116,6 +125,7 @@ _operations_component_config:
       - secret_name: "{{ operations_aap_instance_name }}-hub-secret-key"
         field: "secret_key"
         artifact_key: "hub_secret"
+    ocp_resource_secrets: []
     multi_resource_keys: []
     static_services:
       - automation-hub-api
