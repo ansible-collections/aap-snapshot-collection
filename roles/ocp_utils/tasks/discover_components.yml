@@ -85,7 +85,8 @@
         kind: Pod
         namespace: "{{ ocp_utils_ocp_namespace }}"
         label_selectors:
-          - "app.kubernetes.io/component={{ ocp_utils_aap_instance_name }}-gateway"
+          - "app.kubernetes.io/component=aap-gateway"
+          - "app.kubernetes.io/name={{ ocp_utils_aap_instance_name }}"
         field_selectors:
           - "status.phase=Running"
       register: _ocp_utils_found_pods
@@ -99,7 +100,8 @@
         kind: Pod
         namespace: "{{ ocp_utils_ocp_namespace }}"
         label_selectors:
-          - "app.kubernetes.io/component={{ ocp_utils_aap_instance_name }}-gateway"
+          - "app.kubernetes.io/component=aap-gateway"
+          - "app.kubernetes.io/name={{ ocp_utils_aap_instance_name }}"
         field_selectors:
           - "status.phase=Running"
       register: _ocp_utils_found_pods
