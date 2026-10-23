@@ -119,7 +119,9 @@
           {% endif %}
           {% endif %}
           - Review custom TLS certificates and reapply if needed
-      when: artifact_manifest is defined
+      when:
+        - artifact_manifest is defined
+        - aap_platform != 'containerized'
 
     - name: Advise re-running the containerized installer
       ansible.builtin.debug:
