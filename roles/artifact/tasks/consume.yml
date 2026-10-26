@@ -381,6 +381,20 @@
         - "'hub' in _artifact_import_components"
         - artifact_hub_has_content_data | default(false)
 
+    # Restoring the Gateway database can leave its OAuth2 state out of sync
+    # with this operator-managed Secret. Remove it before operators resume so
+    # they can recreate a token for the restored database.
+    - name: Remove stale Gateway OAuth2 token secret after database restore
+      kubernetes.core.k8s:
+        api_version: v1
+        kind: Secret
+        name: "{{ ocp_utils_aap_instance_name }}-gateway-oauth2-token-secret"
+        namespace: "{{ ocp_namespace | default('aap') }}"
+        state: absent
+      environment: "{{ artifact_ocp_environment }}"
+      no_log: "{{ __artifact_no_log }}"
+      when: "'gateway' in _artifact_import_components"
+
     # --- Resume AAP ---
     - name: Scale operators back up
       ansible.builtin.include_role:
@@ -395,6 +409,20 @@
         tasks_from: idle_aap.yml
       vars:
         ocp_idle_aap: false
+
+    - name: Wait for Gateway OAuth2 token secret to be recreated
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Secret
+        name: "{{ ocp_utils_aap_instance_name }}-gateway-oauth2-token-secret"
+        namespace: "{{ ocp_namespace | default('aap') }}"
+      environment: "{{ artifact_ocp_environment }}"
+      register: _artifact_gateway_oauth2_token_secret
+      until: _artifact_gateway_oauth2_token_secret.resources | length > 0
+      retries: "{{ ocp_utils_scale_wait_retries | default(30) }}"
+      delay: "{{ ocp_utils_scale_wait_delay | default(10) }}"
+      no_log: "{{ __artifact_no_log }}"
+      when: "'gateway' in _artifact_import_components"
 
     - name: Restore Lightspeed and MCP workloads after import
       ansible.builtin.include_role:

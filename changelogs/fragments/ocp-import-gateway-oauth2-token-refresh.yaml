@@ -1,0 +1,4 @@
+---
+bugfixes:
+  - Recreate the Gateway OAuth2 token Secret after restoring the database during OCP import.
+...
