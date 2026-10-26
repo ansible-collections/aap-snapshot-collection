@@ -1,0 +1,4 @@
+---
+bugfixes:
+  - Handle skipped operator lookup results when recording Lightspeed and MCP replicas during OCP import.
+...

@@ -56,7 +56,9 @@
       loop: "{{ _ocp_utils_lightspeed_mcp_operator_info.results | default([]) }}"
       loop_control:
         label: "{{ item.item }}"
-      when: item.resources | length > 0
+      when:
+        - item.resources is defined
+        - item.resources | length > 0
 
     - name: Require an operator controller for discovered Lightspeed or MCP workloads
       ansible.builtin.assert:
