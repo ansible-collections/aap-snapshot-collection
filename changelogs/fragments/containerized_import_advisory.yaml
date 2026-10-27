@@ -1,0 +1,4 @@
+---
+bugfixes:
+  - Fix artifact_import to skip the generic post-import advisory for containerized targets and show only the containerized installer advisory.
+...
