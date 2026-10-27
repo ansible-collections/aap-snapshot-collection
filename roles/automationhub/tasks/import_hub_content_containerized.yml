@@ -14,7 +14,8 @@
     - aap_platform == 'containerized'
     - automationhub_import_hub_content | default(true) | bool
     - artifact_hub_has_content_data | default(false) | bool
-    - inventory_hostname in groups.get('hub_groups', [])
+    - groups.get('hub_groups', []) | length > 0
+    - inventory_hostname == groups['hub_groups'][0]
   block:
     - name: Check if hub content tarball was staged on this host
       ansible.builtin.stat:

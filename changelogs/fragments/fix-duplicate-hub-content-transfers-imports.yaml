@@ -1,0 +1,4 @@
+---
+bugfixes:
+  - Only copy the hub content tar file to the first hub node and extract to the local or shared NFS storage there.
+...
