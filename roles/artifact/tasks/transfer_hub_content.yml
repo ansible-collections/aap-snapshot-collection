@@ -9,7 +9,7 @@
 - name: Transfer hub content tarball if this host needs it
   when:
     - groups.get('hub_groups', []) | length > 0
-    - inventory_hostname in groups['hub_groups']
+    - inventory_hostname == groups['hub_groups'][0]
   block:
     # automationhub_content_tar_name is a role default of automationhub, not
     # artifact (this file runs via include_tasks from the artifact role, so
