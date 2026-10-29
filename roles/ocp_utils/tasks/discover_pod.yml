@@ -1,4 +1,25 @@
 ---
+- name: Wait for selected Deployment rollout to complete
+  kubernetes.core.k8s_info:
+    kind: Deployment
+    namespace: "{{ ocp_utils_ocp_namespace }}"
+    label_selectors: "{{ _discover_deployment_selectors | default(_discover_selectors) }}"
+  environment: "{{ ocp_utils_ocp_environment }}"
+  register: _ocp_utils_discovered_deployment
+  until: >-
+    _ocp_utils_discovered_deployment.resources | length > 0
+    and (_ocp_utils_discovered_deployment.resources[0].status.observedGeneration | default(0) | int)
+        >= (_ocp_utils_discovered_deployment.resources[0].metadata.generation | default(0) | int)
+    and (_ocp_utils_discovered_deployment.resources[0].status.replicas | default(0) | int)
+        == (_ocp_utils_discovered_deployment.resources[0].spec.replicas | default(1) | int)
+    and (_ocp_utils_discovered_deployment.resources[0].status.updatedReplicas | default(0) | int)
+        == (_ocp_utils_discovered_deployment.resources[0].spec.replicas | default(1) | int)
+    and (_ocp_utils_discovered_deployment.resources[0].status.availableReplicas | default(0) | int)
+        == (_ocp_utils_discovered_deployment.resources[0].spec.replicas | default(1) | int)
+  retries: "{{ _discover_retries | default(30) }}"
+  delay: "{{ _discover_delay | default(10) }}"
+  when: _discover_wait_for_deployment | default(false) | bool
+
 - name: "Discover pod"
   kubernetes.core.k8s_info:
     kind: Pod
