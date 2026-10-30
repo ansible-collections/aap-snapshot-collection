@@ -331,7 +331,11 @@
           ansible.builtin.set_fact:
             _postgresql_ocp_export_failure:
               task: "{{ ansible_failed_task.name }}"
-              message: "{{ ansible_failed_result.msg | default('No error message returned.') }}"
+              message: >-
+                {{ ansible_failed_result.stderr
+                   | default(ansible_failed_result.module_stderr
+                     | default(ansible_failed_result.msg
+                       | default('No error message returned.')), true) }}
           no_log: "{{ __postgresql_no_log }}"
 
       always:
@@ -351,9 +355,8 @@
           {{ _pg_pod_name }} after export task
           '{{ _postgresql_ocp_export_failure.task | default("completed") }}'.
       when:
-        - >-
-          (_postgresql_dump_cleanup_result is defined
-           and (_postgresql_dump_cleanup_result.rc | default(1) | int) != 0)
+        - _postgresql_dump_cleanup_result is defined
+        - (_postgresql_dump_cleanup_result.rc | default(0, true) | int) != 0
 
     - name: Re-raise OCP PostgreSQL export failure after cleanup
       ansible.builtin.fail:
