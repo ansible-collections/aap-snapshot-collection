@@ -2,24 +2,62 @@
 - name: Discover OCP components
   environment: "{{ ocp_utils_ocp_environment }}"
   block:
+    - name: Require the selected AAP CR for component discovery
+      ansible.builtin.assert:
+        that:
+          - _ocp_utils_selected_aap_cr is defined
+        fail_msg: >-
+          Component discovery requires the selected AnsibleAutomationPlatform CR.
+          Run check_aap_cr.yml first and set aap_instance_name when the namespace
+          contains multiple AAP CRs.
+
     - name: Get component CR names
       kubernetes.core.k8s_info:
         kind: "{{ item.kind }}"
         api_version: "{{ item.api_version }}"
         namespace: "{{ ocp_utils_ocp_namespace }}"
+        name: "{{ item.name }}"
       register: _ocp_utils_component_crs
       loop:
         - kind: AutomationController
           api_version: automationcontroller.ansible.com/v1beta1
           fact: _controller_cr_name
+          name: >-
+            {{ (_ocp_utils_selected_aap_cr.spec.controller | default({})).name
+               | default(ocp_utils_aap_instance_name ~ '-controller', true) }}
+          disabled: "{{ (_ocp_utils_selected_aap_cr.spec.controller | default({})).disabled | default(false) | bool }}"
         - kind: AutomationHub
           api_version: automationhub.ansible.com/v1beta1
           fact: _hub_cr_name
+          name: >-
+            {{ (_ocp_utils_selected_aap_cr.spec.hub | default({})).name
+               | default(ocp_utils_aap_instance_name ~ '-hub', true) }}
+          disabled: "{{ (_ocp_utils_selected_aap_cr.spec.hub | default({})).disabled | default(false) | bool }}"
         - kind: EDA
           api_version: eda.ansible.com/v1alpha1
           fact: _eda_cr_name
+          name: >-
+            {{ (_ocp_utils_selected_aap_cr.spec.eda | default({})).name
+               | default(ocp_utils_aap_instance_name ~ '-eda', true) }}
+          disabled: "{{ (_ocp_utils_selected_aap_cr.spec.eda | default({})).disabled | default(false) | bool }}"
       loop_control:
         label: "{{ item.kind }}"
+      when: not (item.disabled | bool)
+      no_log: "{{ __ocp_utils_no_log }}"
+
+    - name: Require a CR for every enabled AAP component
+      ansible.builtin.assert:
+        that:
+          - item.resources | default([]) | length == 1
+        fail_msg: >-
+          The selected AAP CR enables {{ item.item.kind }} component
+          '{{ item.item.name }}', but that CR was not found in namespace
+          '{{ ocp_utils_ocp_namespace }}'.
+      loop: "{{ _ocp_utils_component_crs.results }}"
+      loop_control:
+        label: "{{ item.item.kind }}"
+      when:
+        - not (item.item.disabled | default(false) | bool)
 
     - name: Set component CR name facts
       ansible.builtin.set_fact:
@@ -27,7 +65,8 @@
       loop: "{{ _ocp_utils_component_crs.results }}"
       loop_control:
         label: "{{ item.item.kind }}"
-      when: item.resources | length > 0
+      when: item.resources | default([]) | length > 0
+      no_log: "{{ __ocp_utils_no_log }}"
 
     - name: Set hub hostname from CR public_base_url
       ansible.builtin.set_fact:
@@ -37,8 +76,9 @@
         label: "{{ item.item.kind }}"
       when:
         - item.item.kind == 'AutomationHub'
-        - item.resources | length > 0
+        - item.resources | default([]) | length > 0
         - item.resources[0].spec.public_base_url is defined
+      no_log: "{{ __ocp_utils_no_log }}"
 
     - name: Wait for gateway pod to be running
       kubernetes.core.k8s_info:
@@ -46,6 +86,7 @@
         namespace: "{{ ocp_utils_ocp_namespace }}"
         label_selectors:
           - "app.kubernetes.io/component=aap-gateway"
+          - "app.kubernetes.io/name={{ ocp_utils_aap_instance_name }}"
         field_selectors:
           - "status.phase=Running"
       register: _ocp_utils_found_pods
@@ -60,6 +101,7 @@
         namespace: "{{ ocp_utils_ocp_namespace }}"
         label_selectors:
           - "app.kubernetes.io/component=aap-gateway"
+          - "app.kubernetes.io/name={{ ocp_utils_aap_instance_name }}"
         field_selectors:
           - "status.phase=Running"
       register: _ocp_utils_found_pods
@@ -176,10 +218,12 @@
         namespace: "{{ ocp_utils_ocp_namespace }}"
         label_selectors:
           - "app.kubernetes.io/component=eda-api"
+          - "app.kubernetes.io/name={{ _eda_cr_name }}"
         field_selectors:
           - "status.phase=Running"
       register: _ocp_utils_found_eda_pods
-      until: _ocp_utils_found_eda_pods.resources | length > 0
+      until: >-
+        _ocp_utils_found_eda_pods.resources | length > 0
       retries: "{{ _discover_retries | default(60) }}"
       delay: "{{ _discover_delay | default(10) }}"
       when:
@@ -192,6 +236,7 @@
         namespace: "{{ ocp_utils_ocp_namespace }}"
         label_selectors:
           - "app.kubernetes.io/component=eda-api"
+          - "app.kubernetes.io/name={{ _eda_cr_name }}"
         field_selectors:
           - "status.phase=Running"
       register: _ocp_utils_found_eda_pods
@@ -207,40 +252,7 @@
         - _eda_cr_name is defined
         - _ocp_utils_found_eda_pods.resources | default([]) | length > 0
 
-    - name: Wait for hub pod to be running
-      kubernetes.core.k8s_info:
-        kind: Pod
-        namespace: "{{ ocp_utils_ocp_namespace }}"
-        label_selectors:
-          - "app.kubernetes.io/name=automationhub-api"
-        field_selectors:
-          - "status.phase=Running"
-      register: _ocp_utils_found_hub_pods
-      until: _ocp_utils_found_hub_pods.resources | length > 0
-      retries: "{{ _discover_retries | default(60) }}"
-      delay: "{{ _discover_delay | default(10) }}"
-      when:
-        - _hub_cr_name is defined
-        - _wait_for_running | default(false) | bool
-
-    - name: Discover hub pod
-      kubernetes.core.k8s_info:
-        kind: Pod
-        namespace: "{{ ocp_utils_ocp_namespace }}"
-        label_selectors:
-          - "app.kubernetes.io/name=automationhub-api"
-        field_selectors:
-          - "status.phase=Running"
-      register: _ocp_utils_found_hub_pods
-      when:
-        - _hub_cr_name is defined
-        - not (_wait_for_running | default(false) | bool)
-
-    - name: Set hub pod facts
-      ansible.builtin.set_fact:
-        _ocp_utils_hub_pod_name: "{{ _ocp_utils_found_hub_pods.resources[0].metadata.name }}"
-        _ocp_utils_hub_container_name: "api"
-      when:
-        - _hub_cr_name is defined
-        - _ocp_utils_found_hub_pods.resources | default([]) | length > 0
+    - name: Discover Hub pod contexts for the selected component CR
+      ansible.builtin.include_tasks: discover_hub_pods.yml
+      when: _hub_cr_name is defined
 ...

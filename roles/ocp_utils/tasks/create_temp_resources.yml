@@ -15,6 +15,7 @@
           requests:
             storage: "{{ ocp_utils_temp_pvc_size }}"
   environment: "{{ ocp_utils_ocp_environment }}"
+  when: _ocp_utils_create_temp_pvc | default(true) | bool
 
 - name: Create temporary deployment for migration
   kubernetes.core.k8s:
@@ -36,9 +37,12 @@
               app: "{{ ocp_utils_temp_deployment_name }}"
           spec:
             serviceAccountName: "{{ _ocp_utils_temp_service_account | default(omit) }}"
+            securityContext: "{{ _ocp_utils_temp_pod_security_context | default(omit) }}"
+            imagePullSecrets: "{{ _ocp_utils_temp_image_pull_secrets | default(omit) }}"
             containers:
-              - name: postgres
-                image: "{{ ocp_utils_temp_pod_image | default(ocp_utils_temp_postgres_image) }}"
+              - name: "{{ _ocp_utils_temp_container_name | default('postgres') }}"
+                image: "{{ _ocp_utils_temp_pod_image | default(ocp_utils_temp_postgres_image) }}"
+                imagePullPolicy: "{{ _ocp_utils_temp_image_pull_policy | default(omit) }}"
                 command: ["sleep", "infinity"]
                 securityContext: "{{ _ocp_utils_temp_security_context | default(omit) }}"
                 volumeMounts: "{{ _ocp_utils_temp_volume_mounts }}"
@@ -53,7 +57,7 @@
           claimName: "{{ ocp_utils_temp_pvc_name }}"
   environment: "{{ ocp_utils_ocp_environment }}"
 
-- name: Wait for temporary pod to be ready
+- name: Wait for temporary pod container to be ready
   kubernetes.core.k8s_info:
     kind: Pod
     namespace: "{{ ocp_utils_ocp_namespace }}"
@@ -63,11 +67,26 @@
       - "status.phase=Running"
   environment: "{{ ocp_utils_ocp_environment }}"
   register: _ocp_utils_temp_pods
-  until: _ocp_utils_temp_pods.resources | length > 0
+  until: >-
+    _ocp_utils_temp_pods.resources
+    | rejectattr('metadata.deletionTimestamp', 'defined')
+    | selectattr('status.containerStatuses', 'defined')
+    | map(attribute='status.containerStatuses') | flatten
+    | selectattr('name', 'equalto', _ocp_utils_temp_container_name | default('postgres'))
+    | selectattr('ready', 'equalto', true) | list | length > 0
   retries: "{{ ocp_utils_scale_wait_retries }}"
   delay: "{{ ocp_utils_scale_wait_delay }}"
 
-- name: Set temporary pod name fact
+- name: Set temporary pod name from a ready pod
   ansible.builtin.set_fact:
-    ocp_utils_temp_pod_name: "{{ _ocp_utils_temp_pods.resources[0].metadata.name }}"
+    ocp_utils_temp_pod_name: "{{ item.metadata.name }}"
+  loop: "{{ _ocp_utils_temp_pods.resources }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+  when:
+    - item.metadata.deletionTimestamp is not defined
+    - >-
+      item.status.containerStatuses | default([])
+      | selectattr('name', 'equalto', _ocp_utils_temp_container_name | default('postgres'))
+      | selectattr('ready', 'equalto', true) | list | length > 0
 ...

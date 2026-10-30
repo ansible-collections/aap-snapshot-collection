@@ -5,29 +5,8 @@
     - artifact_hub_has_content_data | default(false)
   environment: "{{ automationhub_ocp_environment }}"
   block:
-    - name: Discover hub file-storage PVC name
-      kubernetes.core.k8s_info:
-        kind: PersistentVolumeClaim
-        namespace: "{{ automationhub_ocp_namespace }}"
-        label_selectors:
-          - "app.kubernetes.io/name=automationhub-storage"
-          - "app.kubernetes.io/managed-by=automationhub-operator"
-          - "app.kubernetes.io/instance=automationhub-storage-{{ _hub_cr_name }}"
-      register: _automationhub_pvcs
-
-    - name: Assert hub file-storage PVC was found
-      ansible.builtin.assert:
-        that: _automationhub_pvcs.resources | length > 0
-        fail_msg: >-
-          No hub file-storage PVC found in namespace {{ automationhub_ocp_namespace }}
-          for hub instance {{ _hub_cr_name }}, even though Hub's Pulp storage
-          backend was already confirmed to be FileSystem-based. Check that the
-          PVC labels match app.kubernetes.io/instance=automationhub-storage-{{ _hub_cr_name }}
-          and that the operator has finished provisioning file storage for this Hub.
-
-    - name: Set hub file-storage PVC fact
-      ansible.builtin.set_fact:
-        _automationhub_file_storage_pvc: "{{ _automationhub_pvcs.resources[0].metadata.name }}"
+    - name: Discover hub file-storage PVC
+      ansible.builtin.include_tasks: discover_file_storage_pvc.yml
 
     - name: Delete temporary deployment for recreation
       kubernetes.core.k8s:
@@ -74,8 +53,9 @@
         pod: "{{ ocp_utils_temp_pod_name }}"
         container: postgres
         command: >-
-          tar xf /tmp/migration/artifact/hub/{{ automationhub_content_tar_name }}
-          -C /mnt/hub-storage/media/
+          sh -c 'tar xf "$1" -C "$2"' sh
+          {{ ('/tmp/migration/artifact/hub/' ~ (artifact_hub_content_filename | default('hub_content.tar'))) | quote }}
+          /mnt/hub-storage/media/
       register: _automationhub_content_extract
       failed_when: _automationhub_content_extract.rc != 0
       changed_when: _automationhub_content_extract.rc == 0

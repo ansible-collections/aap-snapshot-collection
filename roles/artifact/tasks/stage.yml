@@ -10,6 +10,7 @@
       ansible.builtin.set_fact:
         artifact_secrets: "{{ hostvars['localhost']['artifact_secrets'] }}"
         artifact_manifest: "{{ hostvars['localhost']['artifact_manifest'] }}"
+        artifact_hub_content_filename: "{{ hostvars['localhost']['artifact_hub_content_filename'] }}"
       no_log: "{{ __artifact_no_log }}"
 
     - name: Ensure containerized artifact staging directory exists
