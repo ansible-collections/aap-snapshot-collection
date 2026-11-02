@@ -1,0 +1,4 @@
+---
+bugfixes:
+  - Wait for the temporary Hub export ReplicaSet to be deleted before creating its replacement.
+...

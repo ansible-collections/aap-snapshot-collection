@@ -74,6 +74,18 @@
             wait: true
             wait_timeout: 120
 
+        - name: Wait for previous temporary Hub export ReplicaSet to terminate
+          kubernetes.core.k8s_info:
+            api_version: apps/v1
+            kind: ReplicaSet
+            namespace: "{{ automationhub_ocp_namespace }}"
+            label_selectors:
+              - "app={{ automationhub_temp_export_deployment_name }}"
+          register: _automationhub_old_export_replicasets
+          until: _automationhub_old_export_replicasets.resources | length == 0
+          retries: 30
+          delay: 10
+
         - name: Wait for previous temporary Hub export pod to terminate
           kubernetes.core.k8s_info:
             kind: Pod
