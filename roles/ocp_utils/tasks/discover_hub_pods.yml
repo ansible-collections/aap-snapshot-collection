@@ -45,10 +45,10 @@
   loop_control:
     label: "{{ item.metadata.name }}"
   when:
-    - item.metadata.name | regex_search('^' ~ (_hub_cr_name | regex_escape) ~ '-')
+    - item.metadata.name is match('^' ~ (_hub_cr_name | regex_escape) ~ '-')
     - >-
       (item.metadata.labels | default({})).get('app.kubernetes.io/instance', '')
-      | regex_search('(^|-)'
+      is search('(^|-)'
           ~ (_hub_cr_name | regex_escape) ~ '$')
 
 - name: Set the selected Hub export pod
