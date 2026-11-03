@@ -1,0 +1,4 @@
+---
+bugfixes:
+  - Ignore terminating pods when discovering a Ready pod for OCP operations.
+...

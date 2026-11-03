@@ -30,18 +30,30 @@
   environment: "{{ ocp_utils_ocp_environment }}"
   register: _ocp_utils_discovered_pod
   until: >-
-    _ocp_utils_discovered_pod.resources | length > 0
-    and (_ocp_utils_discovered_pod.resources[0].status.conditions
-         | default([])
-         | selectattr('type', 'equalto', 'Ready')
-         | selectattr('status', 'equalto', 'True')
-         | list | length > 0)
+    _ocp_utils_discovered_pod.resources | default([])
+    | rejectattr('metadata.deletionTimestamp')
+    | map(attribute='status.conditions')
+    | select('defined')
+    | flatten
+    | selectattr('type', 'equalto', 'Ready')
+    | selectattr('status', 'equalto', 'True')
+    | list | length > 0
   retries: "{{ _discover_retries | default(30) }}"
   delay: "{{ _discover_delay | default(10) }}"
 
-- name: "Set pod facts"
+- name: "Set pod facts from ready, non-terminating pods"
   ansible.builtin.set_fact:
-    "{{ _discover_pod_fact }}": "{{ _ocp_utils_discovered_pod.resources[0].metadata.name }}"
+    "{{ _discover_pod_fact }}": "{{ item.metadata.name }}"
     "{{ _discover_container_fact }}": "{{ _discover_container_name }}"
-  when: _ocp_utils_discovered_pod.resources | length > 0
+  loop: >-
+    {{ _ocp_utils_discovered_pod.resources
+       | rejectattr('metadata.deletionTimestamp')
+       | list }}
+  loop_control:
+    label: "{{ item.metadata.name }}"
+  when:
+    - item.status.conditions | default([])
+      | selectattr('type', 'equalto', 'Ready')
+      | selectattr('status', 'equalto', 'True')
+      | list | length > 0
 ...
