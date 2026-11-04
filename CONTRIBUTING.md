@@ -114,14 +114,8 @@ antsibull-changelog lint
 
 ### How releases work
 
-At release time, a maintainer runs:
-
-```bash
-antsibull-changelog release --version <version>
-```
-
-This collects all fragments into `CHANGELOG.rst`, updates
-`changelogs/changelog.yaml`, and removes the consumed fragment files.
+Releases are staged and published through GitHub Actions. Follow the
+[aap_snapshot release guide](docs/releasing.md) for the maintainer steps.
 
 ## Excluding Paths from Collection Build
 
