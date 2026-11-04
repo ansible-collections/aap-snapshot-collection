@@ -1,0 +1,5 @@
+---
+bugfixes:
+  - Wait for the selected EDA API deployment rollout to complete before resource sync during OCP import.
+  - Wait for the selected Hub API deployment rollout before running OCP reconciliation commands.
+...

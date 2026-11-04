@@ -6,20 +6,6 @@
   vars:
     component_name: "{{ automationhub_component_name }}"
 
-- name: Re-discover hub pod
-  ansible.builtin.include_role:
-    name: ansible.aap_snapshot.ocp_utils
-    tasks_from: discover_pod.yml
-  vars:
-    component_name: "{{ automationhub_component_name }}"
-    _discover_label: "hub API"
-    _discover_selectors:
-      - "app.kubernetes.io/name=automationhub-api"
-    _discover_pod_fact: "_ocp_utils_hub_pod_name"
-    _discover_container_fact: "_ocp_utils_hub_container_name"
-    _discover_container_name: "api"
-  when: aap_platform == 'operator'
-
 - name: Set gateway API URL (OCP)
   ansible.builtin.set_fact:
     _automationhub_gw_api_url: "http://{{ automationhub_aap_instance_name }}.{{ automationhub_ocp_namespace }}.svc.cluster.local"
@@ -48,6 +34,24 @@
          | list | length > 0)
   retries: 60
   delay: 15
+  when:
+    - aap_platform == 'operator'
+    - _hub_cr_name is defined
+
+- name: Re-discover hub pod after the deployment rollout
+  ansible.builtin.include_role:
+    name: ansible.aap_snapshot.ocp_utils
+    tasks_from: discover_pod.yml
+  vars:
+    component_name: "{{ automationhub_component_name }}"
+    _discover_label: "hub API"
+    _discover_selectors:
+      - "app.kubernetes.io/name=automationhub-api"
+      - "app.kubernetes.io/instance=automationhub-api-{{ _hub_cr_name }}"
+    _discover_pod_fact: "_ocp_utils_hub_pod_name"
+    _discover_container_fact: "_ocp_utils_hub_container_name"
+    _discover_container_name: "api"
+    _discover_wait_for_deployment: true
   when:
     - aap_platform == 'operator'
     - _hub_cr_name is defined

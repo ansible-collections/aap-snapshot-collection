@@ -1,4 +1,25 @@
 ---
+- name: Wait for selected Deployment rollout to complete
+  kubernetes.core.k8s_info:
+    kind: Deployment
+    namespace: "{{ ocp_utils_ocp_namespace }}"
+    label_selectors: "{{ _discover_deployment_selectors | default(_discover_selectors) }}"
+  environment: "{{ ocp_utils_ocp_environment }}"
+  register: _ocp_utils_discovered_deployment
+  until: >-
+    _ocp_utils_discovered_deployment.resources | length > 0
+    and (_ocp_utils_discovered_deployment.resources[0].status.observedGeneration | default(0) | int)
+        >= (_ocp_utils_discovered_deployment.resources[0].metadata.generation | default(0) | int)
+    and (_ocp_utils_discovered_deployment.resources[0].status.replicas | default(0) | int)
+        == (_ocp_utils_discovered_deployment.resources[0].spec.replicas | default(1) | int)
+    and (_ocp_utils_discovered_deployment.resources[0].status.updatedReplicas | default(0) | int)
+        == (_ocp_utils_discovered_deployment.resources[0].spec.replicas | default(1) | int)
+    and (_ocp_utils_discovered_deployment.resources[0].status.availableReplicas | default(0) | int)
+        == (_ocp_utils_discovered_deployment.resources[0].spec.replicas | default(1) | int)
+  retries: "{{ _discover_retries | default(30) }}"
+  delay: "{{ _discover_delay | default(10) }}"
+  when: _discover_wait_for_deployment | default(false) | bool
+
 - name: "Discover pod"
   kubernetes.core.k8s_info:
     kind: Pod
@@ -9,18 +30,30 @@
   environment: "{{ ocp_utils_ocp_environment }}"
   register: _ocp_utils_discovered_pod
   until: >-
-    _ocp_utils_discovered_pod.resources | length > 0
-    and (_ocp_utils_discovered_pod.resources[0].status.conditions
-         | default([])
-         | selectattr('type', 'equalto', 'Ready')
-         | selectattr('status', 'equalto', 'True')
-         | list | length > 0)
+    _ocp_utils_discovered_pod.resources | default([])
+    | rejectattr('metadata.deletionTimestamp', 'defined')
+    | map(attribute='status.conditions')
+    | select('defined')
+    | flatten
+    | selectattr('type', 'equalto', 'Ready')
+    | selectattr('status', 'equalto', 'True')
+    | list | length > 0
   retries: "{{ _discover_retries | default(30) }}"
   delay: "{{ _discover_delay | default(10) }}"
 
-- name: "Set pod facts"
+- name: "Set pod facts from ready, non-terminating pods"
   ansible.builtin.set_fact:
-    "{{ _discover_pod_fact }}": "{{ _ocp_utils_discovered_pod.resources[0].metadata.name }}"
+    "{{ _discover_pod_fact }}": "{{ item.metadata.name }}"
     "{{ _discover_container_fact }}": "{{ _discover_container_name }}"
-  when: _ocp_utils_discovered_pod.resources | length > 0
+  loop: >-
+    {{ _ocp_utils_discovered_pod.resources
+       | rejectattr('metadata.deletionTimestamp', 'defined')
+       | list }}
+  loop_control:
+    label: "{{ item.metadata.name }}"
+  when:
+    - item.status.conditions | default([])
+      | selectattr('type', 'equalto', 'Ready')
+      | selectattr('status', 'equalto', 'True')
+      | list | length > 0
 ...
