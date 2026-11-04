@@ -31,7 +31,7 @@
   register: _ocp_utils_discovered_pod
   until: >-
     _ocp_utils_discovered_pod.resources | default([])
-    | rejectattr('metadata.deletionTimestamp')
+    | rejectattr('metadata.deletionTimestamp', 'defined')
     | map(attribute='status.conditions')
     | select('defined')
     | flatten
@@ -47,7 +47,7 @@
     "{{ _discover_container_fact }}": "{{ _discover_container_name }}"
   loop: >-
     {{ _ocp_utils_discovered_pod.resources
-       | rejectattr('metadata.deletionTimestamp')
+       | rejectattr('metadata.deletionTimestamp', 'defined')
        | list }}
   loop_control:
     label: "{{ item.metadata.name }}"
