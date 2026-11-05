@@ -3,6 +3,12 @@
   ansible.builtin.set_fact:
     _operations_current_component: "{{ _operations_component_config[component_name] }}"
 
+- name: Resolve OCP component pod context
+  ansible.builtin.set_fact:
+    _component_pod_name: "{{ vars['_ocp_utils_' ~ component_name ~ '_pod_name'] }}"
+    _component_container_name: "{{ vars['_ocp_utils_' ~ component_name ~ '_container_name'] }}"
+  when: aap_platform == 'operator'
+
 - name: "Gather version (RPM)"
   when: aap_platform == 'rpm'
   block:

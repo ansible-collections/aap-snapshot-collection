@@ -33,7 +33,8 @@ Control artifact creation and packaging.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `automationhub_export_hub_content` | `true` | Include Hub (Pulp) content in the exported artifact. Set to `false` to export without Hub content when transferring that content separately. This controls export, not restoration during import. |
+| `artifact_export_hub_content` | `true` | Include Pulp content data in the artifact; OCP export supports file-storage PVCs. Set to `false` to omit it when Hub content is transferred separately. |
+| `automationhub_export_hub_content` | `true` | Hub role alias for the export toggle. This controls export, not restoration during import. |
 | `postgresql_db_type` | `managed` | Database topology: `managed` (co-located) or `external` |
 
 ### Hub Content Export
@@ -50,7 +51,6 @@ Control artifact creation and packaging.
 |----------|---------|-------------|
 | `postgresql_export_dir` | `/tmp/backups/automation-platform` | Temp directory on source host for database dumps |
 | `postgresql_export_dest` | `$PWD/db_export` | Local directory to fetch database dumps to |
-| `postgresql_export_extension` | `pgc` | Database dump file extension (PostgreSQL custom format) |
 | `postgresql_export_rsync_opts` | `[]` | Additional rsync options for database dump transfers; the role applies `--chmod=F600` after these options |
 
 ## Import Variables
@@ -64,7 +64,7 @@ Control artifact restoration to the target platform.
 | `keep_temp_on_failure` | `true` | Keep temporary OCP migration resources (PVC, pod) on failure for debugging. Set `false` to auto-cleanup |
 | `postgresql_restore_admin_user` | `postgres` | PostgreSQL superuser for database restore operations |
 | `postgresql_restore_timeout` | `3600` | Async timeout in seconds for `pg_restore` |
-| `postgresql_temp_container_image` | `registry.redhat.io/rhel9/postgresql-15:latest` | Image used for the throwaway postgres client container that runs `pg_dump`/`pg_restore` on containerized targets. Override if your target's PostgreSQL server version differs |
+| `postgresql_temp_container_image` | `registry.redhat.io/rhel9/postgresql-15:latest` | Shared image for temporary PostgreSQL clients on containerized and OCP paths. Override if the PostgreSQL server version differs |
 
 ### Hub Content Import
 
@@ -88,6 +88,12 @@ for the preparation steps.
 Apply when `aap_platform: operator`. Control interaction with the OpenShift
 cluster and AAP operator.
 
+For export, use a localhost inventory and provide kubeconfig access to inspect
+the AAP/component CRs and secrets, execute commands in component pods, and copy
+files from pods. OCP-source artifacts include a sanitized `aap_cr.yml`
+reference. Hub content is supported only on file-storage PVCs; set
+`artifact_export_hub_content: false` to omit it when Hub uses S3 or Azure Blob.
+
 ### Namespace and Instance
 
 | Variable | Default | Description |
@@ -97,6 +103,7 @@ cluster and AAP operator.
 | `aap_instance_name` | `aap` | Name of the AnsibleAutomationPlatform CR |
 | `aap_cr_kind` | `AnsibleAutomationPlatform` | Kubernetes kind for the AAP CR |
 | `aap_cr_api_version` | `aap.ansible.com/v1alpha1` | API version for the AAP CR |
+| `postgresql_ocp_postgres_statefulset` | `{{ aap_instance_name }}-postgres-15` | Managed PostgreSQL StatefulSet name used to find the source pod during OCP export; when no running pod matches, export creates a temporary PostgreSQL client pod |
 
 ### Temporary Migration Resources
 
@@ -109,7 +116,7 @@ database restores. These are cleaned up after import completes.
 | `temp_pvc_size` | `60Gi` | Size of the temporary PVC (see sizing guidance below) |
 | `temp_pvc_access_mode` | `ReadWriteOnce` | PVC access mode |
 | `temp_deployment_name` | `aap-snapshot-temp-postgres` | Name for the temporary PostgreSQL deployment |
-| `temp_postgres_image` | `registry.redhat.io/rhel9/postgresql-15:latest` | Container image for the temporary PostgreSQL pod |
+| `temp_postgres_image` | Unset | Deprecated compatibility alias used to initialize `postgresql_temp_container_image` when the latter is unset |
 
 **Sizing `temp_pvc_size`:** The PVC must hold the artifact tarball and its extracted contents
 simultaneously, so set it to at least **2x your artifact file size**. The 60Gi default is

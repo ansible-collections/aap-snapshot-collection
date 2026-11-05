@@ -10,7 +10,7 @@ automationhub_content_tar_name: "hub_content.tar"
 # Staging directory for the hub content tarball on the remote host.
 # Set this to a larger filesystem if /tmp is too small for your hub data.
 automationhub_content_staging_dir: "/tmp"
-automationhub_export_hub_content: true
+automationhub_export_hub_content: "{{ artifact_export_hub_content | default(export_hub_content | default(true)) }}"
 automationhub_import_hub_content: true
 
 # Pulp repair task polling configuration (OCP only).
@@ -20,6 +20,8 @@ automationhub_pulp_repair_delay: 30
 
 automationhub_temp_deployment_name: "{{ ocp_utils_temp_deployment_name | default('aap-snapshot-temp-postgres') }}"
 automationhub_temp_pvc_name: "{{ ocp_utils_temp_pvc_name | default('aap-snapshot-temp') }}"
+automationhub_temp_export_deployment_name: "aap-snapshot-temp-hub-export"
+automationhub_temp_export_mount_path: "/mnt/hub-storage"
 
 # Kubeconfig resolution for this role's own OCP tasks (import_hub_content.yml,
 # reconcile.yml), which cannot rely on ocp_utils_ocp_environment being loaded

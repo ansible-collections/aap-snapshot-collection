@@ -32,4 +32,13 @@
 - name: Set artifact manifest fact
   ansible.builtin.set_fact:
     artifact_manifest: "{{ _artifact_manifest_raw.content | b64decode | from_yaml }}"
+
+- name: Set artifact Hub content filename fact
+  ansible.builtin.set_fact:
+    artifact_hub_content_filename: >-
+      {{ artifact_manifest.components
+         | selectattr('name', 'equalto', 'hub')
+         | map(attribute='content_filename')
+         | first
+         | default('hub_content.tar') }}
 ...

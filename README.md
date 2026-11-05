@@ -14,7 +14,8 @@ imports it into a new deployment.
 | RPM Installer | Containerized Installer | Supported |
 | Containerized Installer | OCP Operator | Supported |
 | Containerized Installer | Containerized Installer | Supported |
-| OCP Operator | OCP Operator | Planned |
+| OCP Operator | OCP Operator | Supported |
+| OCP Operator | Containerized Installer | Supported |
 
 The collection handles four AAP components: Controller, Hub, Gateway, and
 EDA. Hub (Pulp) content can only be imported into file-based storage; importing
@@ -56,7 +57,7 @@ artifact.
 ### Platform Requirements
 
 - **RPM export:** SSH access to component hosts, `become` privileges
-- **OCP Operator import:** `kubeconfig` with cluster-admin or namespace-admin access
+- **OCP Operator export/import:** `kubeconfig` with read/update access to AAP resources and secrets; permission to create/delete temporary Deployments and PVCs; and permission to inspect and execute commands in component and temporary pods and copy files to/from pods. Temporary pods are created by their Deployments.
 - **Containerized export:** SSH access to component hosts, podman access on component hosts
 - **Containerized import:** SSH access to component hosts, podman access on component hosts
 
@@ -183,6 +184,20 @@ Export from a containerized deployment:
 ansible-playbook -i inventory ansible.aap_snapshot.artifact_export -e aap_platform=containerized
 ```
 
+Export from an OCP operator deployment using a localhost inventory:
+
+```bash
+ansible-playbook -i localhost, -c local ansible.aap_snapshot.artifact_export \
+  -e aap_platform=operator \
+  -e ocp_namespace=aap \
+  -e aap_instance_name=aap
+```
+
+OCP exports include a sanitized `aap_cr.yml` reference in the artifact. Hub
+content export supports file-storage PVCs; set
+`artifact_export_hub_content=false` to omit Hub content. OCP Hub content on
+S3 or Azure Blob is not supported.
+
 ### Import a migration artifact
 
 If the artifact includes Hub content, the target Hub must use file-based
@@ -237,7 +252,9 @@ See the [variables reference](docs/variables.md) for the complete list.
 
 ## Testing
 
-The collection supports RPM and containerized export, and OCP operator and containerized import, on RHEL 8 and RHEL 9.
+The collection supports RPM, containerized, and OCP operator export, and OCP
+operator and containerized import. RPM and containerized paths run on RHEL 8
+and RHEL 9.
 
 Dev dependencies: `pip install pytest pyyaml ansible-lint`
 

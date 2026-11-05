@@ -6,8 +6,8 @@
     - name: Synchronize the database dump to the control node
       ansible.posix.synchronize:
         mode: pull
-        src: "{{ postgresql_export_dir }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
-        dest: "{{ postgresql_export_dest }}/{{ postgresql_component_name }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+        src: "{{ postgresql_export_dir }}/{{ postgresql_component_name }}.pgc"
+        dest: "{{ postgresql_export_dest }}/{{ postgresql_component_name }}/{{ postgresql_component_name }}.pgc"
         archive: false
         rsync_opts: "{{ (postgresql_export_rsync_opts | default([])) + ['--chmod=F600'] }}"
         use_ssh_args: true
@@ -26,8 +26,8 @@
       block:
         - name: Fetch the database dump through the Ansible connection
           ansible.builtin.fetch:
-            src: "{{ postgresql_export_dir }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
-            dest: "{{ postgresql_export_dest }}/{{ postgresql_component_name }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+            src: "{{ postgresql_export_dir }}/{{ postgresql_component_name }}.pgc"
+            dest: "{{ postgresql_export_dest }}/{{ postgresql_component_name }}/{{ postgresql_component_name }}.pgc"
             flat: true
           become: "{{ _postgresql_export_transfer_become | default(false) | bool }}"
           become_user: "{{ _postgresql_export_transfer_become_user | default(omit) }}"
@@ -42,7 +42,7 @@
 
     - name: Set permissions on the fetched database dump
       ansible.builtin.file:
-        path: "{{ postgresql_export_dest }}/{{ postgresql_component_name }}/{{ postgresql_component_name }}.{{ postgresql_export_extension }}"
+        path: "{{ postgresql_export_dest }}/{{ postgresql_component_name }}/{{ postgresql_component_name }}.pgc"
         state: file
         mode: "0600"
       delegate_to: localhost

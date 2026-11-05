@@ -1,36 +1,46 @@
 ---
 {% set _parsed_version = _operations_aap_version | ansible.aap_snapshot.parse_aap_version %}
-schema_version: "1.0"
+schema_version: "1.1"
 aap_version: "{{ _parsed_version.major_minor }}"
 aap_version_patch: "{{ _parsed_version.patch }}"
 source_topology: "{{ aap_platform }}"
-{% if groups.get('hub_groups', []) | length > 0 %}
+{% if 'hub' in _artifact_manifest_components %}
+{% if aap_platform == 'operator' %}
+{% set _ocp_hub_hostname = hostvars['localhost'].ocp_utils_hub_hostname | default(hostvars['localhost'].ocp_utils_gateway_hostname | default('', true), true) %}
+{% if _ocp_hub_hostname | length > 0 %}
+source_hub_hostname: "{{ _ocp_hub_hostname }}"
+{% endif %}
+{% else %}
 source_hub_hostname: "{{ hostvars[groups['hub_groups'][0]].ansible_host | default(groups['hub_groups'][0]) }}"
+{% endif %}
 {% endif %}
 export_timestamp: "{{ artifact_timestamp }}"
 exported_by: "ansible.aap_snapshot/{{ artifact_collection_version }}"
 
 components:
-{% if groups.get('controller_groups', []) | length > 0 %}
+{% if 'controller' in _artifact_manifest_components %}
   - name: controller
     version: "{{ _controller_version }}"
     database_name: "{{ _controller_db_name | default('awx') }}"
     has_custom_configs: {{ (aap_platform | default('rpm') == 'rpm') | lower }}
 {% endif %}
-{% if groups.get('hub_groups', []) | length > 0 %}
+{% if 'hub' in _artifact_manifest_components %}
   - name: hub
     version: "{{ _hub_version }}"
     database_name: "{{ _hub_db_name | default('automationhub') }}"
     has_custom_configs: false
     has_content_data: {{ (_automationhub_content_exported | default(false)) | lower }}
+{% if _automationhub_content_exported | default(false) %}
+    content_filename: {{ hostvars['localhost'].artifact_hub_content_filename | default('hub_content.tar') | to_json }}
 {% endif %}
-{% if groups.get('gateway_groups', []) | length > 0 %}
+{% endif %}
+{% if 'gateway' in _artifact_manifest_components %}
   - name: gateway
     version: "{{ _gateway_version }}"
     database_name: "{{ _gateway_db_name | default('gateway') }}"
     has_custom_configs: false
 {% endif %}
-{% if groups.get('eda_groups', []) | length > 0 %}
+{% if 'eda' in _artifact_manifest_components %}
   - name: eda
     version: "{{ _eda_version }}"
     database_name: "{{ _eda_db_name | default('automationedacontroller') }}"

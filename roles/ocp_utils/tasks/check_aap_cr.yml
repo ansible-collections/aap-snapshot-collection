@@ -6,6 +6,7 @@
     namespace: "{{ ocp_utils_ocp_namespace }}"
   environment: "{{ ocp_utils_ocp_environment }}"
   register: _ocp_utils_aap_cr_check
+  no_log: "{{ __ocp_utils_no_log }}"
 
 - name: Set AAP CR existence fact
   ansible.builtin.set_fact:
@@ -20,6 +21,11 @@
   when:
     - aap_instance_name is defined
     - aap_instance_name not in (_ocp_utils_aap_cr_check.resources | map(attribute='metadata.name') | list)
+
+- name: Use user-provided AAP instance name
+  ansible.builtin.set_fact:
+    ocp_utils_aap_instance_name: "{{ aap_instance_name }}"
+  when: aap_instance_name is defined
 
 - name: Fail when multiple AAP CRs found in namespace
   ansible.builtin.fail:
@@ -37,4 +43,13 @@
   when:
     - aap_instance_name is not defined
     - _ocp_utils_aap_cr_check.resources | length == 1
+
+- name: Set selected AAP CR fact
+  ansible.builtin.set_fact:
+    _ocp_utils_selected_aap_cr: >-
+      {{ _ocp_utils_aap_cr_check.resources
+         | selectattr('metadata.name', 'equalto', ocp_utils_aap_instance_name)
+         | list | first }}
+  no_log: "{{ __ocp_utils_no_log }}"
+  when: _ocp_utils_aap_cr_exists | default(false) | bool
 ...

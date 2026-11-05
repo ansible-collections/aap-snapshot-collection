@@ -1,10 +1,8 @@
 ---
 # OCP equivalent of check_storage_backend.yml - execs into the hub pod via
-# kubernetes.core.k8s_exec instead of a local podman container. Called from
-# consume.yml before the artifact is staged or AAP is idled, so a
-# not-yet-implemented S3/Azure Blob target is caught before any destructive
-# stop/restore work starts, matching the containerized path's fail-fast
-# behavior.
+# kubernetes.core.k8s_exec instead of a local podman container. Used before
+# importing or exporting Hub content so unsupported object storage fails
+# before content transfer begins.
 - name: Assert hub pod was discovered for storage backend check
   ansible.builtin.assert:
     that: _ocp_utils_hub_pod_name is defined
@@ -52,11 +50,9 @@
     msg: >-
       Hub CR '{{ _hub_cr_name }}' in namespace {{ automationhub_ocp_namespace }}
       is configured with storage backend '{{ _automationhub_storage_backend }}'.
-      Hub content import currently only supports Pulp's local FileSystem
-      storage (backed by a PVC). Importing hub content into an Azure Blob or
-      AWS S3-backed hub is not yet implemented and is tracked separately -
-      re-export the artifact with automationhub_export_hub_content=false to
-      import without hub content, or wait for object-storage import support
-      to land, before importing hub content onto this target.
+      Hub content export and import currently support Pulp's local FileSystem
+      storage (backed by a PVC). OCP artifact export cannot package content
+      from Azure Blob or AWS S3 storage. Set artifact_export_hub_content=false
+      to export without Hub content.
   when: "'filesystem' not in (_automationhub_storage_backend | lower)"
 ...

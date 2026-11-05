@@ -51,6 +51,7 @@
         name: ansible.aap_snapshot.ocp_utils
         tasks_from: get_db_credentials.yml
       vars:
+        ocp_pg_component_name: "{{ postgresql_component_name }}"
         ocp_pg_config_secret: >-
           {{ postgresql_aap_instance_name }}-{{ postgresql_component_name }}-postgres-configuration
 

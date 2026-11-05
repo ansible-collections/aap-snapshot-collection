@@ -7,6 +7,11 @@
         name: ansible.aap_snapshot.ocp_utils
         tasks_from: check_aap_cr.yml
 
+    - name: Use selected AAP instance name for preflight checks
+      ansible.builtin.set_fact:
+        preflight_aap_instance_name: "{{ ocp_utils_aap_instance_name }}"
+      when: _ocp_utils_aap_cr_exists | default(false) | bool
+
     - name: Require AAP CR to exist for import
       ansible.builtin.fail:
         msg: >-
@@ -21,12 +26,12 @@
     - name: Assert AAP is not already idled from a previous failed run
       ansible.builtin.assert:
         that:
-          - not (_ocp_utils_aap_cr_check.resources[0].spec.idle_aap | default(false) | bool)
+          - not (_ocp_utils_selected_aap_cr.spec.idle_aap | default(false) | bool)
         fail_msg: >-
-          AnsibleAutomationPlatform CR '{{ preflight_aap_instance_name }}' in namespace
+          AnsibleAutomationPlatform CR '{{ _ocp_utils_selected_aap_cr.metadata.name }}' in namespace
           '{{ preflight_ocp_namespace }}' has idle_aap: true - likely from a previous
           failed import. Restore the cluster before retrying:
-            oc patch aap/{{ preflight_aap_instance_name }} -n {{ preflight_ocp_namespace }}
+            oc patch aap/{{ _ocp_utils_selected_aap_cr.metadata.name }} -n {{ preflight_ocp_namespace }}
               --type merge -p '{"spec":{"idle_aap": false}}'
           Then wait for pods to come back:
             oc get pods -n {{ preflight_ocp_namespace }} -w
@@ -37,13 +42,13 @@
     - name: Verify AAP CR conditions are healthy
       ansible.builtin.assert:
         that:
-          - (_ocp_utils_aap_cr_check.resources[0].status | default({})).conditions | default([])
+          - (_ocp_utils_selected_aap_cr.status | default({})).conditions | default([])
             | selectattr('type', 'equalto', 'Failure')
             | selectattr('status', 'equalto', 'True')
             | list | length == 0
         fail_msg: >-
           AAP CR has failure conditions:
-          {{ (_ocp_utils_aap_cr_check.resources[0].status | default({})).conditions | default([])
+          {{ (_ocp_utils_selected_aap_cr.status | default({})).conditions | default([])
              | selectattr('type', 'equalto', 'Failure')
              | selectattr('status', 'equalto', 'True')
              | map(attribute='message') | list | join(', ') }}

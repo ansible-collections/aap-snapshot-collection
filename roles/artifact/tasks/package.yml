@@ -1,4 +1,35 @@
 ---
+- name: Export source AAP CR reference (OCP)
+  ansible.builtin.include_tasks: export_ocp_cr.yml
+  when: aap_platform == 'operator'
+
+- name: Verify AAP version is available for the artifact manifest
+  ansible.builtin.assert:
+    that:
+      - _operations_aap_version is defined
+      - _operations_aap_version | string | length > 0
+    fail_msg: >-
+      The source AAP version was not discovered. Confirm the component export
+      play completed successfully before packaging the artifact.
+  when: aap_platform == 'operator'
+
+- name: Set component list for the artifact manifest
+  ansible.builtin.set_fact:
+    _artifact_manifest_components: >-
+      {{ _artifact_export_components
+         if aap_platform == 'operator'
+         else (
+           [
+             {'name': 'controller', 'enabled': groups.get('controller_groups', []) | length > 0},
+             {'name': 'eda', 'enabled': groups.get('eda_groups', []) | length > 0},
+             {'name': 'gateway', 'enabled': groups.get('gateway_groups', []) | length > 0},
+             {'name': 'hub', 'enabled': groups.get('hub_groups', []) | length > 0}
+           ]
+           | selectattr('enabled')
+           | map(attribute='name')
+           | list
+         ) }}
+
 - name: Create manifest.yml
   ansible.builtin.template:
     dest: '{{ __artifact_build_dir }}/manifest.yml'
@@ -15,17 +46,30 @@
     mode: '0600'
   no_log: "{{ __artifact_no_log }}"
 
+- name: Select hosts used to collect artifact checksums
+  ansible.builtin.set_fact:
+    _artifact_checksum_hosts: >-
+      {{ [hostvars['localhost']]
+         if aap_platform == 'operator'
+         else groups['all'] | map('extract', hostvars) | list }}
+  run_once: true
+
 - name: Collect database checksums from all hosts
   ansible.builtin.set_fact:
     _artifact_all_checksums: >-
-      {{ (groups['all'] | map('extract', hostvars)
+      {{ (_artifact_checksum_hosts
           | selectattr('_postgresql_db_checksum', 'defined')
           | map(attribute='_postgresql_db_checksum')
           | list
           +
-          groups['all'] | map('extract', hostvars)
+          _artifact_checksum_hosts
           | selectattr('_automationhub_db_checksum', 'defined')
           | map(attribute='_automationhub_db_checksum')
+          | list
+          +
+          _artifact_checksum_hosts
+          | selectattr('_artifact_aap_cr_checksum', 'defined')
+          | map(attribute='_artifact_aap_cr_checksum')
           | list)
          | map('trim') | select | list }}
   run_once: true
