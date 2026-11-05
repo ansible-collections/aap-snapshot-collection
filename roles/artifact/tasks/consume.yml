@@ -156,7 +156,7 @@
         - groups.get('hub_groups', []) | length > 0
         - inventory_hostname == groups['hub_groups'][0]
 
-    # Runs on first hub node 
+    # Runs on first hub node
     # Pulp content storage is shared.
     - name: Restore hub content
       ansible.builtin.include_role:
