@@ -1,7 +1,7 @@
 ---
 # Transfers the hub content tarball from the control node (where the
 # artifact was already extracted) to the first host in hub_groups, as
-# Pulp's FileSystem storage is shared across all nodes.  
+# Pulp's FileSystem storage is shared across all nodes.
 - name: Transfer hub content tarball if this host needs it
   when:
     - groups.get('hub_groups', []) | length > 0
