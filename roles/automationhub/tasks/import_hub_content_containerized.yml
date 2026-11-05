@@ -3,7 +3,7 @@
 # hub content tarball - staged to this host by
 # artifact/tasks/transfer_hub_content.yml - into this host's own Pulp
 # FileSystem media directory. Runs on the first hub host: each node has the
-# same shared storage mounted.  
+# same shared storage mounted.
 #
 # By the time this runs, roles/automationhub/tasks/check_storage_backend.yml
 # has already confirmed (or failed the run) that this hub is FileSystem-backed
