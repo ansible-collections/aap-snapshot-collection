@@ -1,15 +1,11 @@
 ---
 # Transfers the hub content tarball from the control node (where the
-# artifact was already extracted) to EVERY host in hub_groups - unlike
-# transfer.yml's per-component DB dump (which only needs to land on the
-# first host of its group, for the host doing the DB restore), Pulp's
-# FileSystem storage is per-node, so every hub node needs its own copy of
-# the content to serve downloads regardless of which node a request is
-# routed to.
+# artifact was already extracted) to the first host in hub_groups, as
+# Pulp's FileSystem storage is shared across all nodes.
 - name: Transfer hub content tarball if this host needs it
   when:
     - groups.get('hub_groups', []) | length > 0
-    - inventory_hostname in groups['hub_groups']
+    - inventory_hostname == groups['hub_groups'][0]
   block:
     # The artifact manifest records the filename chosen by the exporting
     # deployment. Version 1.0 artifacts use the historical default.

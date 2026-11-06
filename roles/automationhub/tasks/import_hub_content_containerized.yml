@@ -2,9 +2,8 @@
 # Containerized equivalent of import_hub_content.yml (OCP). Extracts the
 # hub content tarball - staged to this host by
 # artifact/tasks/transfer_hub_content.yml - into this host's own Pulp
-# FileSystem media directory. Runs on every hub host: each node has its
-# own independent storage, unlike OCP's single shared PVC, so every node
-# needs its own copy restored to serve downloads correctly.
+# FileSystem media directory. Runs on the first hub host: each node has the
+# same shared storage mounted.
 #
 # By the time this runs, roles/automationhub/tasks/check_storage_backend.yml
 # has already confirmed (or failed the run) that this hub is FileSystem-backed
@@ -14,7 +13,6 @@
     - aap_platform == 'containerized'
     - automationhub_import_hub_content | default(true) | bool
     - artifact_hub_has_content_data | default(false) | bool
-    - inventory_hostname in groups.get('hub_groups', [])
   block:
     - name: Check if hub content tarball was staged on this host
       ansible.builtin.stat:
