@@ -30,6 +30,7 @@
         name: '{{ postgresql_container_name }}'
         command: "{{ postgresql_django_manage_cmd }} shell {{ _operations_manage_shell_args | default('') }} -c '{{ postgresql_django_manage_get_cmd }}'"
       changed_when: false
+      no_log: "{{ __postgresql_no_log }}"
       register: _postgresql_dump_result
 
     - name: Set db settings
@@ -52,19 +53,10 @@
         tasks_from: get_db_credentials.yml
       vars:
         ocp_pg_component_name: "{{ postgresql_component_name }}"
-        ocp_pg_config_secret: >-
-          {{ postgresql_aap_instance_name }}-{{ postgresql_component_name }}-postgres-configuration
 
     - name: Set db settings from OCP secret
       ansible.builtin.set_fact:
-        postgresql_auth_settings:
-          default:
-            HOST: "{{ _ocp_utils_db_host }}"
-            PORT: "{{ _ocp_utils_db_port }}"
-            NAME: "{{ _ocp_utils_db_name }}"
-            USER: "{{ _ocp_utils_db_user }}"
-            PASSWORD: "{{ _ocp_utils_db_password }}"
-            OPTIONS: {}
+        postgresql_auth_settings: "{{ _ocp_utils_db_settings }}"
       no_log: "{{ __postgresql_no_log }}"
 
 - name: Set database name fact for manifest
@@ -89,14 +81,19 @@
   no_log: "{{ __postgresql_no_log }}"
   when: _operations_component_secrets is defined
 
-- name: Set PostgreSQL environment for cert auth
+- name: Apply component CA path inside OCP client pod
   ansible.builtin.set_fact:
-    postgresql_pg_dump_env:
-      PGSSLCERT: "{{ postgresql_auth_settings.default.OPTIONS.sslcert }}"
-      PGSSLKEY: "{{ postgresql_auth_settings.default.OPTIONS.sslkey }}"
-      PGSSLROOTCERT: "{{ postgresql_auth_settings.default.OPTIONS.sslrootcert }}"
+    postgresql_auth_settings: >-
+      {{ {'default': postgresql_auth_settings.default | combine({
+           'OPTIONS': postgresql_auth_settings.default.OPTIONS | combine({
+             'sslrootcert': '/etc/aap-snapshot-ca/' ~ postgresql_component_name ~ '/ca.crt'}) })} }}
   no_log: "{{ __postgresql_no_log }}"
   when:
-    - postgresql_auth_settings.default.OPTIONS.sslcert is defined
-    - postgresql_auth_settings.default.OPTIONS.sslkey is defined
+    - aap_platform == 'operator'
+    - postgresql_component_name in (postgresql_ocp_ssl_rootcert_secrets | default({}))
+
+- name: Reset PostgreSQL TLS environment for this component
+  ansible.builtin.set_fact:
+    postgresql_pg_dump_env: "{{ postgresql_auth_settings.default.OPTIONS | default({}) | ansible.aap_snapshot.postgresql_ssl_environment }}"
+  no_log: "{{ __postgresql_no_log }}"
 ...

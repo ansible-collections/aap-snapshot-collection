@@ -77,14 +77,17 @@ see [artifact-format.md](artifact-format.md).
 - Validates artifact structure and checksums
 - Loads `manifest.yml` and `secrets.yml` into variables
 
-### Phase 3: Quiesce Target (OCP)
+### Phase 3: Prepare and Validate Target (OCP)
 
-When `aap_platform: operator`:
+When `aap_platform: operator`, the target AAP deployment must already exist.
+The collection resolves and caches each component's database configuration
+Secret from the selected AAP CR's resolved status, effective component CR, or
+conventional-name fallback. It stages the artifact in a temporary PostgreSQL
+client pod and validates connectivity, TLS, versions, extensions, object
+ownership, and schema writability from that pod before downtime.
 
-1. **Idle AAP** - sets `spec.idle: true` on the AnsibleAutomationPlatform CR
-   to pause operator reconciliation
-2. **Scale operators to zero** - scales gateway and controller operator
-   deployments to 0 replicas
+After every database passes, it scales Lightspeed/MCP workloads down, sets
+`spec.idle_aap: true`, and scales gateway/controller operators to zero.
 
 ### Phase 3: Quiesce Target (Containerized)
 
@@ -92,11 +95,11 @@ When `aap_platform: containerized`:
 
 - Stops services in order: PCP monitoring, EDA, Hub, Controller, Gateway
 
-### Phase 4: Prepare Migration Resources (OCP only)
+### Temporary Migration Resources (OCP only)
 
-- Creates a temporary PVC (`aap-snapshot-temp`, 60Gi default)
-- Creates a temporary PostgreSQL deployment with the PVC mounted
-- Transfers the artifact to the temporary pod
+Before downtime, the collection creates a temporary PVC (`aap-snapshot-temp`,
+60Gi default), starts a PostgreSQL client deployment, mounts optional CA
+Secrets read-only, and transfers the artifact to the pod.
 
 ### Phase 5: Import Databases and Secrets
 
@@ -104,9 +107,12 @@ For each component listed in the artifact manifest:
 
 1. **Extract DB credentials** from the target platform (OCP Secret or
    containerized config)
-2. **Restore database** using `pg_restore --clean --if-exists` with the
-   admin user. Uses `block/always` to guarantee `CREATEDB` privilege is
-   revoked after restore regardless of success/failure
+2. **Restore database** into the existing target database as its configured
+   component user, using `--clean --if-exists --no-owner --no-acl` without
+   `--create`. OCP uses a filtered table of contents to preserve provisioned
+   extensions and their schemas. No database admin password or temporary
+   `CREATEDB` grant is required. Genuine SQL or execution failures abort import;
+   only fully identified inherited-partition constraint cleanup errors are allowed
 3. **Update secrets** on the target:
    - OCP: patches Kubernetes Secrets with artifact values
    - Containerized: creates/updates podman secrets
@@ -121,7 +127,7 @@ restored database.
 - OCP: all imports run on `localhost` using `kubernetes.core.k8s_exec`
   against the temporary PostgreSQL pod
 - Containerized: imports run on each component host using
-  `community.postgresql` modules
+  a temporary PostgreSQL client container
 
 ### Phase 6: Cleanup and Resume
 

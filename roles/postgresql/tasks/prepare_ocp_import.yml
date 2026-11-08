@@ -1,0 +1,38 @@
+---
+# Resolve every target before creating the client pod or changing AAP state.
+- name: Reset OCP import database caches
+  ansible.builtin.set_fact:
+    _postgresql_ocp_connections: {}
+    _postgresql_ocp_restore_lists: {}
+  no_log: "{{ __postgresql_no_log }}"
+
+- name: Resolve target component connections before downtime
+  ansible.builtin.include_role:
+    name: ansible.aap_snapshot.ocp_utils
+    tasks_from: get_db_credentials.yml
+  vars:
+    ocp_pg_component_name: "{{ postgresql_import_component }}"
+  loop: "{{ _artifact_import_components }}"
+  loop_control:
+    loop_var: postgresql_import_component
+    label: "{{ postgresql_import_component }}"
+
+- name: Validate CA Secret references
+  ansible.builtin.set_fact:
+    _postgresql_ca_resources: "{{ postgresql_ocp_ssl_rootcert_secrets | ansible.aap_snapshot.postgresql_ca_mounts }}"
+
+- name: Read optional component CA Secrets before creating client pod
+  kubernetes.core.k8s_info:
+    kind: Secret
+    namespace: "{{ postgresql_ocp_namespace }}"
+    name: "{{ item.value.name }}"
+  environment: "{{ postgresql_ocp_environment }}"
+  register: _postgresql_ca_secrets
+  loop: "{{ postgresql_ocp_ssl_rootcert_secrets | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  no_log: "{{ __postgresql_no_log }}"
+  failed_when: >-
+    _postgresql_ca_secrets.resources | length != 1
+    or (item.value.key | default('ca.crt')) not in (_postgresql_ca_secrets.resources[0].data | default({}))
+...
