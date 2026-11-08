@@ -1,0 +1,18 @@
+---
+- name: Resolve per-component CA mounts
+  ansible.builtin.set_fact:
+    _snapshot_ca_mounts: "{{ postgresql_ocp_ssl_rootcert_secrets | default({}) | ansible.aap_snapshot.postgresql_ca_mounts }}"
+
+- name: Configure migration pod CA volumes
+  ansible.builtin.set_fact:
+    ocp_utils_temp_extra_volumes: "{{ _snapshot_ca_mounts.volumes + (postgresql_ocp_ssl_extra_volumes | default([])) }}"
+    ocp_utils_temp_extra_volume_mounts: "{{ _snapshot_ca_mounts.mounts + (postgresql_ocp_ssl_extra_mounts | default([])) }}"
+
+- name: Create session-specific migration resources
+  ansible.builtin.include_tasks: create_temp_resources.yml
+
+- name: Stage matching artifact for explicit finalization
+  ansible.builtin.include_tasks: transfer_artifact.yml
+  vars:
+    artifact_path: "{{ artifact_file }}"
+...

@@ -1,0 +1,34 @@
+---
+- name: Read every held resource
+  kubernetes.core.k8s_info:
+    api_version: "{{ item.apiVersion }}"
+    kind: "{{ item.kind }}"
+    name: "{{ item.name }}"
+    namespace: "{{ item.namespace }}"
+  loop: "{{ _snapshot_record.recovery }}"
+  loop_control:
+    label: "{{ item.kind }}/{{ item.name }}"
+  register: _snapshot_held_resources
+  no_log: "{{ __ocp_utils_no_log }}"
+
+- name: Verify persistent idle and replica holds
+  ansible.builtin.assert:
+    that:
+      - item.resources | length == 1
+      - item.resources[0].metadata.uid == item.item.uid
+      - item.resources[0].spec | combine(item.item.held, recursive=true) == item.resources[0].spec
+    fail_msg: "Target hold was changed: {{ item.item.kind }}/{{ item.item.name }}. Reapply prepare before continuing."
+  loop: "{{ _snapshot_held_resources.results }}"
+  loop_control:
+    label: "{{ item.item.kind }}/{{ item.item.name }}"
+
+- name: Gather target ReplicaSets for pod ownership
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: ReplicaSet
+    namespace: "{{ ocp_utils_ocp_namespace }}"
+  register: _snapshot_replicasets
+
+- name: Wait for application writers and unfinished migration jobs to drain
+  ansible.builtin.include_tasks: manual_drain.yml
+...

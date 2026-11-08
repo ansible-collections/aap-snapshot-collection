@@ -1,6 +1,6 @@
 ---
 {% set _parsed_version = _operations_aap_version | ansible.aap_snapshot.parse_aap_version %}
-schema_version: "1.1"
+schema_version: "{{ '1.2' if postgres_skip_data | default(false) | bool else '1.1' }}"
 aap_version: "{{ _parsed_version.major_minor }}"
 aap_version_patch: "{{ _parsed_version.patch }}"
 source_topology: "{{ aap_platform }}"
@@ -20,12 +20,20 @@ exported_by: "ansible.aap_snapshot/{{ artifact_collection_version }}"
 components:
 {% if 'controller' in _artifact_manifest_components %}
   - name: controller
+{% if postgres_skip_data | default(false) | bool %}
+    has_database_dump: false
+    database_metadata: {{ (_snapshot_database_metadata | default({})).get('controller', {}) | to_json }}
+{% endif %}
     version: "{{ _controller_version }}"
     database_name: "{{ _controller_db_name | default('awx') }}"
     has_custom_configs: {{ (aap_platform | default('rpm') == 'rpm') | lower }}
 {% endif %}
 {% if 'hub' in _artifact_manifest_components %}
   - name: hub
+{% if postgres_skip_data | default(false) | bool %}
+    has_database_dump: false
+    database_metadata: {{ (_snapshot_database_metadata | default({})).get('hub', {}) | to_json }}
+{% endif %}
     version: "{{ _hub_version }}"
     database_name: "{{ _hub_db_name | default('automationhub') }}"
     has_custom_configs: false
@@ -36,12 +44,20 @@ components:
 {% endif %}
 {% if 'gateway' in _artifact_manifest_components %}
   - name: gateway
+{% if postgres_skip_data | default(false) | bool %}
+    has_database_dump: false
+    database_metadata: {{ (_snapshot_database_metadata | default({})).get('gateway', {}) | to_json }}
+{% endif %}
     version: "{{ _gateway_version }}"
     database_name: "{{ _gateway_db_name | default('gateway') }}"
     has_custom_configs: false
 {% endif %}
 {% if 'eda' in _artifact_manifest_components %}
   - name: eda
+{% if postgres_skip_data | default(false) | bool %}
+    has_database_dump: false
+    database_metadata: {{ (_snapshot_database_metadata | default({})).get('eda', {}) | to_json }}
+{% endif %}
     version: "{{ _eda_version }}"
     database_name: "{{ _eda_db_name | default('automationedacontroller') }}"
     has_custom_configs: false

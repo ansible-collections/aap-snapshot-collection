@@ -1,0 +1,36 @@
+---
+- name: Read RPM source database metadata
+  become: true
+  become_user: "{{ postgresql_django_manage_user }}"
+  block:
+    - name: Discover source connection settings
+      ansible.builtin.include_tasks: db_auth.yml
+
+    - name: Query source metadata in a bounded read-only transaction
+      community.postgresql.postgresql_query:
+        login_db: "{{ postgresql_auth_settings.default.NAME }}"
+        login_host: "{{ postgresql_auth_settings.default.HOST }}"
+        login_port: "{{ postgresql_auth_settings.default.PORT }}"
+        login_user: "{{ postgresql_auth_settings.default.USER }}"
+        login_password: "{{ postgresql_auth_settings.default.PASSWORD | default(omit) }}"
+        ssl_mode: "{{ postgresql_auth_settings.default.OPTIONS.sslmode | default('prefer') }}"
+        ca_cert: "{{ postgresql_auth_settings.default.OPTIONS.sslrootcert | default(omit) }}"
+        ssl_cert: "{{ postgresql_auth_settings.default.OPTIONS.sslcert | default(omit) }}"
+        ssl_key: "{{ postgresql_auth_settings.default.OPTIONS.sslkey | default(omit) }}"
+        connect_params:
+          connect_timeout: 10
+          options: '-c statement_timeout=10000 -c default_transaction_read_only=on'
+        query: "{{ lookup('ansible.builtin.file', role_path ~ '/files/migration_metadata.sql') }}"
+      register: _snapshot_source_metadata
+      no_log: "{{ __postgresql_no_log }}"
+
+    - name: Retain non-secret source metadata for manifest
+      ansible.builtin.set_fact:
+        _snapshot_database_metadata: >-
+          {{ hostvars['localhost']._snapshot_database_metadata | default({})
+             | combine({postgresql_component_name: _snapshot_source_metadata.query_result[0].metadata}) }}
+        "_{{ postgresql_component_name }}_db_name": "{{ postgresql_auth_settings.default.NAME }}"
+        _postgresql_version: "{{ (_snapshot_source_metadata.query_result[0].metadata.version | int // 10000) | string }}"
+      delegate_to: localhost
+      delegate_facts: true
+...

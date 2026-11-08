@@ -1,0 +1,153 @@
+---
+# Deliberately separate from automatic import's resume-on-error recovery.
+- name: Select target AAP CR without requiring application pods
+  ansible.builtin.include_tasks: check_aap_cr.yml
+
+- name: Require target CR and supported source artifact
+  ansible.builtin.assert:
+    that:
+      - _ocp_utils_aap_cr_exists | bool
+      - artifact_manifest.source_topology == 'rpm'
+      - artifact_manifest.aap_version == '2.6'
+      - artifact_manifest.components | length > 0
+    fail_msg: 'DBA migration currently supports RPM AAP 2.6 to an existing OCP AAP 2.6 target.'
+
+- name: Check target operator version without application pods
+  ansible.builtin.include_role:
+    name: ansible.aap_snapshot.preflight
+    tasks_from: check_version_match.yml
+
+- name: Require supported target version on every invocation
+  ansible.builtin.assert:
+    that:
+      - _preflight_target_aap_version | default('') == '2.6'
+    fail_msg: 'DBA-managed migration requires a discoverable AAP 2.6 operator on every phase invocation.'
+
+- name: Calculate artifact binding
+  ansible.builtin.stat:
+    path: "{{ artifact_file }}"
+    checksum_algorithm: sha256
+  register: _snapshot_artifact_stat
+
+- name: Set migration identifiers
+  ansible.builtin.set_fact:
+    _artifact_import_components: "{{ artifact_manifest.components | map(attribute='name') | list | sort }}"
+    _snapshot_record_name: "{{ ocp_utils_aap_instance_name[:40] }}-snapshot-migration"
+    _snapshot_session_name: "aap-migrate-{{ _ocp_utils_selected_aap_cr.metadata.uid[:8] }}-{{ _snapshot_artifact_stat.stat.checksum[:10] }}"
+    _snapshot_namespace: "{{ ocp_utils_ocp_namespace }}"
+
+- name: Read durable migration record
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: ConfigMap
+    namespace: "{{ ocp_utils_ocp_namespace }}"
+    name: "{{ _snapshot_record_name }}"
+  register: _snapshot_record_info
+
+- name: Load recovery state
+  ansible.builtin.set_fact:
+    _snapshot_record: "{{ (_snapshot_record_info.resources[0].data.record | from_json) if _snapshot_record_info.resources | length > 0 else {} }}"
+
+- name: Require matching target artifact and included components
+  ansible.builtin.assert:
+    that:
+      - _snapshot_record | ansible.aap_snapshot.snapshot_manual_record(_ocp_utils_selected_aap_cr.metadata.uid,
+          _snapshot_artifact_stat.stat.checksum, _artifact_import_components, artifact_import_phase)
+      - artifact_import_phase != 'finalize' or artifact_db_restore_confirmed | default(false) | bool
+    fail_msg: 'Finalization requires artifact_db_restore_confirmed=true for every included database.'
+
+- name: Prepare new durable migration record before downtime
+  ansible.builtin.include_tasks: manual_prepare.yml
+  when: _snapshot_record | length == 0
+
+- name: Resolve session resource names
+  ansible.builtin.set_fact:
+    ocp_utils_temp_deployment_name: "{{ _snapshot_record.temp_deployment }}"
+    ocp_utils_temp_pvc_name: "{{ _snapshot_record.temp_pvc }}"
+    _hub_cr_name: "{{ _snapshot_record.component_names.hub | default('') }}"
+    _controller_cr_name: "{{ _snapshot_record.component_names.controller | default('') }}"
+    _eda_cr_name: "{{ _snapshot_record.component_names.eda | default('') }}"
+    artifact_hub_has_content_data: "{{ _snapshot_record.hub_content | bool }}"
+
+- name: Freeze phase execution decision before completion changes the record
+  ansible.builtin.set_fact:
+    _snapshot_run_phase: "{{ _snapshot_record.phase != 'complete' }}"
+
+- name: Run durable migration phase
+  when: _snapshot_run_phase | bool
+  block:
+    - name: Stage artifact during preparation
+      ansible.builtin.include_tasks: manual_stage.yml
+      when: artifact_import_phase == 'prepare'
+
+    - name: Resolve target application settings during preparation
+      ansible.builtin.include_tasks: manual_read_connection.yml
+      loop: "{{ _snapshot_record.components }}"
+      loop_control:
+        loop_var: snapshot_component
+        label: "{{ snapshot_component }}"
+      when: artifact_import_phase == 'prepare'
+
+    - name: Hold applications during preparation or interrupted finalization
+      ansible.builtin.include_tasks: manual_hold.yml
+      when:
+        - artifact_import_phase == 'prepare' or _snapshot_record.phase == 'finalizing'
+
+    - name: Discover additional target workloads during the handoff
+      ansible.builtin.include_tasks: manual_refresh_holds.yml
+
+    - name: Verify target remains held and drained
+      ansible.builtin.include_tasks: manual_check_held.yml
+
+    - name: Persist prepared phase
+      ansible.builtin.include_tasks: manual_save.yml
+      vars:
+        _snapshot_record_updates:
+          phase: prepared
+      when: artifact_import_phase == 'prepare'
+
+    - name: Check every restored application database
+      ansible.builtin.include_tasks: manual_validate.yml
+      when: artifact_import_phase in ['validate', 'finalize']
+
+    - name: Finalize confirmed database migration
+      ansible.builtin.include_tasks: manual_finalize.yml
+      when: artifact_import_phase == 'finalize'
+
+  rescue:
+    - name: Return target to its held state
+      ansible.builtin.include_tasks: manual_hold.yml
+
+    - name: Invalidate previous readiness results after failure
+      ansible.builtin.include_tasks: manual_save.yml
+      vars:
+        _snapshot_record_updates:
+          validation_passed: false
+
+    - name: Report held migration failure
+      ansible.builtin.fail:
+        msg: >-
+          DBA migration phase failed at {{ ansible_failed_task.name | default('unknown') }}.
+          Target remains held. Correct the reported prerequisite and rerun the same phase.
+          Do not resume workloads manually after target database writes.
+
+- name: Report DBA migration phase
+  ansible.builtin.debug:
+    msg: >-
+      DBA phase {{ artifact_import_phase }}: {{ _snapshot_record.phase }}.
+      Recovery ConfigMap: {{ ocp_utils_ocp_namespace }}/{{ _snapshot_record_name }}.
+      No database dump or restore command was executed.
+      Run artifact_import_phase=validate whenever the DBA is ready; then run
+      artifact_import_phase=finalize with artifact_db_restore_confirmed=true.
+      Validation checks readiness, not data completeness or restore completion.
+
+- name: Show repeatable DBA handoff commands
+  ansible.builtin.debug:
+    msg: |-
+      Use the same inventory and shared variables file for every invocation.
+      Example commands (replace target.ini and manual-import.yml with your paths):
+      ansible-playbook -i target.ini playbooks/artifact_import.yaml -e @manual-import.yml -e artifact_import_phase=validate
+      ansible-playbook -i target.ini playbooks/artifact_import.yaml -e @manual-import.yml -e artifact_import_phase=finalize -e artifact_db_restore_confirmed=true
+      Preparation has exited. There is no restore wait, expiry, or automatic restart.
+  when: _snapshot_record.phase != 'complete'
+...

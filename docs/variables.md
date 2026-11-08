@@ -182,3 +182,17 @@ Post-import reconciliation settings.
 |----------|---------|-------------|
 | `eda_container_name` | `automation-eda-api` | EDA container name for manage commands |
 | `eda_manage_cmd` | `aap-eda-manage` | Django manage command for EDA |
+
+## DBA-managed database migration
+
+See [the DBA-managed migration guide](dba-managed-database-migration.md) for the
+supported RPM 2.6 to OCP 2.6 workflow and complete variable files.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `postgres_skip_data` | `false` | Delegate all database dump/restore work to the DBA. |
+| `artifact_import_phase` | `all` | Manual mode requires `prepare`, `validate`, or `finalize`. |
+| `artifact_source_quiesced` | `false` | Required RPM source writer shutdown confirmation. |
+| `artifact_db_restore_confirmed` | `false` | Required explicit DBA confirmation for finalization. |
+| `postgresql_ocp_ssl_options` | `{}` | Component-keyed libpq TLS option overrides for manual validation. |
+| `postgresql_ocp_ssl_rootcert_secrets` | `{}` | Component-keyed namespace-local CA Secret references (`name`, `key`). |

@@ -33,6 +33,14 @@
   ansible.builtin.set_fact:
     artifact_manifest: "{{ _artifact_manifest_raw.content | b64decode | from_yaml }}"
 
+- name: Reject automatic restore of intentionally omitted database dumps
+  ansible.builtin.assert:
+    that:
+      - postgres_skip_data | default(false) | bool or
+          artifact_manifest.components | selectattr('has_database_dump', 'defined')
+          | selectattr('has_database_dump', 'equalto', false) | list | length == 0
+    fail_msg: 'Artifact omits database dumps. Use postgres_skip_data=true with explicit prepare, validate and finalize phases.'
+
 - name: Set artifact Hub content filename fact
   ansible.builtin.set_fact:
     artifact_hub_content_filename: >-

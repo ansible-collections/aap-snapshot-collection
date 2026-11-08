@@ -1,0 +1,30 @@
+---
+- name: Read recovery resource identity
+  kubernetes.core.k8s_info:
+    api_version: "{{ snapshot_resource.apiVersion }}"
+    kind: "{{ snapshot_resource.kind }}"
+    name: "{{ snapshot_resource.name }}"
+    namespace: "{{ snapshot_resource.namespace }}"
+  register: _snapshot_patch_resource
+  no_log: "{{ __ocp_utils_no_log }}"
+
+- name: Reject replaced recovery resources
+  ansible.builtin.assert:
+    that:
+      - _snapshot_patch_resource.resources | length == 1
+      - _snapshot_patch_resource.resources[0].metadata.uid == snapshot_resource.uid
+    fail_msg: "Recovery resource changed: {{ snapshot_resource.kind }}/{{ snapshot_resource.name }}. Retain the record and investigate."
+
+- name: Patch only captured idle or replica settings
+  kubernetes.core.k8s:
+    state: patched
+    merge_type: merge
+    definition:
+      apiVersion: "{{ snapshot_resource.apiVersion }}"
+      kind: "{{ snapshot_resource.kind }}"
+      metadata:
+        name: "{{ snapshot_resource.name }}"
+        namespace: "{{ snapshot_resource.namespace }}"
+        uid: "{{ snapshot_resource.uid }}"
+      spec: "{{ _snapshot_patch_spec }}"
+...

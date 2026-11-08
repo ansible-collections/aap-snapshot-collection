@@ -1,0 +1,12 @@
+---
+# Reverse order stops auxiliary operators before their applications, then
+# applies child idle controls and finally the parent idle flag.
+- name: Apply persisted workload holds
+  ansible.builtin.include_tasks: manual_patch.yml
+  vars:
+    _snapshot_patch_spec: "{{ snapshot_resource.held }}"
+  loop: "{{ _snapshot_record.recovery | reverse | list }}"
+  loop_control:
+    loop_var: snapshot_resource
+    label: "{{ snapshot_resource.kind }}/{{ snapshot_resource.name }}"
+...

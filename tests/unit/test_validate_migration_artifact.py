@@ -214,3 +214,79 @@ class TestBuildReport:
         report = validate_mod._build_report(manifest, results, False, True, False, ["hub.pgc not found"])
         assert "INVALID" in report
         assert "hub.pgc not found" in report
+
+
+class ModuleResult(Exception):
+    def __init__(self, result):
+        self.result = result
+
+
+def run_validation(monkeypatch, path):
+    class Module:
+        params = {'artifact_dir': path, 'supported_schema_versions': ['1.0', '1.1', '1.2'], 'target_aap_version': None}
+
+        def exit_json(self, **result):
+            raise ModuleResult(result)
+
+        def fail_json(self, **result):
+            raise ModuleResult(result)
+
+    monkeypatch.setattr(validate_mod, 'AnsibleModule', lambda **kwargs: Module())
+    with pytest.raises(ModuleResult) as result:
+        validate_mod.main()
+    return result.value.result
+
+
+def make_manual_artifact(path):
+    with open(os.path.join(path, 'manifest.yml')) as stream:
+        manifest = yaml.safe_load(stream)
+    manifest['schema_version'] = '1.2'
+    for comp in manifest['components']:
+        comp['has_database_dump'] = False
+        comp['has_content_data'] = False
+        os.remove(os.path.join(path, comp['name'], comp['name'] + '.pgc'))
+    os.remove(os.path.join(path, 'hub', 'hub_content.tar'))
+    with open(os.path.join(path, 'manifest.yml'), 'w') as stream:
+        yaml.safe_dump(manifest, stream)
+    lines = []
+    for name in ['manifest.yml', 'secrets.yml']:
+        with open(os.path.join(path, name), 'rb') as stream:
+            lines.append(hashlib.sha256(stream.read()).hexdigest() + '  ' + name)
+    with open(os.path.join(path, 'sha256sum.txt'), 'w') as stream:
+        stream.write('\n'.join(lines) + '\n')
+    return manifest
+
+
+def test_omitted_dumps_with_no_media_are_valid(monkeypatch, artifact_dir):
+    make_manual_artifact(artifact_dir)
+    result = run_validation(monkeypatch, artifact_dir)
+    assert result['valid'], result['errors']
+    assert 'DBA' in result['report']
+
+
+def test_omission_requires_new_schema(monkeypatch, artifact_dir):
+    manifest = make_manual_artifact(artifact_dir)
+    manifest['schema_version'] = '1.1'
+    with open(os.path.join(artifact_dir, 'manifest.yml'), 'w') as stream:
+        yaml.safe_dump(manifest, stream)
+    assert not run_validation(monkeypatch, artifact_dir)['valid']
+
+
+def test_missing_legacy_dump_remains_invalid(monkeypatch, artifact_dir):
+    os.remove(os.path.join(artifact_dir, 'controller', 'controller.pgc'))
+    assert not run_validation(monkeypatch, artifact_dir)['valid']
+
+
+def test_omitted_artifact_requires_every_payload_checksum(monkeypatch, artifact_dir):
+    make_manual_artifact(artifact_dir)
+    with open(os.path.join(artifact_dir, 'sha256sum.txt'), 'w') as stream:
+        stream.write('')
+    result = run_validation(monkeypatch, artifact_dir)
+    assert not result['valid']
+    assert any('checksum' in error.lower() for error in result['errors'])
+
+
+def test_legacy_dump_must_be_checksummed(monkeypatch, artifact_dir):
+    with open(os.path.join(artifact_dir, 'sha256sum.txt'), 'w') as stream:
+        stream.write('')
+    assert not run_validation(monkeypatch, artifact_dir)['valid']

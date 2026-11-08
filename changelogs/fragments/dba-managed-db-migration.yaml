@@ -1,0 +1,5 @@
+---
+minor_changes:
+  - Add explicit DBA-managed RPM AAP 2.6 to OCP AAP 2.6 migration phases with omitted database dumps, durable target holds, bounded read-only validation, and confirmed finalization.
+  - Checksum all artifact payloads and require explicit schema 1.2 omission metadata for database-free artifacts while retaining legacy dump requirements.
+...

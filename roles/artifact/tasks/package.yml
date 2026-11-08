@@ -30,6 +30,13 @@
            | list
          ) }}
 
+- name: Require supported DBA export version
+  ansible.builtin.assert:
+    that:
+      - (_operations_aap_version | ansible.aap_snapshot.parse_aap_version).major_minor == '2.6'
+    fail_msg: 'DBA-managed migration currently supports RPM AAP 2.6 to OCP AAP 2.6 only.'
+  when: postgres_skip_data | default(false) | bool
+
 - name: Create manifest.yml
   ansible.builtin.template:
     dest: '{{ __artifact_build_dir }}/manifest.yml'
@@ -46,37 +53,33 @@
     mode: '0600'
   no_log: "{{ __artifact_no_log }}"
 
-- name: Select hosts used to collect artifact checksums
-  ansible.builtin.set_fact:
-    _artifact_checksum_hosts: >-
-      {{ [hostvars['localhost']]
-         if aap_platform == 'operator'
-         else groups['all'] | map('extract', hostvars) | list }}
-  run_once: true
+# Include manifest, secrets and configuration as well as dumps and media.
+- name: Discover artifact payload files
+  ansible.builtin.find:
+    paths: "{{ __artifact_build_dir }}"
+    recurse: true
+    hidden: true
+    file_type: file
+    get_checksum: true
+    checksum_algorithm: sha256
+  register: _artifact_payload_files
 
-- name: Collect database checksums from all hosts
+- name: Initialize payload checksum list
   ansible.builtin.set_fact:
-    _artifact_all_checksums: >-
-      {{ (_artifact_checksum_hosts
-          | selectattr('_postgresql_db_checksum', 'defined')
-          | map(attribute='_postgresql_db_checksum')
-          | list
-          +
-          _artifact_checksum_hosts
-          | selectattr('_automationhub_db_checksum', 'defined')
-          | map(attribute='_automationhub_db_checksum')
-          | list
-          +
-          _artifact_checksum_hosts
-          | selectattr('_artifact_aap_cr_checksum', 'defined')
-          | map(attribute='_artifact_aap_cr_checksum')
-          | list)
-         | map('trim') | select | list }}
-  run_once: true
+    _artifact_payload_checksums: []
 
-- name: Create file for database checksums
+- name: Collect checksums for every payload
+  ansible.builtin.set_fact:
+    _artifact_payload_checksums: >-
+      {{ _artifact_payload_checksums + [item.checksum ~ '  ' ~ item.path[(__artifact_build_dir | length + 1):]] }}
+  loop: "{{ _artifact_payload_files.files }}"
+  loop_control:
+    label: "{{ item.path | basename }}"
+  when: item.path != __artifact_build_dir ~ '/sha256sum.txt'
+
+- name: Create payload checksum file
   ansible.builtin.copy:
-    content: "{{ _artifact_all_checksums | join('\n') }}\n"
+    content: "{{ _artifact_payload_checksums | sort | join('\n') }}\n"
     dest: '{{ __artifact_build_dir }}/sha256sum.txt'
     mode: '0640'
   run_once: true

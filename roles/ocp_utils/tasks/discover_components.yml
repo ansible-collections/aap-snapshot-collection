@@ -80,7 +80,7 @@
         - item.resources[0].spec.public_base_url is defined
       no_log: "{{ __ocp_utils_no_log }}"
 
-    - name: Wait for gateway pod to be running
+    - name: Discover gateway pod and optionally wait
       kubernetes.core.k8s_info:
         kind: Pod
         namespace: "{{ ocp_utils_ocp_namespace }}"
@@ -90,22 +90,9 @@
         field_selectors:
           - "status.phase=Running"
       register: _ocp_utils_found_pods
-      until: _ocp_utils_found_pods.resources | length > 0
+      until: not (_wait_for_running | default(false) | bool) or _ocp_utils_found_pods.resources | length > 0
       retries: "{{ _discover_retries | default(60) }}"
       delay: "{{ _discover_delay | default(10) }}"
-      when: _wait_for_running | default(false) | bool
-
-    - name: Discover gateway pod
-      kubernetes.core.k8s_info:
-        kind: Pod
-        namespace: "{{ ocp_utils_ocp_namespace }}"
-        label_selectors:
-          - "app.kubernetes.io/component=aap-gateway"
-          - "app.kubernetes.io/name={{ ocp_utils_aap_instance_name }}"
-        field_selectors:
-          - "status.phase=Running"
-      register: _ocp_utils_found_pods
-      when: not (_wait_for_running | default(false) | bool)
 
     - name: Set gateway pod facts
       ansible.builtin.set_fact:
@@ -173,7 +160,7 @@
       no_log: "{{ __ocp_utils_no_log }}"
       when: _ocp_utils_admin_secret.resources | length > 0
 
-    - name: Wait for controller pod to be running
+    - name: Discover controller pod and optionally wait
       kubernetes.core.k8s_info:
         kind: Pod
         namespace: "{{ ocp_utils_ocp_namespace }}"
@@ -183,26 +170,11 @@
         field_selectors:
           - "status.phase=Running"
       register: _ocp_utils_found_controller_pods
-      until: _ocp_utils_found_controller_pods.resources | length > 0
+      until: not (_wait_for_running | default(false) | bool) or _ocp_utils_found_controller_pods.resources | length > 0
       retries: "{{ _discover_retries | default(60) }}"
       delay: "{{ _discover_delay | default(10) }}"
       when:
         - _controller_cr_name is defined
-        - _wait_for_running | default(false) | bool
-
-    - name: Discover controller pod
-      kubernetes.core.k8s_info:
-        kind: Pod
-        namespace: "{{ ocp_utils_ocp_namespace }}"
-        label_selectors:
-          - "app.kubernetes.io/component=automationcontroller"
-          - "app.kubernetes.io/name={{ _controller_cr_name }}-task"
-        field_selectors:
-          - "status.phase=Running"
-      register: _ocp_utils_found_controller_pods
-      when:
-        - _controller_cr_name is defined
-        - not (_wait_for_running | default(false) | bool)
 
     - name: Set controller pod facts
       ansible.builtin.set_fact:
@@ -212,7 +184,7 @@
         - _controller_cr_name is defined
         - _ocp_utils_found_controller_pods.resources | default([]) | length > 0
 
-    - name: Wait for EDA pod to be running
+    - name: Discover EDA pod and optionally wait
       kubernetes.core.k8s_info:
         kind: Pod
         namespace: "{{ ocp_utils_ocp_namespace }}"
@@ -223,26 +195,11 @@
           - "status.phase=Running"
       register: _ocp_utils_found_eda_pods
       until: >-
-        _ocp_utils_found_eda_pods.resources | length > 0
+        not (_wait_for_running | default(false) | bool) or _ocp_utils_found_eda_pods.resources | length > 0
       retries: "{{ _discover_retries | default(60) }}"
       delay: "{{ _discover_delay | default(10) }}"
       when:
         - _eda_cr_name is defined
-        - _wait_for_running | default(false) | bool
-
-    - name: Discover EDA pod
-      kubernetes.core.k8s_info:
-        kind: Pod
-        namespace: "{{ ocp_utils_ocp_namespace }}"
-        label_selectors:
-          - "app.kubernetes.io/component=eda-api"
-          - "app.kubernetes.io/name={{ _eda_cr_name }}"
-        field_selectors:
-          - "status.phase=Running"
-      register: _ocp_utils_found_eda_pods
-      when:
-        - _eda_cr_name is defined
-        - not (_wait_for_running | default(false) | bool)
 
     - name: Set EDA pod facts
       ansible.builtin.set_fact:

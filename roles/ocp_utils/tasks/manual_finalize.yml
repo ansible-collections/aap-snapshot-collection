@@ -1,0 +1,132 @@
+---
+- name: Load application secret mappings
+  ansible.builtin.include_tasks: set_secret_mapping.yml
+
+- name: Install component-specific application and optional Hub keys
+  ansible.builtin.include_role:
+    name: ansible.aap_snapshot.operations
+    tasks_from: update_secret.yml
+  vars:
+    component_name: "{{ snapshot_component }}"
+  loop: "{{ _snapshot_record.components }}"
+  loop_control:
+    loop_var: snapshot_component
+    label: "{{ snapshot_component }}"
+  when: not (_snapshot_record.keys_installed | bool)
+
+- name: Install source application keys before workloads resume
+  kubernetes.core.k8s:
+    kind: Secret
+    name: "{{ item.secret_name }}"
+    namespace: "{{ ocp_utils_ocp_namespace }}"
+    state: patched
+    definition:
+      data: "{{ {item.field: artifact_secrets[item.artifact_key]} }}"
+  loop: "{{ _ocp_utils_secret_mapping }}"
+  loop_control:
+    label: "{{ item.component }}/{{ item.secret_name }}"
+  no_log: "{{ __ocp_utils_no_log }}"
+  when:
+    - not (_snapshot_record.keys_installed | bool)
+    - item.component in _snapshot_record.components
+    - artifact_secrets[item.artifact_key] is defined
+
+- name: Persist application key installation
+  ansible.builtin.include_tasks: manual_save.yml
+  vars:
+    _snapshot_record_updates:
+      keys_installed: true
+
+# Reuse the existing PVC; never delete or recreate it during a DBA migration.
+# Repeating extraction after interruption overwrites files with the same bytes.
+- name: Restore consistent Hub content to existing PVC
+  ansible.builtin.include_role:
+    name: ansible.aap_snapshot.automationhub
+    tasks_from: import_hub_content.yml
+  when:
+    - _snapshot_record.hub_content | bool
+    - not (_snapshot_record.hub_content_restored | bool)
+
+- name: Persist Hub content restoration
+  ansible.builtin.include_tasks: manual_save.yml
+  vars:
+    _snapshot_record_updates:
+      hub_content_restored: true
+
+- name: Remove stale Gateway OAuth2 state before reconciliation
+  kubernetes.core.k8s:
+    api_version: v1
+    kind: Secret
+    name: "{{ ocp_utils_aap_instance_name }}-gateway-oauth2-token-secret"
+    namespace: "{{ ocp_utils_ocp_namespace }}"
+    state: absent
+  no_log: "{{ __ocp_utils_no_log }}"
+  when: "'gateway' in _snapshot_record.components"
+
+- name: Reset completed Controller initialization jobs for restored schema
+  ansible.builtin.include_tasks: manual_controller_jobs.yml
+  when:
+    - "'controller' in _snapshot_record.components"
+    - not (_snapshot_record.controller_jobs_reset | default(false) | bool)
+
+- name: Restore captured workload settings for reconciliation
+  ansible.builtin.include_tasks: manual_patch.yml
+  vars:
+    _snapshot_patch_spec: "{{ snapshot_resource.original }}"
+  loop: "{{ _snapshot_record.recovery | reverse | list }}"
+  loop_control:
+    loop_var: snapshot_resource
+    label: "{{ snapshot_resource.kind }}/{{ snapshot_resource.name }}"
+  when: snapshot_resource.kind != 'CronJob'
+
+- name: Discover resumed component pods
+  ansible.builtin.include_tasks: discover_components.yml
+  vars:
+    _wait_for_running: true
+
+- name: Detect gateway Django version
+  ansible.builtin.include_role:
+    name: ansible.aap_snapshot.operations
+    tasks_from: detect_django_version_ocp.yml
+  vars:
+    _component_pod_name: "{{ _ocp_utils_gateway_pod_name }}"
+    _component_container_name: "{{ _ocp_utils_gateway_container_name }}"
+    _operations_detect_manage_cmd: aap-gateway-manage
+    operations_ocp_namespace: "{{ ocp_utils_ocp_namespace }}"
+
+- name: Reconcile included components after DBA restore
+  ansible.builtin.include_role:
+    name: "ansible.aap_snapshot.{{ _snapshot_component_roles[item] }}"
+    tasks_from: reconcile.yml
+  vars:
+    _snapshot_component_roles:
+      gateway: automationgateway
+      controller: automationcontroller
+      hub: automationhub
+      eda: automationeda
+  loop: ['gateway', 'controller', 'hub', 'eda']
+  loop_control:
+    label: "{{ item }}"
+  when: item in _snapshot_record.components
+
+- name: Wait for reconciled AAP
+  ansible.builtin.include_tasks: wait_aap_ready.yml
+
+- name: Restore scheduled writers only after successful reconciliation
+  ansible.builtin.include_tasks: manual_patch.yml
+  vars:
+    _snapshot_patch_spec: "{{ snapshot_resource.original }}"
+  loop: "{{ _snapshot_record.recovery | selectattr('kind', 'equalto', 'CronJob') | list }}"
+  loop_control:
+    loop_var: snapshot_resource
+    label: "{{ snapshot_resource.name }}"
+
+- name: Remove temporary resources after successful finalization
+  ansible.builtin.include_tasks: cleanup_temp_resources.yml
+
+- name: Mark durable migration complete
+  ansible.builtin.include_tasks: manual_save.yml
+  vars:
+    _snapshot_record_updates:
+      phase: complete
+...

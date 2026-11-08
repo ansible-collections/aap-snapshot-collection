@@ -1,0 +1,44 @@
+---
+- name: Rediscover live target application deployments
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    namespace: "{{ ocp_utils_ocp_namespace }}"
+  register: _snapshot_live_deployments
+
+- name: Rediscover live target scheduled writers
+  kubernetes.core.k8s_info:
+    api_version: batch/v1
+    kind: CronJob
+    namespace: "{{ ocp_utils_ocp_namespace }}"
+  register: _snapshot_live_cronjobs
+
+- name: Detect additional target writers without replacing original recovery settings
+  ansible.builtin.set_fact:
+    _snapshot_new_deployments: >-
+      {{ ((_snapshot_live_deployments.resources + _snapshot_live_cronjobs.resources) | ansible.aap_snapshot.snapshot_target_resources(
+         _ocp_utils_selected_aap_cr, _snapshot_record.recovery | map(attribute='uid') | list))
+         | ansible.aap_snapshot.snapshot_new_workloads(_snapshot_record.recovery) }}
+
+- name: Capture additional workload holds before changing them
+  ansible.builtin.include_tasks: manual_save.yml
+  vars:
+    _snapshot_record_updates:
+      recovery: >-
+        {{ _snapshot_record.recovery + (_snapshot_new_deployments | map('ansible.aap_snapshot.snapshot_hold_resource') | list) }}
+      validation_passed: false
+  when: _snapshot_new_deployments | length > 0
+
+- name: Hold additional workloads discovered during the DBA window
+  ansible.builtin.include_tasks: manual_hold.yml
+  when: _snapshot_new_deployments | length > 0
+
+- name: Require integrity review after discovering additional writers
+  ansible.builtin.assert:
+    that:
+      - artifact_import_phase == 'prepare' or _snapshot_new_deployments | length == 0
+    fail_msg: >-
+      Additional target application or scheduled workloads appeared during the DBA handoff.
+      Their original settings were captured and they have been held. Have the DBA
+      review restore integrity and rerun validation before finalizing.
+...

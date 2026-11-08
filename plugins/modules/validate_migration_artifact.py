@@ -30,7 +30,7 @@ options:
       - List of schema versions this collection supports.
     type: list
     elements: str
-    default: ["1.0", "1.1"]
+    default: ["1.0", "1.1", "1.2"]
   target_aap_version:
     description:
       - If set, validates that the artifact's AAP version (X.Y) matches this value.
@@ -143,6 +143,29 @@ def _validate_checksums(artifact_dir):
     return failures
 
 
+def _validate_payload_coverage(artifact_dir, manifest):
+    """Require database coverage for legacy artifacts and all payloads for 1.2."""
+    path = os.path.join(artifact_dir, 'sha256sum.txt')
+    if not os.path.isfile(path):
+        return []  # The caller already reports the missing checksum file.
+    with open(path) as stream:
+        entries = {line.strip().split('  ', 1)[1] for line in stream if '  ' in line.strip()}
+    required = set()
+    for comp in manifest.get('components', []):
+        name = comp.get('name', '')
+        if comp.get('has_database_dump', True) is not False:
+            required.add(name + '/' + name + '.pgc')
+        if name == 'hub' and comp.get('has_content_data', False):
+            required.add('hub/' + comp.get('content_filename', 'hub_content.tar'))
+    if manifest.get('schema_version') == '1.2':
+        for root, dirs, files in os.walk(artifact_dir):
+            for filename in files:
+                relative = os.path.relpath(os.path.join(root, filename), artifact_dir)
+                if relative != 'sha256sum.txt':
+                    required.add(relative)
+    return ['Payload is missing checksum: ' + name for name in sorted(required - entries)]
+
+
 def _validate_source_aap_cr(artifact_dir, source_topology):
     if source_topology != "operator":
         return []
@@ -171,11 +194,7 @@ def _validate_source_aap_cr(artifact_dir, source_topology):
         failures.append("OCP-source artifact is missing the aap_cr.yml checksum")
     else:
         with open(checksum_path, "r") as f:
-            checksum_entries = {
-                line.strip().split("  ", 1)[1]
-                for line in f
-                if "  " in line.strip()
-            }
+            checksum_entries = {line.strip().split("  ", 1)[1] for line in f if "  " in line.strip()}
         if "aap_cr.yml" not in checksum_entries:
             failures.append("aap_cr.yml is not listed in sha256sum.txt")
 
@@ -202,6 +221,8 @@ def _build_report(manifest, component_results, hub_content_ok, checksum_ok, secr
         version = comp.get("version", "?")
         db_name = comp.get("database_name", "?")
         dump_status = "OK" if component_results.get(name, False) else "MISSING"
+        if manifest.get('schema_version') == '1.2' and comp.get('has_database_dump') is False:
+            dump_status = 'DBA managed (omitted)'
         entry = f"    - {name:<16} v{version:<12} {db_name}  [dump: {dump_status}]"
 
         if comp.get("has_content_data", False):
@@ -238,7 +259,7 @@ def main():
     module = AnsibleModule(
         argument_spec=dict(
             artifact_dir=dict(type="str", required=True),
-            supported_schema_versions=dict(type="list", elements="str", default=["1.0", "1.1"]),
+            supported_schema_versions=dict(type="list", elements="str", default=["1.0", "1.1", "1.2"]),
             target_aap_version=dict(type="str", default=None),
         ),
         supports_check_mode=True,
@@ -280,11 +301,7 @@ def main():
             if target_version:
                 artifact_version = manifest.get("aap_version", "")
                 if artifact_version != target_version:
-                    errors.append(
-                        f"Artifact from AAP {artifact_version} but target is "
-                        f"AAP {target_version}. Migrate to same version first, "
-                        f"then upgrade in place."
-                    )
+                    errors.append(f"Artifact from AAP {artifact_version} but target is " f"AAP {target_version}. Migrate to same version first, " f"then upgrade in place.")
 
     exists, _path = _check_file_exists(artifact_dir, "secrets.yml")
     if not exists:
@@ -303,6 +320,7 @@ def main():
             checksum_ok = True
 
     errors.extend(_validate_source_aap_cr(artifact_dir, manifest.get("source_topology")))
+    errors.extend(_validate_payload_coverage(artifact_dir, manifest))
 
     database_metadata = manifest.get("database", {})
     if not isinstance(database_metadata, dict):
@@ -319,8 +337,14 @@ def main():
 
         dump_exists = os.path.isfile(dump_path)
         component_results[name] = dump_exists
-
-        if not dump_exists:
+        omitted = manifest.get('schema_version') == '1.2' and comp.get('has_database_dump') is False
+        if comp.get('has_database_dump') is False and not omitted:
+            errors.append('Database omission requires schema 1.2')
+        if manifest.get('schema_version') == '1.2' and type(comp.get('has_database_dump')) is not bool:
+            errors.append('Schema 1.2 requires explicit boolean has_database_dump for ' + name)
+        if omitted and dump_exists:
+            errors.append('Database marked omitted but dump is present: ' + name)
+        if not dump_exists and not omitted:
             errors.append(f"Component '{name}' listed in manifest but {name}.pgc not found")
 
         if name == "hub" and comp.get("has_content_data", False):

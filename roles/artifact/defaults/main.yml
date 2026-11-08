@@ -11,6 +11,14 @@ artifact_collection_version: >-
     | default("unknown", true)
   }}
 
+# DBA workflow defaults are also guarded with default() at playbook entry points.
+postgres_skip_data: false
+artifact_import_phase: 'all'
+artifact_source_quiesced: false
+artifact_db_restore_confirmed: false
+postgresql_ocp_ssl_options: {}
+postgresql_ocp_ssl_rootcert_secrets: {}
+
 ### input variables
 artifact_filename: '{{ __artifact_filename }}'
 artifact_dir: '{{ lookup("env", "PWD") }}'
@@ -19,6 +27,7 @@ artifact_dir: '{{ lookup("env", "PWD") }}'
 __artifact_supported_schema_versions:
   - "1.0"
   - "1.1"
+  - "1.2"
 
 ### export control
 artifact_export_hub_content: "{{ export_hub_content | default(true) }}"

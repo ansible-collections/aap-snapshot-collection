@@ -50,7 +50,21 @@
       ansible.builtin.include_role:
         name: ansible.aap_snapshot.artifact
         tasks_from: consume.yml
-      when: aap_platform == 'operator'
+      when:
+        - aap_platform == 'operator'
+        - not (postgres_skip_data | default(false) | bool)
+
+- name: DBA-managed import phases
+  hosts: localhost
+  gather_facts: false
+  any_errors_fatal: true
+  environment: "{{ ocp_utils_ocp_environment | default({}) }}"
+  tasks:
+    - name: Run durable DBA migration workflow
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.ocp_utils
+        tasks_from: manual_migration.yml
+      when: postgres_skip_data | default(false) | bool
 
 - name: Consume artifact (containerized)
   hosts: controller_groups:eda_groups:gateway_groups:hub_groups
@@ -95,7 +109,9 @@
             - {{ comp.name }} (not deployed on target)
           {% endfor %}
           {% endif %}
-      when: artifact_manifest is defined
+      when:
+        - artifact_manifest is defined
+        - not (postgres_skip_data | default(false) | bool) or (_snapshot_record.phase | default('') == 'complete')
 
     - name: Post-import advisory
       ansible.builtin.debug:
@@ -122,6 +138,7 @@
       when:
         - artifact_manifest is defined
         - aap_platform != 'containerized'
+        - not (postgres_skip_data | default(false) | bool) or (_snapshot_record.phase | default('') == 'complete')
 
     - name: Advise re-running the containerized installer
       ansible.builtin.debug:

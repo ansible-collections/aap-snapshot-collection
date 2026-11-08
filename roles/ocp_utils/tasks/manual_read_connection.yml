@@ -1,0 +1,55 @@
+---
+- name: Clear previous child connection context
+  ansible.builtin.set_fact:
+    _snapshot_connection_children: []
+
+- name: Read current child database configuration without application pods
+  kubernetes.core.k8s_info:
+    api_version: "{{ _snapshot_child_types[snapshot_component].api }}"
+    kind: "{{ _snapshot_child_types[snapshot_component].kind }}"
+    name: "{{ _snapshot_record.component_names[snapshot_component] }}"
+    namespace: "{{ ocp_utils_ocp_namespace }}"
+  vars:
+    _snapshot_child_types:
+      controller: {api: 'automationcontroller.ansible.com/v1beta1', kind: AutomationController}
+      hub: {api: 'automationhub.ansible.com/v1beta1', kind: AutomationHub}
+      eda: {api: 'eda.ansible.com/v1alpha1', kind: EDA}
+  register: _snapshot_connection_child
+  no_log: "{{ __ocp_utils_no_log }}"
+  when: snapshot_component != 'gateway'
+
+- name: Use current child configuration
+  ansible.builtin.set_fact:
+    _snapshot_connection_children: "{{ _snapshot_connection_child.resources }}"
+  no_log: "{{ __ocp_utils_no_log }}"
+  when: snapshot_component != 'gateway'
+
+- name: Resolve effective application database Secret
+  ansible.builtin.set_fact:
+    _snapshot_connection_secret: >-
+      {{ _ocp_utils_selected_aap_cr | ansible.aap_snapshot.postgresql_resolve_secret(snapshot_component, _snapshot_connection_children) }}
+  no_log: "{{ __ocp_utils_no_log }}"
+
+- name: Read current application credentials without administrator credentials
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    namespace: "{{ ocp_utils_ocp_namespace }}"
+    name: "{{ _snapshot_connection_secret }}"
+  register: _snapshot_connection_secret_info
+  no_log: "{{ __ocp_utils_no_log }}"
+
+- name: Decode independent component connection
+  ansible.builtin.set_fact:
+    _snapshot_connection: "{{ _snapshot_connection_secret_info.resources[0].data | ansible.aap_snapshot.postgresql_decode_secret }}"
+  no_log: "{{ __ocp_utils_no_log }}"
+
+- name: Resolve configured TLS options and mounted CA
+  ansible.builtin.set_fact:
+    _snapshot_connection: >-
+      {{ {'default': _snapshot_connection.default | combine({'OPTIONS':
+          _snapshot_connection.default.OPTIONS | combine((postgresql_ocp_ssl_options | default({})).get(snapshot_component, {}))
+          | combine({'sslrootcert': '/etc/aap-snapshot-ca/' ~ snapshot_component ~ '/ca.crt'}
+            if snapshot_component in (postgresql_ocp_ssl_rootcert_secrets | default({})) else {})})} }}
+  no_log: "{{ __ocp_utils_no_log }}"
+...

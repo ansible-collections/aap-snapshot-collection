@@ -1,0 +1,44 @@
+---
+- name: Check platform configuration
+  ansible.builtin.include_tasks: check_platform.yml
+
+- name: Check included RPM source hosts
+  when: inventory_hostname in (groups.get('controller_groups', []) + groups.get('hub_groups', []) + groups.get('gateway_groups', []) + groups.get('eda_groups', []))
+  block:
+    - name: Gather source writer service states
+      ansible.builtin.service_facts:
+
+    - name: Require known source writer services
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.services | dict2items | selectattr('key', 'match', _snapshot_writer_pattern) | list | length > 0
+        fail_msg: 'No known RPM writer services found; verify inventory and service management before export.'
+      vars:
+        _snapshot_writer_pattern: '^(supervisord|pulpcore.*|pulp.*|automation-.*|receptor|nginx|httpd)\.service$'
+
+    - name: Verify all known RPM writers are stopped
+      ansible.builtin.assert:
+        that:
+          - item.value.state in ['stopped', 'inactive']
+        fail_msg: "Source writer {{ item.key }} must be stopped by the administrator before export."
+      loop: "{{ ansible_facts.services | dict2items | selectattr('key', 'match', '^(supervisord|pulpcore.*|pulp.*|automation-.*|receptor|nginx|httpd)\\.service$') | list }}"
+      loop_control:
+        label: "{{ item.key }}"
+
+    - name: Discover versions while RPM services are intentionally stopped
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.operations
+        tasks_from: preflight.yml
+      vars:
+        component_name: "{{ item }}"
+      loop: ['controller', 'hub', 'gateway', 'eda']
+      loop_control:
+        label: "{{ item }}"
+      when: inventory_hostname in groups.get(item ~ '_groups', [])
+
+- name: Require RPM AAP 2.6 before exporting payloads
+  ansible.builtin.assert:
+    that:
+      - (hostvars['localhost']._operations_aap_version | ansible.aap_snapshot.parse_aap_version).major_minor == '2.6'
+    fail_msg: 'DBA export currently supports RPM AAP 2.6 only.'
+...

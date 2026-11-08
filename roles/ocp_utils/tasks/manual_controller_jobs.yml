@@ -1,0 +1,37 @@
+---
+- name: Read Controller migration jobs after DBA confirmation
+  kubernetes.core.k8s_info:
+    api_version: batch/v1
+    kind: Job
+    namespace: "{{ ocp_utils_ocp_namespace }}"
+  register: _snapshot_controller_jobs
+
+- name: Persist completed initialization Job identities once
+  ansible.builtin.include_tasks: manual_save.yml
+  vars:
+    _snapshot_record_updates:
+      controller_jobs: "{{ _snapshot_controller_jobs.resources | ansible.aap_snapshot.snapshot_controller_jobs(_controller_cr_name) }}"
+  when: _snapshot_record.controller_jobs is not defined
+
+- name: Delete only the recorded completed initialization Jobs
+  kubernetes.core.k8s:
+    api_version: batch/v1
+    kind: Job
+    name: "{{ item.name }}"
+    namespace: "{{ ocp_utils_ocp_namespace }}"
+    state: absent
+    delete_options:
+      preconditions:
+        uid: "{{ item.uid }}"
+    wait: true
+    wait_timeout: 120
+  loop: "{{ _snapshot_record.controller_jobs }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Persist Controller migration Job reset checkpoint
+  ansible.builtin.include_tasks: manual_save.yml
+  vars:
+    _snapshot_record_updates:
+      controller_jobs_reset: true
+...

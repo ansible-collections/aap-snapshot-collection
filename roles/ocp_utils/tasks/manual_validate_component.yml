@@ -1,0 +1,45 @@
+---
+- name: Resolve current application connection and TLS
+  ansible.builtin.include_tasks: manual_read_connection.yml
+
+- name: Run bounded read-only metadata checks from migration pod
+  kubernetes.core.k8s_exec:
+    namespace: "{{ ocp_utils_ocp_namespace }}"
+    pod: "{{ ocp_utils_temp_pod_name }}"
+    container: postgres
+    command: >-
+      {{ _snapshot_connection | ansible.aap_snapshot.postgresql_client_command(
+         ['psql', '-XqAt', '--set=ON_ERROR_STOP=1', '--command',
+          'BEGIN READ ONLY; SET LOCAL statement_timeout=10000; SET LOCAL lock_timeout=3000; '
+          ~ lookup('ansible.builtin.file', role_path ~ '/../postgresql/files/migration_metadata.sql') ~ ' COMMIT;']) }}
+  register: _snapshot_database_check
+  changed_when: false
+  failed_when: false
+  no_log: "{{ __ocp_utils_no_log }}"
+
+- name: Require successful application database metadata read
+  ansible.builtin.assert:
+    that:
+      - _snapshot_database_check.rc == 0
+    fail_msg: >-
+      {{ snapshot_component }}: database read failed. Check the current application Secret,
+      host/port, NetworkPolicy, TLS mode and CA, SELECT access to django_migrations,
+      and statement/lock timeouts. Raw credential-bearing client output is protected.
+
+- name: Check schema extensions migrations and privileges
+  ansible.builtin.set_fact:
+    _snapshot_component_readiness: >-
+      {{ (_snapshot_database_check.stdout | from_json) | ansible.aap_snapshot.snapshot_validate_database(
+         (artifact_manifest.components | selectattr('name', 'equalto', snapshot_component) | first).database_metadata | default({}),
+         snapshot_component, (artifact_manifest.database | default({})).postgresql_version | default('')) }}
+
+- name: Persist per-component sanitized validation result
+  ansible.builtin.include_tasks: manual_save.yml
+  vars:
+    _snapshot_record_updates:
+      validation_results: "{{ _snapshot_record.validation_results | combine({snapshot_component: _snapshot_component_readiness}) }}"
+
+- name: Report component database readiness
+  ansible.builtin.debug:
+    msg: "{{ snapshot_component }}: {{ _snapshot_component_readiness }}"
+...

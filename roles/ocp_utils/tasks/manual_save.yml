@@ -1,0 +1,17 @@
+---
+- name: Update in-memory migration record
+  ansible.builtin.set_fact:
+    _snapshot_record: "{{ _snapshot_record | combine(_snapshot_record_updates) }}"
+
+- name: Persist namespace-local migration recovery state
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: "{{ _snapshot_record_name }}"
+        namespace: "{{ ocp_utils_ocp_namespace }}"
+      data:
+        record: "{{ _snapshot_record | to_json }}"
+...

@@ -1,0 +1,32 @@
+---
+- name: Discover migration jobs
+  kubernetes.core.k8s_info:
+    api_version: batch/v1
+    kind: Job
+    namespace: "{{ ocp_utils_ocp_namespace }}"
+  register: _snapshot_jobs
+
+- name: Select target migration jobs
+  ansible.builtin.set_fact:
+    _snapshot_target_jobs: >-
+      {{ _snapshot_jobs.resources | ansible.aap_snapshot.snapshot_target_resources(_ocp_utils_selected_aap_cr,
+         _snapshot_record.recovery | map(attribute='uid') | list) }}
+
+- name: Require migration jobs to be finished
+  ansible.builtin.assert:
+    that:
+      - ([] | ansible.aap_snapshot.snapshot_active_writers([], [], _snapshot_target_jobs)) | length == 0
+    fail_msg: 'Unfinished target migration jobs remain. Let them finish or have an administrator resolve them, then rerun prepare. Jobs are never deleted automatically.'
+
+- name: Wait for held application pods to terminate
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Pod
+    namespace: "{{ ocp_utils_ocp_namespace }}"
+  register: _snapshot_pods
+  until: >-
+    (_snapshot_pods.resources | ansible.aap_snapshot.snapshot_active_writers(
+      _snapshot_record.recovery, _snapshot_replicasets.resources, _snapshot_target_jobs)) | length == 0
+  retries: "{{ ocp_utils_scale_wait_retries }}"
+  delay: "{{ ocp_utils_scale_wait_delay }}"
+...

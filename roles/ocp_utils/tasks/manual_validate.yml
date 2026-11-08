@@ -1,0 +1,25 @@
+---
+- name: Clear previous readiness before repeatable validation
+  ansible.builtin.include_tasks: manual_save.yml
+  vars:
+    _snapshot_record_updates:
+      validation_passed: false
+      validation_results: {}
+
+- name: Ensure migration client and matching artifact are staged
+  ansible.builtin.include_tasks: manual_stage.yml
+
+- name: Validate each application database as its own user
+  ansible.builtin.include_tasks: manual_validate_component.yml
+  loop: "{{ _snapshot_record.components }}"
+  loop_control:
+    loop_var: snapshot_component
+    label: "{{ snapshot_component }}"
+
+- name: Persist database readiness results
+  ansible.builtin.include_tasks: manual_save.yml
+  vars:
+    _snapshot_record_updates:
+      phase: "{{ 'finalizing' if artifact_import_phase == 'finalize' else 'validated' }}"
+      validation_passed: true
+...

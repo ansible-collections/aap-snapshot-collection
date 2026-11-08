@@ -1,0 +1,147 @@
+---
+- name: Require available applications for a new migration
+  ansible.builtin.assert:
+    that:
+      - not (_ocp_utils_selected_aap_cr.spec.idle_aap | default(false) | bool)
+    fail_msg: 'A new DBA migration requires a running target to capture versions and original settings.'
+
+- name: Discover target component resources while available
+  ansible.builtin.include_tasks: discover_components.yml
+
+- name: Require all included components on target
+  ansible.builtin.assert:
+    that:
+      - _artifact_import_components | difference(['gateway']
+          + (['controller'] if _controller_cr_name is defined else [])
+          + (['hub'] if _hub_cr_name is defined else [])
+          + (['eda'] if _eda_cr_name is defined else [])) | length == 0
+
+- name: Capture target component versions
+  ansible.builtin.include_role:
+    name: ansible.aap_snapshot.operations
+    tasks_from: get_version.yml
+  vars:
+    component_name: "{{ snapshot_component }}"
+  loop: "{{ _artifact_import_components }}"
+  loop_control:
+    loop_var: snapshot_component
+    label: "{{ snapshot_component }}"
+
+- name: Reject application version downgrades before downtime
+  ansible.builtin.assert:
+    that:
+      - vars['_' ~ item.name ~ '_version'] is version(item.version, '>=')
+    fail_msg: "Target {{ item.name }} version is older than source {{ item.version }}."
+  loop: "{{ artifact_manifest.components }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Require source application keys before downtime
+  ansible.builtin.assert:
+    that:
+      - artifact_secrets[_snapshot_required_keys[item]] is defined
+      - artifact_secrets[_snapshot_required_keys[item]] | length > 0
+    fail_msg: "Missing source application key for {{ item }}."
+  vars:
+    _snapshot_required_keys:
+      controller: controller_secret_key
+      gateway: gateway_secret_key
+      hub: hub_db_fields_encryption_key
+      eda: eda_secret_key
+  loop: "{{ _artifact_import_components }}"
+  loop_control:
+    label: "{{ item }}"
+  no_log: "{{ __ocp_utils_no_log }}"
+
+- name: Set Hub content flag
+  ansible.builtin.set_fact:
+    artifact_hub_has_content_data: >-
+      {{ artifact_manifest.components | selectattr('name', 'equalto', 'hub')
+         | map(attribute='has_content_data') | first | default(false) | bool }}
+
+- name: Check matching Hub content storage before downtime
+  ansible.builtin.include_role:
+    name: ansible.aap_snapshot.automationhub
+    tasks_from: check_storage_backend_ocp.yml
+  when: artifact_hub_has_content_data | bool
+
+- name: Gather namespace deployments for recovery
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    namespace: "{{ ocp_utils_ocp_namespace }}"
+  register: _snapshot_deployments
+
+- name: Gather target scheduled database writers for recovery
+  kubernetes.core.k8s_info:
+    api_version: batch/v1
+    kind: CronJob
+    namespace: "{{ ocp_utils_ocp_namespace }}"
+  register: _snapshot_cronjobs
+
+- name: Select target child resources and deployments
+  ansible.builtin.set_fact:
+    _snapshot_children: "{{ _ocp_utils_component_crs.results | selectattr('resources', 'defined') | map(attribute='resources') | flatten }}"
+
+- name: Capture original idle and replica fields without credentials
+  ansible.builtin.set_fact:
+    _snapshot_recovery: >-
+      {{ ([_ocp_utils_selected_aap_cr] + _snapshot_children
+         + ((_snapshot_deployments.resources + _snapshot_cronjobs.resources) | ansible.aap_snapshot.snapshot_target_resources(
+             _ocp_utils_selected_aap_cr, _snapshot_children | map(attribute='metadata.uid') | list)))
+         | map('ansible.aap_snapshot.snapshot_hold_resource') | list }}
+
+# Auxiliary operators currently ignore the parent's idle controls. Their original
+# replicas must be persisted before scaling, just like application workloads.
+- name: Discover auxiliary operators when their workloads are present
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    namespace: "{{ ocp_utils_operator_namespace }}"
+    name: "{{ item }}"
+  loop:
+    - ansible-lightspeed-operator-controller-manager
+    - ansible-mcp-server-operator-controller-manager
+  loop_control:
+    label: "{{ item }}"
+  register: _snapshot_extra_operators
+  when: _snapshot_recovery | selectattr('name', 'search', '(lightspeed|mcp)') | list | length > 0
+
+- name: Add auxiliary operator replica recovery settings
+  ansible.builtin.set_fact:
+    _snapshot_recovery: >-
+      {{ _snapshot_recovery + (_snapshot_extra_operators.results | selectattr('resources', 'defined')
+         | map(attribute='resources') | flatten | map('ansible.aap_snapshot.snapshot_hold_resource') | list) }}
+
+- name: Capture target versions and names
+  ansible.builtin.set_fact:
+    _snapshot_versions: "{{ _snapshot_versions | default({}) | combine({item: vars['_' ~ item ~ '_version']}) }}"
+  loop: "{{ _artifact_import_components }}"
+  loop_control:
+    label: "{{ item }}"
+
+- name: Build initial recovery record
+  ansible.builtin.set_fact:
+    _snapshot_record:
+      target_uid: "{{ _ocp_utils_selected_aap_cr.metadata.uid }}"
+      artifact_sha256: "{{ _snapshot_artifact_stat.stat.checksum }}"
+      components: "{{ _artifact_import_components }}"
+      phase: preparing
+      target_versions: "{{ _snapshot_versions }}"
+      component_names:
+        controller: "{{ _controller_cr_name | default('') }}"
+        hub: "{{ _hub_cr_name | default('') }}"
+        eda: "{{ _eda_cr_name | default('') }}"
+      recovery: "{{ _snapshot_recovery }}"
+      temp_deployment: "{{ _snapshot_session_name }}"
+      temp_pvc: "{{ _snapshot_session_name }}-data"
+      hub_content: "{{ artifact_hub_has_content_data | bool }}"
+      keys_installed: false
+      hub_content_restored: false
+      validation_passed: false
+
+- name: Persist recovery record before changing workloads
+  ansible.builtin.include_tasks: manual_save.yml
+  vars:
+    _snapshot_record_updates: {}
+...

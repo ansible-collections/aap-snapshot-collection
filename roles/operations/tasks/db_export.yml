@@ -6,6 +6,7 @@
 # --- Controller-specific: pre-create database partitions ---
 - name: Ensure the database partitions are created (RPM)
   when:
+    - not (postgres_skip_data | default(false) | bool)
     - _operations_current_component.has_db_partitions | bool
     - aap_platform is defined
     - aap_platform == 'rpm'
@@ -24,6 +25,7 @@
 
 - name: Ensure the database partitions are created (containerized)
   when:
+    - not (postgres_skip_data | default(false) | bool)
     - _operations_current_component.has_db_partitions | bool
     - aap_platform is defined
     - aap_platform == 'containerized'
