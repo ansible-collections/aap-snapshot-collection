@@ -24,4 +24,13 @@
 - name: Export hub content data
   ansible.builtin.include_tasks: export_hub_content.yml
   when: automationhub_export_hub_content | default(true) | bool
+
+- name: Report Hub content export disabled by configuration
+  ansible.builtin.debug:
+    msg: >-
+      Hub content export is skipped because automationhub_export_hub_content
+      is false.
+  when:
+    - not (automationhub_export_hub_content | default(true) | bool)
+    - not (_automationhub_skip_hub_content_export | default(false) | bool)
 ...

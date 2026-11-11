@@ -1,8 +1,8 @@
 ---
-# OCP equivalent of check_storage_backend.yml - execs into the hub pod via
-# kubernetes.core.k8s_exec instead of a local podman container. Used before
-# importing or exporting Hub content so unsupported object storage fails
-# before content transfer begins.
+# OCP equivalent of check_storage_backend.yml - execs into the Hub pod via
+# kubernetes.core.k8s_exec instead of a local podman container. Import still
+# requires local FileSystem storage; source exports using Azure Blob or S3
+# skip the content archive because those files live outside the file-storage PVC.
 - name: Assert hub pod was discovered for storage backend check
   ansible.builtin.assert:
     that: _ocp_utils_hub_pod_name is defined
@@ -45,6 +45,14 @@
           if (_automationhub_storage_settings.STORAGES | default(none)) is mapping
           else (_automationhub_storage_settings.DEFAULT_FILE_STORAGE | default(''))) }}
 
+- name: Skip Hub content export for object storage (OCP)
+  ansible.builtin.set_fact:
+    automationhub_export_hub_content: false
+    _automationhub_skip_hub_content_export: true
+  when:
+    - _automationhub_storage_backend_check_mode | default('import') == 'export'
+    - (_automationhub_storage_backend | lower) is search('azure|s3')
+
 - name: Fail if Hub is not using local FileSystem storage (OCP)
   ansible.builtin.fail:
     msg: >-
@@ -54,5 +62,10 @@
       storage (backed by a PVC). OCP artifact export cannot package content
       from Azure Blob or AWS S3 storage. Set artifact_export_hub_content=false
       to export without Hub content.
-  when: "'filesystem' not in (_automationhub_storage_backend | lower)"
+  when:
+    - "'filesystem' not in (_automationhub_storage_backend | lower)"
+    - not (
+        (_automationhub_storage_backend_check_mode | default('import') == 'export')
+        and ((_automationhub_storage_backend | lower) is search('azure|s3'))
+      )
 ...

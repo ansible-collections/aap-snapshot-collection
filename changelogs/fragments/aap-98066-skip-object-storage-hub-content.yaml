@@ -1,0 +1,4 @@
+---
+bugfixes:
+  - Skip Hub content export for source environments using S3 or Azure Blob storage and report the skipped export.
+...
