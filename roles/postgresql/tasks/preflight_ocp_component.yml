@@ -20,7 +20,7 @@
     container: postgres
     command: >-
       {{ {} | ansible.aap_snapshot.postgresql_client_command(
-           ['pg_restore', '--schema-only', '--no-owner', '--no-acl', '--file=-', _postgresql_ocp_archive_path]) }}
+           ['pg_restore', '--verbose', '--schema-only', '--no-owner', '--no-acl', '--file=-', _postgresql_ocp_archive_path]) }}
   register: _postgresql_archive_schema
   changed_when: false
   failed_when: _postgresql_archive_schema.rc != 0

@@ -85,7 +85,7 @@ def database():
         sql('REVOKE SELECT ON app FROM source_grant_only;', 'source_db')
         sql('DROP ROLE source_grant_only;')
         toc = run(['pg_restore', '--list', '/tmp/source.pgc']).stdout
-        schema = run(['pg_restore', '--schema-only', '--no-owner', '--no-acl', '-f', '-', '/tmp/source.pgc']).stdout
+        schema = run(['pg_restore', '--verbose', '--schema-only', '--no-owner', '--no-acl', '-f', '-', '/tmp/source.pgc']).stdout
         archive = pg.archive_info(toc, schema)
         run(['sh', '-c', 'umask 077; cat > /tmp/restore.list'], data=archive['restore_toc'])
         yield run, sql, settings, archive
@@ -188,7 +188,7 @@ def test_extension_configuration_table_data_is_retained(database):
     before = sql("SELECT oid FROM pg_extension WHERE extname='aap_snapshot_fixture'", 'config_target_db')
     run(['pg_dump', '-U', 'postgres', '-d', 'config_source_db', '-Fc', '-f', '/tmp/config.pgc'])
     archive = pg.archive_info(
-        run(['pg_restore', '--list', '/tmp/config.pgc']).stdout, run(['pg_restore', '--schema-only', '--no-owner', '--no-acl', '-f', '-', '/tmp/config.pgc']).stdout
+        run(['pg_restore', '--list', '/tmp/config.pgc']).stdout, run(['pg_restore', '--verbose', '--schema-only', '--no-owner', '--no-acl', '-f', '-', '/tmp/config.pgc']).stdout
     )
     assert 'TABLE DATA public fixture_config' in archive['restore_toc']
     run(['sh', '-c', 'umask 077; cat > /tmp/config.list'], data=archive['restore_toc'])
@@ -232,3 +232,54 @@ def test_rpm_dump_task_handles_special_source_user_and_database_names(database):
     env = environment.from_string(task['environment']).render(variables)
     run(['env'] + [key + '=' + value for key, value in env.items()] + argv)
     assert 'TABLE public quoted_source' in run(['pg_restore', '--list', '/tmp/quoted.pgc']).stdout
+
+
+@pytest.mark.parametrize('extension_schema', ['public', 'extensions', 'custom schema'])
+def test_restore_preserves_custom_extension_schema_with_spaced_source_owner(database, extension_schema):
+    run, sql, settings, _ = database
+    suffix = uuid.uuid4().hex[:8]
+    source_db = 'schema_source_' + suffix
+    target_db = 'schema_target_' + suffix
+    owner = 'application owner ' + suffix
+    other_schema = '"' + extension_schema + ' application"'
+    quoted_schema = '"' + extension_schema.replace('"', '""') + '"'
+    sql('CREATE ROLE "' + owner + '";')
+    sql('CREATE DATABASE ' + source_db + ';')
+    sql('CREATE DATABASE ' + target_db + ' OWNER target_user;')
+    source_schema_sql = 'ALTER SCHEMA public OWNER TO "' + owner + '"; ' if extension_schema == 'public' else 'CREATE SCHEMA ' + quoted_schema + ' AUTHORIZATION "' + owner + '"; '
+    sql(
+        source_schema_sql + 'CREATE SCHEMA ' + other_schema + ' AUTHORIZATION source_user; '
+        'CREATE TABLE ' + other_schema + '.other_payload (id integer); '
+        'INSERT INTO ' + other_schema + '.other_payload VALUES (11); '
+        'COMMENT ON SCHEMA ' + quoted_schema + " IS 'preserve extension schema'; "
+        'CREATE EXTENSION hstore WITH SCHEMA ' + quoted_schema + '; '
+        'CREATE TABLE public.payload (id integer, attributes ' + quoted_schema + '.hstore); '
+        "INSERT INTO public.payload VALUES (7, 'name=>source');",
+        source_db,
+    )
+    target_schema_sql = 'ALTER SCHEMA public OWNER TO target_user; ' if extension_schema == 'public' else 'CREATE SCHEMA ' + quoted_schema + ' AUTHORIZATION target_user; '
+    sql(target_schema_sql + 'CREATE EXTENSION hstore WITH SCHEMA ' + quoted_schema + ';', target_db)
+    before = sql("SELECT oid || ':' || extowner FROM pg_extension WHERE extname='hstore'", target_db)
+    dump_path = '/tmp/schema-' + suffix + '.pgc'
+    list_path = '/tmp/schema-' + suffix + '.list'
+    run(['pg_dump', '-U', 'postgres', '-d', source_db, '-Fc', '-f', dump_path])
+    archive = pg.archive_info(
+        run(['pg_restore', '--list', dump_path]).stdout,
+        run(['pg_restore', '--verbose', '--schema-only', '--no-owner', '--no-acl', '-f', '-', dump_path]).stdout,
+    )
+    target = {'default': settings['default'] | {'NAME': target_db}}
+    state = json.loads(
+        run(shlex.split(pg.client_command(target, ['psql', '-XAt', '-v', 'ON_ERROR_STOP=1', '-c', (ROOT / 'roles/postgresql/files/target_preflight.sql').read_text()]))).stdout
+    )
+    assert pg.validate_target(archive, state, run(['pg_restore', '--version']).stdout, 'hub')
+    run(shlex.split(pg.client_command(target, ['psql', '-XAt', '-v', 'ON_ERROR_STOP=1', '-c', pg.write_probe(archive)])))
+    run(['sh', '-c', 'umask 077; cat > "$1"', 'sh', list_path], data=archive['restore_toc'])
+    result = run(
+        shlex.split(pg.client_command(target, ['pg_restore', '--clean', '--if-exists', '--no-owner', '--no-acl', '--use-list', list_path, dump_path])),
+        check=False,
+    )
+    assert not pg.restore_failed({'rc': result.returncode, 'stderr': result.stderr}), result.stderr
+    assert sql("SELECT oid || ':' || extowner FROM pg_extension WHERE extname='hstore'", target_db) == before
+    assert sql("SELECT id || ':' || attributes::text FROM public.payload", target_db) == '7:"name"=>"source"'
+    assert sql("SELECT pg_get_userbyid(relowner) FROM pg_class WHERE relname='payload'", target_db) == 'target_user'
+    assert sql('SELECT id FROM ' + other_schema + '.other_payload', target_db) == '11'

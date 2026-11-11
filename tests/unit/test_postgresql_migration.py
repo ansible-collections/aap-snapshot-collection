@@ -127,7 +127,7 @@ TOC = ''';
 5; 0 456 TABLE DATA public app source
 6; 0 999 TABLE DATA public extension_config source
 '''
-SCHEMA = 'CREATE EXTENSION IF NOT EXISTS hstore WITH SCHEMA public;\n'
+SCHEMA = '-- TOC entry 1 (class 2615 OID 2200)\nCREATE SCHEMA public;\n-- TOC entry 2 (class 3079 OID 123)\nCREATE EXTENSION IF NOT EXISTS hstore WITH SCHEMA public;\n'
 
 
 def test_filter_preserves_application_and_extension_configuration_data(pg):
@@ -141,7 +141,9 @@ def test_filter_preserves_application_and_extension_configuration_data(pg):
 
 
 def test_extension_schema_uses_quoted_sql_identifiers(pg):
-    assert pg.archive_info(TOC, 'CREATE EXTENSION IF NOT EXISTS hstore WITH SCHEMA "custom schema";')['extensions'] == {'hstore': 'custom schema'}
+    assert pg.archive_info(TOC, '-- TOC entry 1 (class 2615 OID 2200)\nCREATE SCHEMA "custom schema";\nCREATE EXTENSION IF NOT EXISTS hstore WITH SCHEMA "custom schema";')[
+        'extensions'
+    ] == {'hstore': 'custom schema'}
 
 
 def target_state():
@@ -206,7 +208,8 @@ def test_writability_probe_quotes_application_schemas_and_rolls_back(pg):
 
 def test_extension_only_schemas_do_not_need_application_create_privilege(pg):
     archive = pg.archive_info(
-        TOC.replace('SCHEMA - public', 'SCHEMA - extensions'), 'CREATE EXTENSION IF NOT EXISTS hstore WITH SCHEMA extensions;\nCREATE TABLE public.app (id integer);'
+        TOC.replace('SCHEMA - public', 'SCHEMA - extensions'),
+        '-- TOC entry 1 (class 2615 OID 2200)\nCREATE SCHEMA extensions;\nCREATE EXTENSION IF NOT EXISTS hstore WITH SCHEMA extensions;\nCREATE TABLE public.app (id integer);',
     )
     state = target_state() | {
         'extensions': {'hstore': 'extensions'},
@@ -312,3 +315,31 @@ def test_rpm_dump_does_not_expand_literal_dollar_identifiers():
 def test_unrelated_extension_config_tables_do_not_block_import(pg):
     state = target_state() | {'extension_config_privileges': {'unrelated_extension': False}}
     assert pg.validate_target(pg.archive_info(TOC, SCHEMA), state, 'pg_restore (PostgreSQL) 15.7', 'hub')
+
+
+@pytest.mark.parametrize('extension_schema', ['extensions', 'custom schema'])
+def test_extension_schema_filter_accepts_spaced_owners_without_removing_other_schemas(pg, extension_schema):
+    other_schema = extension_schema + ' application'
+    toc = TOC.replace('SCHEMA - public source', f'SCHEMA - {extension_schema} application owner')
+    toc += f'7; 0 0 COMMENT - SCHEMA {extension_schema} application owner\n'
+    toc += f'8; 2615 999 SCHEMA - {other_schema} source user\n'
+    schema_sql = (
+        f'-- TOC entry 1 (class 2615 OID 2200)\nCREATE SCHEMA "{extension_schema}";\n'
+        f'-- TOC entry 7 (class 0 OID 0)\nCOMMENT ON SCHEMA "{extension_schema}" IS \'preserve\';\n'
+        f'-- TOC entry 8 (class 2615 OID 999)\nCREATE SCHEMA "{other_schema}";\n'
+        f'-- TOC entry 2 (class 3079 OID 123)\nCREATE EXTENSION IF NOT EXISTS hstore WITH SCHEMA "{extension_schema}";\n'
+    )
+    archive = pg.archive_info(toc, schema_sql)
+    assert f'SCHEMA - {extension_schema} application owner' not in archive['restore_toc']
+    assert f'SCHEMA - {other_schema} source user' in archive['restore_toc']
+    assert archive['restored_schemas'] == [other_schema]
+
+
+def test_extension_schema_filter_rejects_missing_toc_ids_before_restore(pg):
+    with pytest.raises(ValueError, match='table-of-contents metadata'):
+        pg.archive_info(TOC, 'CREATE SCHEMA public;\nCREATE EXTENSION IF NOT EXISTS hstore WITH SCHEMA public;')
+
+
+def test_extension_schema_filter_handles_initdb_public_schema(pg):
+    schema_sql = SCHEMA.replace('CREATE SCHEMA public;', '-- Name: public; Type: SCHEMA; Schema: -; Owner: -\n-- *not* creating schema, since initdb creates it')
+    assert 'SCHEMA - public' not in pg.archive_info(TOC, schema_sql)['restore_toc']

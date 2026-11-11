@@ -168,13 +168,27 @@ def archive_info(toc, schema_sql):
         raise ValueError('Cannot determine all archive extension schemas')
     lines = []
     schemas = set(extensions.values())
+    schema_names_by_id = {}
+    for entry in re.finditer(r'^-- TOC entry (\d+) [^\n]*\n(.*?)(?=^-- TOC entry |\Z)', schema_sql, re.M | re.S):
+        schema = re.search(r'^(?:CREATE SCHEMA|COMMENT ON SCHEMA) (' + _IDENT + r')(?:;| IS )', entry[2], re.M)
+        if schema:
+            schema_names_by_id[entry[1]] = _identifier(schema[1])
+        elif re.search(r'^-- Name: public; Type: SCHEMA; Schema: -; Owner: -$', entry[2], re.M) and re.search(
+            r'^-- \*not\* creating schema, since initdb creates it$', entry[2], re.M
+        ):
+            schema_names_by_id[entry[1]] = 'public'
     for line in toc.splitlines():
         if re.match(r'^\d+; \d+ \d+ (?:EXTENSION |COMMENT - EXTENSION )', line):
             continue
         # A preserved extension makes DROP SCHEMA fail, even with --no-owner.
-        schema = re.match(r'^\d+; \d+ \d+ (?:SCHEMA - |COMMENT - SCHEMA )(.+?)\s+\S+\s*$', line)
-        if schema and schema[1] in schemas:
-            continue
+        schema_entry = re.match(r'^(\d+); \d+ \d+ (?:SCHEMA - |COMMENT - SCHEMA )', line)
+        if schema_entry and schemas:
+            # TOC names and owners are unquoted and can be indistinguishable.
+            # Verbose schema SQL associates each quoted identifier with its ID.
+            if schema_entry[1] not in schema_names_by_id:
+                raise ValueError('Archive schema inspection is missing table-of-contents metadata')
+            if schema_names_by_id[schema_entry[1]] in schemas:
+                continue
         lines.append(line)
     application_schemas = set()
     for match in re.finditer(r'CREATE (?:UNLOGGED )?(?:TABLE|SEQUENCE|VIEW|MATERIALIZED VIEW|FOREIGN TABLE|TYPE|DOMAIN|FUNCTION|PROCEDURE) (' + _IDENT + r')\.', schema_sql):
