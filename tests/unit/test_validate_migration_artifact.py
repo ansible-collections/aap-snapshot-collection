@@ -214,3 +214,61 @@ class TestBuildReport:
         report = validate_mod._build_report(manifest, results, False, True, False, ["hub.pgc not found"])
         assert "INVALID" in report
         assert "hub.pgc not found" in report
+
+
+class TestHubContentSkipMetadata:
+    def test_valid_skip_metadata_is_a_warning(self):
+        component = {
+            "name": "hub",
+            "has_content_data": False,
+            "content_export_skipped": True,
+            "content_export_skip_reason": "Source Hub uses object-storage backend S3",
+        }
+
+        errors, warnings = validate_mod._validate_hub_content_metadata(component)
+
+        assert errors == []
+        assert warnings == ["Hub content was skipped during export: Source Hub uses object-storage backend S3"]
+
+        report = validate_mod._build_report(
+            {"components": [component]},
+            {"hub": True},
+            False,
+            True,
+            True,
+            errors,
+            warnings,
+        )
+        assert "[content: SKIPPED]" in report
+        assert "Warnings:" in report
+        assert "Source Hub uses object-storage backend S3" in report
+        assert "Result: VALID" in report
+
+    def test_skip_metadata_requires_reason(self):
+        component = {"name": "hub", "has_content_data": False, "content_export_skipped": True}
+
+        errors, warnings = validate_mod._validate_hub_content_metadata(component)
+
+        assert errors == ["Hub content_export_skip_reason must be a non-empty string when content is skipped"]
+        assert warnings == []
+
+    def test_skip_metadata_cannot_claim_content_data(self):
+        component = {
+            "name": "hub",
+            "has_content_data": True,
+            "content_export_skipped": True,
+            "content_export_skip_reason": "Source Hub uses object-storage backend S3",
+        }
+
+        errors, warnings = validate_mod._validate_hub_content_metadata(component)
+
+        assert "Hub content is marked skipped but has_content_data is true" in errors
+        assert warnings == []
+
+    def test_legacy_hub_component_without_skip_metadata_remains_valid(self):
+        component = {"name": "hub", "has_content_data": False}
+
+        errors, warnings = validate_mod._validate_hub_content_metadata(component)
+
+        assert errors == []
+        assert warnings == []

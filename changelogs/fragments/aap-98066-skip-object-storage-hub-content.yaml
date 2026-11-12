@@ -1,4 +1,4 @@
 ---
 bugfixes:
-  - Skip Hub content export for source environments using S3 or Azure Blob storage and report the skipped export.
+  - Skip Hub content export for source environments using S3 or Azure Blob storage, record the reason in the artifact manifest, and report it during validation and import.
 ...
