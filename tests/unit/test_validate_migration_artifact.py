@@ -252,6 +252,18 @@ class TestHubContentSkipMetadata:
         assert errors == ["Hub content_export_skip_reason must be a non-empty string when content is skipped"]
         assert warnings == []
 
+    def test_skip_reason_requires_skipped_flag(self):
+        component = {
+            "name": "hub",
+            "has_content_data": False,
+            "content_export_skip_reason": "Source Hub uses object-storage backend S3",
+        }
+
+        errors, warnings = validate_mod._validate_hub_content_metadata(component)
+
+        assert errors == ["Hub content_export_skip_reason is set but content_export_skipped is not true"]
+        assert warnings == []
+
     def test_skip_metadata_cannot_claim_content_data(self):
         component = {
             "name": "hub",
@@ -264,6 +276,20 @@ class TestHubContentSkipMetadata:
 
         assert "Hub content is marked skipped but has_content_data is true" in errors
         assert warnings == []
+
+    def test_skip_metadata_cannot_include_content_filename(self):
+        component = {
+            "name": "hub",
+            "has_content_data": False,
+            "content_export_skipped": True,
+            "content_export_skip_reason": "Source Hub uses object-storage backend S3",
+            "content_filename": "hub_content.tar",
+        }
+
+        errors, warnings = validate_mod._validate_hub_content_metadata(component)
+
+        assert errors == ["Hub content is marked skipped but content_filename is set"]
+        assert warnings == ["Hub content was skipped during export: Source Hub uses object-storage backend S3"]
 
     def test_legacy_hub_component_without_skip_metadata_remains_valid(self):
         component = {"name": "hub", "has_content_data": False}

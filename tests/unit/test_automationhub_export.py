@@ -34,6 +34,7 @@ def test_skipped_content_metadata_condition(public_toggle, detector_skip, should
 
     assert record_condition(**context) is should_record
     if should_record:
-        assert metadata_task["set_fact"]["artifact_hub_content_export_skipped"] is True
-        reason_template = environment.from_string(metadata_task["set_fact"]["artifact_hub_content_skip_reason"])
+        set_fact = metadata_task["ansible.builtin.set_fact"]
+        assert set_fact["artifact_hub_content_export_skipped"] is True
+        reason_template = environment.from_string(set_fact["artifact_hub_content_skip_reason"])
         assert reason_template.render(**context).strip() == expected_reason
