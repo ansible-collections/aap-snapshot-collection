@@ -43,5 +43,7 @@
          else 'Hub content export disabled by configuration' }}
   delegate_to: localhost
   delegate_facts: true
-  when: not (automationhub_export_hub_content | default(true) | bool)
+  when: >-
+    (not (automationhub_export_hub_content | default(true) | bool))
+    or (_automationhub_skip_hub_content_export | default(false) | bool)
 ...
