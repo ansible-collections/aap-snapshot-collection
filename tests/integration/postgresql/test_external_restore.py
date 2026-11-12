@@ -17,6 +17,7 @@ import pytest
 
 pytestmark = pytest.mark.skipif(os.environ.get('AAP_SNAPSHOT_PG_INTEGRATION') != '1', reason='opt-in PostgreSQL integration fixture')
 ROOT = Path(__file__).parents[3]
+PREFLIGHT_SQL = (ROOT / 'roles/postgresql/files/target_preflight.sql').read_text()
 spec = importlib.util.spec_from_file_location('pg_migration', ROOT / 'plugins/filter/postgresql_migration.py')
 pg = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(pg)
@@ -77,10 +78,21 @@ def database():
             'source_db',
         )
         sql(
-            'CREATE EXTENSION hstore; SET ROLE target_user; ' 'CREATE TABLE app (id integer PRIMARY KEY, attributes hstore); ' "INSERT INTO app VALUES (99, 'name=>target');",
+            """CREATE EXTENSION hstore; SET ROLE target_user;
+CREATE TABLE app (id integer PRIMARY KEY, attributes hstore);
+INSERT INTO app VALUES (99, 'name=>target');""",
             'target_db',
         )
-        settings = {'default': {'HOST': '127.0.0.1', 'PORT': '5432', 'NAME': 'target_db', 'USER': 'target_user', 'PASSWORD': password, 'OPTIONS': {'sslmode': 'disable'}}}
+        settings = {
+            'default': {
+                'HOST': '127.0.0.1',
+                'PORT': '5432',
+                'NAME': 'target_db',
+                'USER': 'target_user',
+                'PASSWORD': password,
+                'OPTIONS': {'sslmode': 'disable'},
+            }
+        }
         run(['pg_dump', '-U', 'postgres', '-d', 'source_db', '-Fc', '-f', '/tmp/source.pgc'])
         sql('REVOKE SELECT ON app FROM source_grant_only;', 'source_db')
         sql('DROP ROLE source_grant_only;')
@@ -97,12 +109,21 @@ def test_external_restore_preserves_admin_owned_extension_and_target_identity(da
     run, sql, settings, archive = database
     before = sql("SELECT oid || ':' || extowner FROM pg_extension WHERE extname='hstore'", 'target_db')
     state = json.loads(
-        run(shlex.split(pg.client_command(settings, ['psql', '-XAt', '-v', 'ON_ERROR_STOP=1', '-c', (ROOT / 'roles/postgresql/files/target_preflight.sql').read_text()]))).stdout
+        run(
+            shlex.split(
+                pg.client_command(settings, ['psql', '-XAt', '-v', 'ON_ERROR_STOP=1', '-c', PREFLIGHT_SQL]),
+            ),
+        ).stdout,
     )
     assert pg.validate_target(archive, state, run(['pg_restore', '--version']).stdout, 'hub')
     run(shlex.split(pg.client_command(settings, ['psql', '-XAt', '-v', 'ON_ERROR_STOP=1', '-c', pg.write_probe(archive)])))
     result = run(
-        shlex.split(pg.client_command(settings, ['pg_restore', '--clean', '--if-exists', '--no-owner', '--no-acl', '--use-list', '/tmp/restore.list', '/tmp/source.pgc'])),
+        shlex.split(
+            pg.client_command(
+                settings,
+                ['pg_restore', '--clean', '--if-exists', '--no-owner', '--no-acl', '--use-list', '/tmp/restore.list', '/tmp/source.pgc'],
+            ),
+        ),
         check=False,
     )
     assert not pg.restore_failed({'rc': result.returncode, 'stderr': result.stderr}), result.stderr
@@ -135,7 +156,12 @@ def test_real_permission_and_connection_failures_are_rejected(database):
     # A role still owns its database, so exercise an object it does not own.
     sql('ALTER TABLE app OWNER TO postgres;', 'target_db')
     result = run(
-        shlex.split(pg.client_command(settings, ['pg_restore', '--clean', '--if-exists', '--no-owner', '--no-acl', '--use-list', '/tmp/restore.list', '/tmp/source.pgc'])),
+        shlex.split(
+            pg.client_command(
+                settings,
+                ['pg_restore', '--clean', '--if-exists', '--no-owner', '--no-acl', '--use-list', '/tmp/restore.list', '/tmp/source.pgc'],
+            ),
+        ),
         check=False,
     )
     assert result.returncode != 0 and pg.restore_failed({'rc': result.returncode, 'stderr': result.stderr})
@@ -154,10 +180,15 @@ def test_real_partition_cleanup_error_is_narrowly_classified(database):
     )
     run(['pg_dump', '-U', 'postgres', '-d', 'source_db', '-Fc', '-t', 'partition*', '-f', '/tmp/partitions.pgc'])
     run(['pg_restore', '-U', 'postgres', '-d', 'target_db', '--no-owner', '--no-acl', '/tmp/partitions.pgc'])
-    result = run(['env', 'LC_ALL=C', 'pg_restore', '-U', 'postgres', '-d', 'target_db', '--clean', '--if-exists', '--no-owner', '--no-acl', '/tmp/partitions.pgc'], check=False)
+    result = run(
+        ['env', 'LC_ALL=C', 'pg_restore', '-U', 'postgres', '-d', 'target_db', '--clean', '--if-exists', '--no-owner', '--no-acl', '/tmp/partitions.pgc'],
+        check=False,
+    )
     assert result.returncode == 1, result.stderr
     assert not pg.restore_failed({'rc': result.returncode, 'stderr': result.stderr}), result.stderr
-    assert pg.restore_failed({'rc': result.returncode, 'stderr': result.stderr + '\npg_restore: error: COPY failed for table app: ERROR: invalid input syntax\n'})
+    assert pg.restore_failed(
+        {'rc': result.returncode, 'stderr': result.stderr + '\npg_restore: error: COPY failed for table app: ERROR: invalid input syntax\n'},
+    )
 
 
 def test_source_acl_roles_and_data_load_errors_are_real_failures(database):
@@ -188,13 +219,17 @@ def test_extension_configuration_table_data_is_retained(database):
     before = sql("SELECT oid FROM pg_extension WHERE extname='aap_snapshot_fixture'", 'config_target_db')
     run(['pg_dump', '-U', 'postgres', '-d', 'config_source_db', '-Fc', '-f', '/tmp/config.pgc'])
     archive = pg.archive_info(
-        run(['pg_restore', '--list', '/tmp/config.pgc']).stdout, run(['pg_restore', '--verbose', '--schema-only', '--no-owner', '--no-acl', '-f', '-', '/tmp/config.pgc']).stdout
+        run(['pg_restore', '--list', '/tmp/config.pgc']).stdout,
+        run(['pg_restore', '--verbose', '--schema-only', '--no-owner', '--no-acl', '-f', '-', '/tmp/config.pgc']).stdout,
     )
     assert 'TABLE DATA public fixture_config' in archive['restore_toc']
     run(['sh', '-c', 'umask 077; cat > /tmp/config.list'], data=archive['restore_toc'])
     target = {'default': settings['default'] | {'NAME': 'config_target_db'}}
     result = run(
-        shlex.split(pg.client_command(target, ['pg_restore', '--clean', '--if-exists', '--no-owner', '--no-acl', '--use-list', '/tmp/config.list', '/tmp/config.pgc'])), check=False
+        shlex.split(
+            pg.client_command(target, ['pg_restore', '--clean', '--if-exists', '--no-owner', '--no-acl', '--use-list', '/tmp/config.list', '/tmp/config.pgc']),
+        ),
+        check=False,
     )
     assert not pg.restore_failed({'rc': result.returncode, 'stderr': result.stderr}), result.stderr
     assert sql('SELECT value FROM fixture_config WHERE id=42', 'config_target_db') == 'source extension data'
@@ -236,7 +271,7 @@ def test_rpm_dump_task_handles_special_source_user_and_database_names(database):
 
 @pytest.mark.parametrize('extension_schema', ['public', 'extensions', 'custom schema'])
 def test_restore_preserves_custom_extension_schema_with_spaced_source_owner(database, extension_schema):
-    run, sql, settings, _ = database
+    run, sql, settings, _archive = database
     suffix = uuid.uuid4().hex[:8]
     source_db = 'schema_source_' + suffix
     target_db = 'schema_target_' + suffix
@@ -246,7 +281,10 @@ def test_restore_preserves_custom_extension_schema_with_spaced_source_owner(data
     sql('CREATE ROLE "' + owner + '";')
     sql('CREATE DATABASE ' + source_db + ';')
     sql('CREATE DATABASE ' + target_db + ' OWNER target_user;')
-    source_schema_sql = 'ALTER SCHEMA public OWNER TO "' + owner + '"; ' if extension_schema == 'public' else 'CREATE SCHEMA ' + quoted_schema + ' AUTHORIZATION "' + owner + '"; '
+    if extension_schema == 'public':
+        source_schema_sql = 'ALTER SCHEMA public OWNER TO "' + owner + '"; '
+    else:
+        source_schema_sql = 'CREATE SCHEMA ' + quoted_schema + ' AUTHORIZATION "' + owner + '"; '
     sql(
         source_schema_sql + 'CREATE SCHEMA ' + other_schema + ' AUTHORIZATION source_user; '
         'CREATE TABLE ' + other_schema + '.other_payload (id integer); '
@@ -257,7 +295,10 @@ def test_restore_preserves_custom_extension_schema_with_spaced_source_owner(data
         "INSERT INTO public.payload VALUES (7, 'name=>source');",
         source_db,
     )
-    target_schema_sql = 'ALTER SCHEMA public OWNER TO target_user; ' if extension_schema == 'public' else 'CREATE SCHEMA ' + quoted_schema + ' AUTHORIZATION target_user; '
+    if extension_schema == 'public':
+        target_schema_sql = 'ALTER SCHEMA public OWNER TO target_user; '
+    else:
+        target_schema_sql = 'CREATE SCHEMA ' + quoted_schema + ' AUTHORIZATION target_user; '
     sql(target_schema_sql + 'CREATE EXTENSION hstore WITH SCHEMA ' + quoted_schema + ';', target_db)
     before = sql("SELECT oid || ':' || extowner FROM pg_extension WHERE extname='hstore'", target_db)
     dump_path = '/tmp/schema-' + suffix + '.pgc'
@@ -269,7 +310,11 @@ def test_restore_preserves_custom_extension_schema_with_spaced_source_owner(data
     )
     target = {'default': settings['default'] | {'NAME': target_db}}
     state = json.loads(
-        run(shlex.split(pg.client_command(target, ['psql', '-XAt', '-v', 'ON_ERROR_STOP=1', '-c', (ROOT / 'roles/postgresql/files/target_preflight.sql').read_text()]))).stdout
+        run(
+            shlex.split(
+                pg.client_command(target, ['psql', '-XAt', '-v', 'ON_ERROR_STOP=1', '-c', PREFLIGHT_SQL]),
+            ),
+        ).stdout,
     )
     assert pg.validate_target(archive, state, run(['pg_restore', '--version']).stdout, 'hub')
     run(shlex.split(pg.client_command(target, ['psql', '-XAt', '-v', 'ON_ERROR_STOP=1', '-c', pg.write_probe(archive)])))

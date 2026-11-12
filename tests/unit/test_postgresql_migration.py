@@ -44,7 +44,14 @@ def test_each_component_has_its_own_resolved_secret(pg, component, field):
 def test_password_only_secret_and_tls_without_admin_password(pg):
     data = {
         key: base64.b64encode(value.encode()).decode()
-        for key, value in {'host': 'db.example', 'port': '5432', 'database': 'target-db', 'username': 'target-user', 'password': "a'\"$()\\word", 'sslmode': 'verify-full'}.items()
+        for key, value in {
+            'host': 'db.example',
+            'port': '5432',
+            'database': 'target-db',
+            'username': 'target-user',
+            'password': "a'\"$()\\word",
+            'sslmode': 'verify-full',
+        }.items()
     }
     settings = pg.decode_pg_secret(data)
     assert settings['default']['NAME'] == 'target-db'
@@ -127,7 +134,11 @@ TOC = ''';
 5; 0 456 TABLE DATA public app source
 6; 0 999 TABLE DATA public extension_config source
 '''
-SCHEMA = '-- TOC entry 1 (class 2615 OID 2200)\nCREATE SCHEMA public;\n-- TOC entry 2 (class 3079 OID 123)\nCREATE EXTENSION IF NOT EXISTS hstore WITH SCHEMA public;\n'
+SCHEMA = '''-- TOC entry 1 (class 2615 OID 2200)
+CREATE SCHEMA public;
+-- TOC entry 2 (class 3079 OID 123)
+CREATE EXTENSION IF NOT EXISTS hstore WITH SCHEMA public;
+'''
 
 
 def test_filter_preserves_application_and_extension_configuration_data(pg):
@@ -141,7 +152,10 @@ def test_filter_preserves_application_and_extension_configuration_data(pg):
 
 
 def test_extension_schema_uses_quoted_sql_identifiers(pg):
-    assert pg.archive_info(TOC, '-- TOC entry 1 (class 2615 OID 2200)\nCREATE SCHEMA "custom schema";\nCREATE EXTENSION IF NOT EXISTS hstore WITH SCHEMA "custom schema";')[
+    assert pg.archive_info(
+        TOC,
+        '-- TOC entry 1 (class 2615 OID 2200)\nCREATE SCHEMA "custom schema";\nCREATE EXTENSION IF NOT EXISTS hstore WITH SCHEMA "custom schema";',
+    )[
         'extensions'
     ] == {'hstore': 'custom schema'}
 
@@ -177,7 +191,12 @@ def test_target_deficiencies_fail_before_restore(pg, mutation, message):
 
 def test_hub_requires_hstore_even_if_archive_omits_extension(pg):
     with pytest.raises(ValueError, match='hstore'):
-        pg.validate_target(pg.archive_info(TOC.replace('2; 3079 123 EXTENSION - hstore\n', ''), ''), target_state() | {'extensions': {}}, 'pg_restore (PostgreSQL) 15.7', 'hub')
+        pg.validate_target(
+            pg.archive_info(TOC.replace('2; 3079 123 EXTENSION - hstore\n', ''), ''),
+            target_state() | {'extensions': {}},
+            'pg_restore (PostgreSQL) 15.7',
+            'hub',
+        )
 
 
 @pytest.mark.parametrize('dump,restore,target', [(16, 15, 16), (15, 15, 16), (16, 16, 15)])
@@ -209,7 +228,10 @@ def test_writability_probe_quotes_application_schemas_and_rolls_back(pg):
 def test_extension_only_schemas_do_not_need_application_create_privilege(pg):
     archive = pg.archive_info(
         TOC.replace('SCHEMA - public', 'SCHEMA - extensions'),
-        '-- TOC entry 1 (class 2615 OID 2200)\nCREATE SCHEMA extensions;\nCREATE EXTENSION IF NOT EXISTS hstore WITH SCHEMA extensions;\nCREATE TABLE public.app (id integer);',
+        '''-- TOC entry 1 (class 2615 OID 2200)
+CREATE SCHEMA extensions;
+CREATE EXTENSION IF NOT EXISTS hstore WITH SCHEMA extensions;
+CREATE TABLE public.app (id integer);''',
     )
     state = target_state() | {
         'extensions': {'hstore': 'extensions'},
@@ -253,7 +275,12 @@ def test_archive_schema_names_with_spaces_do_not_create_phantom_schemas(pg):
 
 def test_configuration_table_permissions_are_checked_before_restore(pg):
     with pytest.raises(ValueError, match='configuration'):
-        pg.validate_target(pg.archive_info(TOC, SCHEMA), target_state() | {'extension_config_privileges': {'hstore': False}}, 'pg_restore (PostgreSQL) 15.7', 'hub')
+        pg.validate_target(
+            pg.archive_info(TOC, SCHEMA),
+            target_state() | {'extension_config_privileges': {'hstore': False}},
+            'pg_restore (PostgreSQL) 15.7',
+            'hub',
+        )
 
 
 def test_rpm_tls_queries_use_service_key_owner():
@@ -341,5 +368,8 @@ def test_extension_schema_filter_rejects_missing_toc_ids_before_restore(pg):
 
 
 def test_extension_schema_filter_handles_initdb_public_schema(pg):
-    schema_sql = SCHEMA.replace('CREATE SCHEMA public;', '-- Name: public; Type: SCHEMA; Schema: -; Owner: -\n-- *not* creating schema, since initdb creates it')
+    schema_sql = SCHEMA.replace(
+        'CREATE SCHEMA public;',
+        '-- Name: public; Type: SCHEMA; Schema: -; Owner: -\n-- *not* creating schema, since initdb creates it',
+    )
     assert 'SCHEMA - public' not in pg.archive_info(TOC, schema_sql)['restore_toc']

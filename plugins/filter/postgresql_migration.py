@@ -121,7 +121,7 @@ def restore_failed(result):
     error = re.compile(
         r'pg_restore: error: could not execute query: ERROR:\s+cannot drop inherited constraint "(?P<constraint>[^"\n]+)" '
         r'of relation "(?P<table>[^"\n]+)"\s*\nCommand was: ALTER TABLE (?:IF EXISTS )?ONLY '
-        r'(?P<schema>' + _IDENT + r')\.(?P<relation>' + _IDENT + r')\s+DROP CONSTRAINT (?:IF EXISTS )?(?P<key>' + _IDENT + r');\s*\n?'
+        r'(?P<schema>' + _IDENT + r')\.(?P<relation>' + _IDENT + r')\s+DROP CONSTRAINT (?:IF EXISTS )?(?P<key>' + _IDENT + r');\s*\n?',
     )
     count = 0
 
@@ -174,7 +174,9 @@ def archive_info(toc, schema_sql):
         if schema:
             schema_names_by_id[entry[1]] = _identifier(schema[1])
         elif re.search(r'^-- Name: public; Type: SCHEMA; Schema: -; Owner: -$', entry[2], re.M) and re.search(
-            r'^-- \*not\* creating schema, since initdb creates it$', entry[2], re.M
+            r'^-- \*not\* creating schema, since initdb creates it$',
+            entry[2],
+            re.M,
         ):
             schema_names_by_id[entry[1]] = 'public'
     for line in toc.splitlines():
@@ -191,7 +193,10 @@ def archive_info(toc, schema_sql):
                 continue
         lines.append(line)
     application_schemas = set()
-    for match in re.finditer(r'CREATE (?:UNLOGGED )?(?:TABLE|SEQUENCE|VIEW|MATERIALIZED VIEW|FOREIGN TABLE|TYPE|DOMAIN|FUNCTION|PROCEDURE) (' + _IDENT + r')\.', schema_sql):
+    for match in re.finditer(
+        r'CREATE (?:UNLOGGED )?(?:TABLE|SEQUENCE|VIEW|MATERIALIZED VIEW|FOREIGN TABLE|TYPE|DOMAIN|FUNCTION|PROCEDURE) (' + _IDENT + r')\.',
+        schema_sql,
+    ):
         application_schemas.add(_identifier(match[1]))
     # Match complete schema names against SQL-derived namespaces. TOC names
     # are not quoted and may themselves contain whitespace.
@@ -258,7 +263,11 @@ def write_probe(archive):
     for schema in archive['schemas']:
         qualified = quote_ident(schema) + '.' + table
         statements.extend(
-            ['CREATE SCHEMA IF NOT EXISTS ' + quote_ident(schema) + ';', 'CREATE TABLE ' + qualified + ' (value integer);', 'INSERT INTO ' + qualified + ' VALUES (1);']
+            [
+                'CREATE SCHEMA IF NOT EXISTS ' + quote_ident(schema) + ';',
+                'CREATE TABLE ' + qualified + ' (value integer);',
+                'INSERT INTO ' + qualified + ' VALUES (1);',
+            ],
         )
     statements.append('ROLLBACK;')
     return '\n'.join(statements)
@@ -271,7 +280,9 @@ def ca_mounts(references):
         if component not in _COMPONENTS or not isinstance(reference, dict) or not reference.get('name'):
             raise ValueError('CA Secret references must map component names to {name, key}')
         name = 'postgres-ca-' + component
-        result['volumes'].append({'name': name, 'secret': {'secretName': reference['name'], 'items': [{'key': reference.get('key', 'ca.crt'), 'path': 'ca.crt'}]}})
+        result['volumes'].append(
+            {'name': name, 'secret': {'secretName': reference['name'], 'items': [{'key': reference.get('key', 'ca.crt'), 'path': 'ca.crt'}]}},
+        )
         result['mounts'].append({'name': name, 'mountPath': '/etc/aap-snapshot-ca/' + component, 'readOnly': True})
     return result
 
