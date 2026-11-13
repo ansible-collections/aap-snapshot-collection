@@ -28,8 +28,8 @@ aap-snapshot-<version>-<date>.tar
 Component directories are only present if the source deployment includes that
 component. The artifact is self-describing - the manifest lists which
 components were exported. Database dumps always use the `.pgc` suffix. Schema
-1.1 records the configured Hub content filename so validation and import can
-use the name stored in the artifact.
+1.1 records the configured Hub content filename and, when Hub content is
+skipped, the skip status and reason so validation and import can report it.
 
 ## manifest.yml
 
@@ -56,6 +56,8 @@ Array of exported components. Each entry:
 | `has_custom_configs` | boolean | Whether custom configuration files are included |
 | `has_content_data` | boolean | Hub only: whether Pulp content tarball is included |
 | `content_filename` | string | Hub only: configured content archive filename when `has_content_data` is true |
+| `content_export_skipped` | boolean | Hub only: whether content export was intentionally skipped |
+| `content_export_skip_reason` | string | Hub only: human-readable reason when content export was skipped |
 
 ### database
 
@@ -169,8 +171,12 @@ When `artifact_export_hub_content: true` (the default), the hub directory
 includes a tarball of Pulp's media directory. Its default filename is
 `hub_content.tar`; schema 1.1 records the configured name in the Hub
 component's `content_filename` field. OCP export supports Hub content stored
-on a file-storage PVC. OCP Hub content stored in S3 or Azure Blob must be
-omitted by setting `artifact_export_hub_content: false`.
+on a file-storage PVC. When the source Hub uses S3 or Azure Blob object
+storage, content export is skipped because those objects are outside the local
+media directory. The manifest records `content_export_skipped: true` and a
+reason, and artifact validation reports the skip as a warning without marking
+the artifact invalid. Content can also be intentionally omitted by setting
+`artifact_export_hub_content: false`.
 
 ## Integrity
 
@@ -194,12 +200,12 @@ validation phase of both export and import workflows.
 ## Versioning
 
 The `schema_version` field identifies the artifact format version. Version
-1.1 records the configured Hub content filename; consumers also support
-version 1.0 artifacts. Both versions use the canonical `.pgc` database dump
-suffix and `hub_content.tar` content filename unless the Hub filename is
-recorded in a 1.1 manifest. The `artifact` role maintains an internal list of
-supported schema versions. Artifacts with unrecognized schema versions are
-rejected during validation.
+1.1 records the configured Hub content filename and optional Hub content skip
+metadata; consumers also support version 1.0 artifacts. Both versions use
+the canonical `.pgc` database dump suffix and `hub_content.tar` content
+filename unless the Hub filename is recorded in a 1.1 manifest. The `artifact`
+role maintains an internal list of supported schema versions. Artifacts with
+unrecognized schema versions are rejected during validation.
 
 The `aap_version` and `aap_version_patch` fields record the source platform
 version. These can be used to enforce version compatibility policies during

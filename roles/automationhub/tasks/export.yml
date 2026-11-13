@@ -24,4 +24,26 @@
 - name: Export hub content data
   ansible.builtin.include_tasks: export_hub_content.yml
   when: automationhub_export_hub_content | default(true) | bool
+
+- name: Report Hub content export disabled by configuration
+  ansible.builtin.debug:
+    msg: >-
+      Hub content export is skipped because automationhub_export_hub_content
+      is false.
+  when:
+    - not (automationhub_export_hub_content | default(true) | bool)
+    - not (_automationhub_skip_hub_content_export | default(false) | bool)
+
+- name: Record skipped Hub content export for artifact reports
+  ansible.builtin.set_fact:
+    artifact_hub_content_export_skipped: true
+    artifact_hub_content_skip_reason: >-
+      {{ ('Source Hub uses object-storage backend ' ~ _automationhub_storage_backend)
+         if (_automationhub_skip_hub_content_export | default(false) | bool)
+         else 'Hub content export disabled by configuration' }}
+  delegate_to: localhost
+  delegate_facts: true
+  when: >-
+    (not (automationhub_export_hub_content | default(true) | bool))
+    or (_automationhub_skip_hub_content_export | default(false) | bool)
 ...

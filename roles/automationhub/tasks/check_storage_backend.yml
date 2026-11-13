@@ -1,11 +1,8 @@
 ---
-# Containerized hub content import only supports Pulp's default local
-# FileSystem storage today. A containerized hub CAN be deployed with a
-# shared Azure Blob or AWS S3 backend instead - importing content into
-# those backends is a separate, not-yet-implemented feature. Fail loudly
-# and early (before any destructive stop/restore work starts) rather than
-# silently restoring only the Pulp database and leaving every migrated
-# collection un-downloadable.
+# Inspect the containerized Hub storage backend. Content import still
+# requires local FileSystem storage; source exports using Azure Blob or S3
+# skip the content archive because those files live outside the local media
+# directory.
 - name: Determine Hub Pulp storage backend
   containers.podman.podman_container_exec:
     name: automation-hub-api
@@ -32,6 +29,14 @@
           if (_automationhub_storage_settings.STORAGES | default(none)) is mapping
           else (_automationhub_storage_settings.DEFAULT_FILE_STORAGE | default(''))) }}
 
+- name: Skip Hub content export for object storage (containerized)
+  ansible.builtin.set_fact:
+    automationhub_export_hub_content: false
+    _automationhub_skip_hub_content_export: true
+  when:
+    - _automationhub_storage_backend_check_mode | default('import') == 'export'
+    - (_automationhub_storage_backend | lower) is search('azure|s3')
+
 - name: Fail if Hub is not using local FileSystem storage
   ansible.builtin.fail:
     msg: >-
@@ -42,5 +47,10 @@
       yet implemented and is tracked separately - re-run the import without
       hub content, or wait for object-storage import support to land,
       before importing hub content onto this target.
-  when: "'filesystem' not in (_automationhub_storage_backend | lower)"
+  when:
+    - "'filesystem' not in (_automationhub_storage_backend | lower)"
+    - not (
+        (_automationhub_storage_backend_check_mode | default('import') == 'export')
+        and ((_automationhub_storage_backend | lower) is search('azure|s3'))
+      )
 ...

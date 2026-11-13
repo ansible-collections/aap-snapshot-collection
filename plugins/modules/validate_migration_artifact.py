@@ -72,6 +72,11 @@ errors:
   returned: always
   type: list
   elements: str
+warnings:
+  description: Non-fatal artifact warnings, including Hub content skipped during export.
+  returned: always
+  type: list
+  elements: str
 """
 
 import hashlib
@@ -182,7 +187,42 @@ def _validate_source_aap_cr(artifact_dir, source_topology):
     return failures
 
 
-def _build_report(manifest, component_results, hub_content_ok, checksum_ok, secrets_ok, errors):
+def _validate_hub_content_metadata(component):
+    """Validate optional Hub content skip metadata while preserving old artifacts."""
+    if component.get("name") != "hub":
+        return [], []
+
+    errors = []
+    warnings = []
+    has_content_data = component.get("has_content_data", False)
+    skipped = component.get("content_export_skipped", False)
+    skip_reason = component.get("content_export_skip_reason")
+
+    if "has_content_data" in component and not isinstance(has_content_data, bool):
+        errors.append("Hub has_content_data must be a boolean")
+        has_content_data = False
+
+    if "content_export_skipped" in component and not isinstance(skipped, bool):
+        errors.append("Hub content_export_skipped must be a boolean")
+        skipped = False
+
+    if skipped:
+        if has_content_data:
+            errors.append("Hub content is marked skipped but has_content_data is true")
+        if not isinstance(skip_reason, str) or not skip_reason.strip():
+            errors.append("Hub content_export_skip_reason must be a non-empty string when content is skipped")
+        elif not has_content_data:
+            warnings.append(f"Hub content was skipped during export: {skip_reason.strip()}")
+        if "content_filename" in component:
+            errors.append("Hub content is marked skipped but content_filename is set")
+    elif skip_reason not in (None, ""):
+        errors.append("Hub content_export_skip_reason is set but content_export_skipped is not true")
+
+    return errors, warnings
+
+
+def _build_report(manifest, component_results, hub_content_ok, checksum_ok, secrets_ok, errors, warnings=None):
+    warnings = warnings or []
     lines = [
         "",
         "=" * 63,
@@ -207,6 +247,10 @@ def _build_report(manifest, component_results, hub_content_ok, checksum_ok, secr
         if comp.get("has_content_data", False):
             content_status = "OK" if hub_content_ok else "MISSING"
             entry += f" [content: {content_status}]"
+        elif name == "hub" and comp.get("content_export_skipped") is True:
+            entry += " [content: SKIPPED]"
+        elif name == "hub":
+            entry += " [content: NOT INCLUDED]"
 
         lines.append(entry)
 
@@ -231,6 +275,12 @@ def _build_report(manifest, component_results, hub_content_ok, checksum_ok, secr
         for err in errors:
             lines.append(f"    - {err}")
 
+    if warnings:
+        lines.append("")
+        lines.append("  Warnings:")
+        for warning in warnings:
+            lines.append(f"    - {warning}")
+
     return "\n".join(lines)
 
 
@@ -252,6 +302,7 @@ def main():
     target_version = module.params["target_aap_version"]
 
     errors = []
+    warnings = []
     manifest = {}
     component_results = {}
     hub_content_ok = False
@@ -310,6 +361,11 @@ def main():
 
     for comp in manifest.get("components", []):
         name = comp.get("name", "")
+        if name == "hub":
+            hub_metadata_errors, hub_metadata_warnings = _validate_hub_content_metadata(comp)
+            errors.extend(hub_metadata_errors)
+            warnings.extend(hub_metadata_warnings)
+
         dump_path = os.path.join(artifact_dir, name, f"{name}.pgc")
 
         if not os.path.realpath(dump_path).startswith(os.path.realpath(artifact_dir)):
@@ -334,7 +390,7 @@ def main():
                 if not hub_content_ok:
                     errors.append(f"Hub content data flagged in manifest but {content_filename} not found")
 
-    report = _build_report(manifest, component_results, hub_content_ok, checksum_ok, secrets_ok, errors)
+    report = _build_report(manifest, component_results, hub_content_ok, checksum_ok, secrets_ok, errors, warnings)
 
     result = dict(
         changed=False,
@@ -342,6 +398,7 @@ def main():
         manifest=manifest,
         report=report,
         errors=errors,
+        warnings=warnings,
     )
 
     if errors:

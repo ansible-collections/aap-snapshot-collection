@@ -1,6 +1,29 @@
 ---
+- name: Check containerized Hub storage backend before content export
+  ansible.builtin.include_tasks: check_storage_backend.yml
+  vars:
+    _automationhub_storage_backend_check_mode: export
+  when: aap_platform == 'containerized'
+
+- name: Check OCP Hub storage backend before content export
+  ansible.builtin.include_tasks: check_storage_backend_ocp.yml
+  vars:
+    _automationhub_storage_backend_check_mode: export
+  when: aap_platform == 'operator'
+
+- name: Report skipped Hub content export for object storage
+  ansible.builtin.debug:
+    msg: >-
+      Hub content export is being skipped because the source Hub uses object
+      storage backend '{{ _automationhub_storage_backend }}'. The artifact will
+      not include Hub content. Configure the target to use the existing S3 or
+      Azure Blob storage API, or migrate the content separately.
+  when: _automationhub_skip_hub_content_export | default(false) | bool
+
 - name: Hub content export
-  when: automationhub_export_hub_content | default(true) | bool
+  when:
+    - automationhub_export_hub_content | default(true) | bool
+    - not (_automationhub_skip_hub_content_export | default(false) | bool)
   block:
     - name: Set OCP Hub content staging directory
       ansible.builtin.set_fact:
@@ -38,10 +61,6 @@
             dest: "{{ automationhub_content_staging_dir }}/{{ automationhub_content_tar_name }}"
             format: tar
             mode: '0640'
-
-    - name: Check OCP Hub storage backend
-      ansible.builtin.include_tasks: check_storage_backend_ocp.yml
-      when: aap_platform == 'operator'
 
     - name: Export Hub content from OCP pod
       when: aap_platform == 'operator'

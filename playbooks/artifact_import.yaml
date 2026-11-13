@@ -95,6 +95,17 @@
             - {{ comp.name }} (not deployed on target)
           {% endfor %}
           {% endif %}
+          {% set _hub = artifact_manifest.components | selectattr('name', 'equalto', 'hub') | list %}
+          {% if _hub %}
+          Hub content:
+          {% if _hub[0].content_export_skipped | default(false) | bool %}
+            skipped during export: {{ _hub[0].content_export_skip_reason | default('reason not recorded') }}
+          {% elif _hub[0].has_content_data | default(false) | bool %}
+            included in the artifact
+          {% else %}
+            not included in the artifact (reason not recorded)
+          {% endif %}
+          {% endif %}
       when: artifact_manifest is defined
 
     - name: Post-import advisory
@@ -109,7 +120,10 @@
           - Execution nodes: register equivalent nodes in target controller UI
           {% if 'hub' in _artifact_import_components | default([]) %}
           {% set _hub = artifact_manifest.components | selectattr('name', 'equalto', 'hub') | list %}
-          {% if _hub and not (_hub[0].has_content_data | default(false)) %}
+          {% if _hub and (_hub[0].content_export_skipped | default(false) | bool) %}
+          - Hub content was skipped during export because {{ _hub[0].content_export_skip_reason | default('the source storage backend is unsupported') }}.
+            It is not included in the artifact. Reuse the source S3/Azure object store on the target Hub if appropriate; otherwise migrate the content separately.
+          {% elif _hub and not (_hub[0].has_content_data | default(false) | bool) %}
           - Hub content was not migrated - run content sync manually
           {% endif %}
           {% elif aap_platform == 'containerized' %}

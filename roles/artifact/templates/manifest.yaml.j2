@@ -30,6 +30,10 @@ components:
     database_name: "{{ _hub_db_name | default('automationhub') }}"
     has_custom_configs: false
     has_content_data: {{ (_automationhub_content_exported | default(false)) | lower }}
+{% if hostvars['localhost'].artifact_hub_content_export_skipped | default(false) | bool %}
+    content_export_skipped: true
+    content_export_skip_reason: {{ hostvars['localhost'].artifact_hub_content_skip_reason | to_json }}
+{% endif %}
 {% if _automationhub_content_exported | default(false) %}
     content_filename: {{ hostvars['localhost'].artifact_hub_content_filename | default('hub_content.tar') | to_json }}
 {% endif %}

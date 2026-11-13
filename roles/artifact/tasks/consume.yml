@@ -27,6 +27,8 @@
       ansible.builtin.include_role:
         name: ansible.aap_snapshot.automationhub
         tasks_from: check_storage_backend.yml
+      vars:
+        _automationhub_storage_backend_check_mode: import
       when:
         - artifact_hub_has_content_data | bool
         - inventory_hostname in groups.get('hub_groups', [])
@@ -270,6 +272,8 @@
       ansible.builtin.include_role:
         name: ansible.aap_snapshot.automationhub
         tasks_from: check_storage_backend_ocp.yml
+      vars:
+        _automationhub_storage_backend_check_mode: import
       when:
         - "'hub' in _artifact_import_components"
         - artifact_hub_has_content_data | default(false) | bool
