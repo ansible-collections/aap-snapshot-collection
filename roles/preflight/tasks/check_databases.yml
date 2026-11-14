@@ -17,11 +17,17 @@
       no_log: "{{ __preflight_no_log }}"
 
     - name: Verify controller database connection (RPM)
+      become: true
+      become_user: awx
       community.postgresql.postgresql_query:
         login_host: "{{ _preflight_controller_db_check.db_credentials.host }}"
         login_port: "{{ _preflight_controller_db_check.db_credentials.port }}"
         login_user: "{{ _preflight_controller_db_check.db_credentials.user }}"
         login_password: "{{ _preflight_controller_db_check.db_credentials.password }}"
+        ssl_mode: "{{ (_preflight_controller_db_check.db_credentials.options | default({})).sslmode | default('prefer') }}"
+        ca_cert: "{{ (_preflight_controller_db_check.db_credentials.options | default({})).sslrootcert | default(omit) }}"
+        ssl_cert: "{{ (_preflight_controller_db_check.db_credentials.options | default({})).sslcert | default(omit) }}"
+        ssl_key: "{{ (_preflight_controller_db_check.db_credentials.options | default({})).sslkey | default(omit) }}"
         login_db: "{{ _preflight_controller_db_check.db_credentials.name }}"
         query: "SHOW server_version"
       no_log: "{{ __preflight_no_log }}"
@@ -42,11 +48,17 @@
       no_log: "{{ __preflight_no_log }}"
 
     - name: Verify gateway database connection (RPM)
+      become: true
+      become_user: gateway
       community.postgresql.postgresql_query:
         login_host: "{{ _preflight_gateway_db_check.db_credentials.host }}"
         login_port: "{{ _preflight_gateway_db_check.db_credentials.port }}"
         login_user: "{{ _preflight_gateway_db_check.db_credentials.user }}"
         login_password: "{{ _preflight_gateway_db_check.db_credentials.password }}"
+        ssl_mode: "{{ (_preflight_gateway_db_check.db_credentials.options | default({})).sslmode | default('prefer') }}"
+        ca_cert: "{{ (_preflight_gateway_db_check.db_credentials.options | default({})).sslrootcert | default(omit) }}"
+        ssl_cert: "{{ (_preflight_gateway_db_check.db_credentials.options | default({})).sslcert | default(omit) }}"
+        ssl_key: "{{ (_preflight_gateway_db_check.db_credentials.options | default({})).sslkey | default(omit) }}"
         login_db: "{{ _preflight_gateway_db_check.db_credentials.name }}"
         query: "SHOW server_version"
       no_log: "{{ __preflight_no_log }}"
@@ -67,11 +79,17 @@
       no_log: "{{ __preflight_no_log }}"
 
     - name: Verify hub database connection (RPM)
+      become: true
+      become_user: pulp
       community.postgresql.postgresql_query:
         login_host: "{{ _preflight_hub_db_check.db_credentials.host }}"
         login_port: "{{ _preflight_hub_db_check.db_credentials.port }}"
         login_user: "{{ _preflight_hub_db_check.db_credentials.user }}"
         login_password: "{{ _preflight_hub_db_check.db_credentials.password }}"
+        ssl_mode: "{{ (_preflight_hub_db_check.db_credentials.options | default({})).sslmode | default('prefer') }}"
+        ca_cert: "{{ (_preflight_hub_db_check.db_credentials.options | default({})).sslrootcert | default(omit) }}"
+        ssl_cert: "{{ (_preflight_hub_db_check.db_credentials.options | default({})).sslcert | default(omit) }}"
+        ssl_key: "{{ (_preflight_hub_db_check.db_credentials.options | default({})).sslkey | default(omit) }}"
         login_db: "{{ _preflight_hub_db_check.db_credentials.name }}"
         query: "SHOW server_version"
       no_log: "{{ __preflight_no_log }}"
@@ -92,11 +110,17 @@
       no_log: "{{ __preflight_no_log }}"
 
     - name: Verify EDA database connection (RPM)
+      become: true
+      become_user: eda
       community.postgresql.postgresql_query:
         login_host: "{{ _preflight_eda_db_check.db_credentials.host }}"
         login_port: "{{ _preflight_eda_db_check.db_credentials.port }}"
         login_user: "{{ _preflight_eda_db_check.db_credentials.user }}"
         login_password: "{{ _preflight_eda_db_check.db_credentials.password }}"
+        ssl_mode: "{{ (_preflight_eda_db_check.db_credentials.options | default({})).sslmode | default('prefer') }}"
+        ca_cert: "{{ (_preflight_eda_db_check.db_credentials.options | default({})).sslrootcert | default(omit) }}"
+        ssl_cert: "{{ (_preflight_eda_db_check.db_credentials.options | default({})).sslcert | default(omit) }}"
+        ssl_key: "{{ (_preflight_eda_db_check.db_credentials.options | default({})).sslkey | default(omit) }}"
         login_db: "{{ _preflight_eda_db_check.db_credentials.name }}"
         query: "SHOW server_version"
       no_log: "{{ __preflight_no_log }}"

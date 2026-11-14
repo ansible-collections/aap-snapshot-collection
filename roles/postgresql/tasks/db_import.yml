@@ -25,6 +25,7 @@
           - --clean
           - --if-exists
           - --no-owner
+          - --no-acl
           - -h
           - "{{ postgresql_auth_settings.default.HOST }}"
           - -p
@@ -32,14 +33,12 @@
           - -U
           - "{{ postgresql_auth_settings.default.USER }}"
           - -d
-          - "{{ postgresql_auth_settings.default.NAME }}"
+          - "{{ postgresql_auth_settings.default.NAME | ansible.aap_snapshot.postgresql_dbname }}"
           - "{{ postgresql_restore_source }}"
-        env:
-          PGPASSWORD: "{{ postgresql_auth_settings.default.PASSWORD }}"
-      # pg_restore --clean itself only warns on "cannot drop inherited
-      # constraint" for partitioned tables - match OCP's leniency.
+        env: "{{ postgresql_auth_settings.default.OPTIONS | default({}) | ansible.aap_snapshot.postgresql_ssl_environment | combine({'LC_ALL': 'C', 'PGPASSWORD': postgresql_auth_settings.default.PASSWORD}) }}"
+      # Only a fully classified inherited-partition cleanup error is allowed.
       register: _postgresql_restore_result
-      failed_when: _postgresql_restore_result.rc != 0 and 'FATAL' in (_postgresql_restore_result.stderr | default(''))
+      failed_when: _postgresql_restore_result | ansible.aap_snapshot.postgresql_restore_failed
       no_log: "{{ __postgresql_no_log }}"
       async: '{{ postgresql_restore_timeout }}'
       poll: 30
@@ -49,8 +48,8 @@
     - name: Re-raise database restore failure
       ansible.builtin.fail:
         msg: >-
-          Database restore failed for {{ postgresql_component_name }}: {{
-          ansible_failed_result.msg | default(ansible_failed_result | to_nice_json) }}
+          Database restore failed for {{ postgresql_component_name }}.
+          Review the failed task; raw database output is protected by no_log.
   always:
     - name: Remove temp postgres client container
       ansible.builtin.include_tasks: remove_temp_container.yml
@@ -59,23 +58,27 @@
   when: aap_platform == 'operator'
   environment: "{{ postgresql_ocp_environment }}"
   block:
-    - name: Get postgres auth credentials
+    - name: Require validated target connection and restore list
+      ansible.builtin.assert:
+        that:
+          - postgresql_component_name in (_postgresql_ocp_connections | default({}))
+          - postgresql_component_name in (_postgresql_ocp_restore_lists | default({}))
+        fail_msg: Run OCP database preflight before attempting restore.
+
+    - name: Load cached target connection
       ansible.builtin.include_tasks: db_auth.yml
 
-    - name: "Restore database"
+    - name: Restore database with target identity and provisioned extensions
       kubernetes.core.k8s_exec:
-        namespace: '{{ postgresql_ocp_namespace }}'
-        pod: '{{ ocp_utils_temp_pod_name }}'
+        namespace: "{{ postgresql_ocp_namespace }}"
+        pod: "{{ ocp_utils_temp_pod_name }}"
         container: postgres
         command: >-
-          sh -c 'PGPASSWORD="$1" pg_restore --clean --if-exists --no-owner
-          -h {{ postgresql_auth_settings.default.HOST }}
-          -p {{ postgresql_auth_settings.default.PORT }}
-          -U {{ postgresql_auth_settings.default.USER }}
-          -d {{ postgresql_auth_settings.default.NAME }} "$2"' sh
-          {{ postgresql_auth_settings.default.PASSWORD | quote }}
-          {{ ('/tmp/migration/artifact/' ~ postgresql_component_name ~ '/' ~ postgresql_component_name ~ '.pgc') | quote }}
-      failed_when: _postgresql_restore_result.rc != 0 and 'FATAL' in (_postgresql_restore_result.stderr | default(''))
+          {{ postgresql_auth_settings | ansible.aap_snapshot.postgresql_client_command(
+               ['pg_restore', '--clean', '--if-exists', '--no-owner', '--no-acl',
+                '--use-list', _postgresql_ocp_restore_lists[postgresql_component_name],
+                '/tmp/migration/artifact/' ~ postgresql_component_name ~ '/' ~ postgresql_component_name ~ '.pgc']) }}
+      failed_when: _postgresql_restore_result | ansible.aap_snapshot.postgresql_restore_failed
       no_log: "{{ __postgresql_no_log }}"
       register: _postgresql_restore_result
 ...
