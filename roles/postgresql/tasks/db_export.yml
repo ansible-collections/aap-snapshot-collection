@@ -21,11 +21,14 @@
         login_port: "{{ postgresql_auth_settings.default.PORT }}"
         login_user: "{{ postgresql_auth_settings.default.USER }}"
         login_password: "{{ postgresql_auth_settings.default.PASSWORD | default(omit) }}"
+        ssl_mode: "{{ (postgresql_auth_settings.default.OPTIONS | default({})).sslmode | default('prefer') }}"
+        ca_cert: "{{ (postgresql_auth_settings.default.OPTIONS | default({})).sslrootcert | default(omit) }}"
+        ssl_cert: "{{ (postgresql_auth_settings.default.OPTIONS | default({})).sslcert | default(omit) }}"
+        ssl_key: "{{ (postgresql_auth_settings.default.OPTIONS | default({})).sslkey | default(omit) }}"
         query: "SHOW server_version"
       environment: "{{ postgresql_pg_dump_env | default({}) }}"
       no_log: "{{ __postgresql_no_log }}"
       register: _postgresql_version_result
-      when: _postgresql_version is not defined
 
     - name: Set PostgreSQL version fact
       ansible.builtin.set_fact:
@@ -36,17 +39,46 @@
         - _postgresql_version_result is not skipped
         - _postgresql_version_result.query_result | length > 0
 
+    - name: Read RPM PostgreSQL dump client version
+      ansible.builtin.command:
+        argv: [pg_dump, --version]
+      changed_when: false
+      register: _postgresql_dump_client_version
+
+    - name: Validate RPM dump client compatibility
+      ansible.builtin.assert:
+        that:
+          - _postgresql_version_result.query_result[0].server_version | ansible.aap_snapshot.postgresql_validate_dump_client(_postgresql_dump_client_version.stdout)
+        quiet: true
+
+    - name: Prepare restricted RPM database dump file
+      ansible.builtin.file:
+        path: "{{ postgresql_export_dir }}/{{ postgresql_component_name }}.pgc"
+        state: touch
+        mode: "0600"
+
     - name: Perform a PostgreSQL dump.
-      community.postgresql.postgresql_db:
-        name: "{{ postgresql_auth_settings.default.NAME }}"
-        login_host: "{{ postgresql_auth_settings.default.HOST }}"
-        login_port: "{{ postgresql_auth_settings.default.PORT }}"
-        login_user: "{{ postgresql_auth_settings.default.USER }}"
-        login_password: "{{ postgresql_auth_settings.default.PASSWORD | default(omit) }}"
-        target: "{{ postgresql_export_dir }}/{{ postgresql_component_name }}.pgc"
-        target_opts: "--clean --create"
-        state: dump
-      environment: "{{ postgresql_pg_dump_env | default({}) }}"
+      ansible.builtin.command:
+        # Older command modules do not expand variables and lack this option.
+        expand_argument_vars: "{{ (ansible_version.full is version('2.16', '>=')) | ternary(false, omit) }}"
+        argv:
+          - pg_dump
+          - --clean
+          - --create
+          - --format=custom
+          - --host
+          - "{{ postgresql_auth_settings.default.HOST }}"
+          - --port
+          - "{{ postgresql_auth_settings.default.PORT | string }}"
+          - --username
+          - "{{ postgresql_auth_settings.default.USER }}"
+          - --dbname
+          - "{{ postgresql_auth_settings.default.NAME | ansible.aap_snapshot.postgresql_dbname }}"
+          - --file
+          - "{{ postgresql_export_dir }}/{{ postgresql_component_name }}.pgc"
+      environment: "{{ postgresql_pg_dump_env | default({}) | combine({'PGPASSWORD': postgresql_auth_settings.default.PASSWORD | default(''), 'LC_ALL': 'C'}) }}"
+      changed_when: true
+      no_log: "{{ __postgresql_no_log }}"
 
     - name: Get file checksum
       ansible.builtin.stat:
@@ -90,11 +122,14 @@
         login_port: "{{ postgresql_auth_settings.default.PORT }}"
         login_user: "{{ postgresql_auth_settings.default.USER }}"
         login_password: "{{ postgresql_auth_settings.default.PASSWORD | default(omit) }}"
+        ssl_mode: "{{ (postgresql_auth_settings.default.OPTIONS | default({})).sslmode | default('prefer') }}"
+        ca_cert: "{{ (postgresql_auth_settings.default.OPTIONS | default({})).sslrootcert | default(omit) }}"
+        ssl_cert: "{{ (postgresql_auth_settings.default.OPTIONS | default({})).sslcert | default(omit) }}"
+        ssl_key: "{{ (postgresql_auth_settings.default.OPTIONS | default({})).sslkey | default(omit) }}"
         query: "SHOW server_version"
       environment: "{{ postgresql_pg_dump_env | default({}) }}"
       no_log: "{{ __postgresql_no_log }}"
       register: _postgresql_version_result
-      when: _postgresql_version is not defined
 
     - name: Set PostgreSQL version fact
       ansible.builtin.set_fact:
@@ -113,6 +148,19 @@
         postgresql_temp_container_volumes:
           - "{{ postgresql_export_dir }}:{{ postgresql_export_dir }}:Z"
 
+    - name: Read container PostgreSQL dump client version
+      containers.podman.podman_container_exec:
+        name: "{{ postgresql_temp_container_name }}"
+        argv: [pg_dump, --version]
+      changed_when: false
+      register: _postgresql_dump_client_version
+
+    - name: Validate container dump client compatibility
+      ansible.builtin.assert:
+        that:
+          - _postgresql_version_result.query_result[0].server_version | ansible.aap_snapshot.postgresql_validate_dump_client(_postgresql_dump_client_version.stdout)
+        quiet: true
+
     - name: Perform a PostgreSQL dump.
       containers.podman.podman_container_exec:
         name: "{{ postgresql_temp_container_name }}"
@@ -129,7 +177,7 @@
           - -U
           - "{{ postgresql_auth_settings.default.USER }}"
           - -d
-          - "{{ postgresql_auth_settings.default.NAME }}"
+          - "{{ postgresql_auth_settings.default.NAME | ansible.aap_snapshot.postgresql_dbname }}"
           - -f
           - "{{ postgresql_export_dir }}/{{ postgresql_component_name }}.pgc"
         env: "{{ postgresql_pg_dump_env | default({}) | combine({'PGPASSWORD': postgresql_auth_settings.default.PASSWORD | default('')}) }}"
@@ -187,10 +235,14 @@
     - name: Use managed PostgreSQL pod for export
       ansible.builtin.set_fact:
         _pg_pod_name: "{{ _postgresql_managed_export_pods.resources[0].metadata.name }}"
-      when: _postgresql_managed_export_pods.resources | default([]) | length > 0
+      when:
+        - _postgresql_managed_export_pods.resources | default([]) | length > 0
+        - postgresql_component_name not in postgresql_ocp_ssl_rootcert_secrets
 
     - name: Create temporary PostgreSQL client pod for export
-      when: _postgresql_managed_export_pods.resources | default([]) | length == 0
+      when: >-
+        _postgresql_managed_export_pods.resources | default([]) | length == 0
+        or postgresql_component_name in postgresql_ocp_ssl_rootcert_secrets
       block:
         - name: Create temporary PostgreSQL client pod
           ansible.builtin.include_role:
@@ -234,19 +286,11 @@
             pod: "{{ _pg_pod_name }}"
             container: postgres
             command: >-
-              sh -c 'PGPASSWORD="$1" psql -h "$2" -p "$3" -U "$4"
-              -d "$5" -t -A -c "$6";
-              result=$?; printf "psql exit code: %s\n" "$result"; exit "$result"'
-              sh {{ postgresql_auth_settings.default.PASSWORD | default('', true) | quote }}
-              {{ postgresql_auth_settings.default.HOST | quote }}
-              {{ postgresql_auth_settings.default.PORT | default('5432', true) | string | quote }}
-              {{ postgresql_auth_settings.default.USER | quote }}
-              {{ postgresql_auth_settings.default.NAME | quote }}
-              {{ 'SHOW server_version' | quote }}
+              {{ postgresql_auth_settings | ansible.aap_snapshot.postgresql_client_command(
+                   ['psql', '-XAt', '--set=ON_ERROR_STOP=1', '--command', 'SHOW server_version']) }}
           register: _postgresql_version_ocp
           failed_when: _postgresql_version_ocp.rc != 0
           no_log: "{{ __postgresql_no_log }}"
-          when: _postgresql_version is not defined
 
         - name: Set PostgreSQL version fact
           ansible.builtin.set_fact:
@@ -257,6 +301,22 @@
             - _postgresql_version_ocp is not skipped
             - _postgresql_version_ocp.stdout is defined
 
+        - name: Read OCP PostgreSQL dump client version
+          kubernetes.core.k8s_exec:
+            namespace: "{{ postgresql_ocp_namespace }}"
+            pod: "{{ _pg_pod_name }}"
+            container: postgres
+            command: pg_dump --version
+          changed_when: false
+          register: _postgresql_dump_client_version
+          failed_when: _postgresql_dump_client_version.rc != 0
+
+        - name: Validate OCP dump client compatibility
+          ansible.builtin.assert:
+            that:
+              - _postgresql_version_ocp.stdout | ansible.aap_snapshot.postgresql_validate_dump_client(_postgresql_dump_client_version.stdout)
+            quiet: true
+
         - name: Dump and transfer database from PostgreSQL pod
           block:
             - name: Perform PostgreSQL dump via pod
@@ -265,16 +325,9 @@
                 pod: "{{ _pg_pod_name }}"
                 container: postgres
                 command: >-
-                  sh -c 'umask 077;
-                  PGPASSWORD="$1" pg_dump --clean --create -Fc
-                  -h "$2" -p "$3" -U "$4" -d "$5" -f "$6";
-                  result=$?; printf "pg_dump exit code: %s\n" "$result"; exit "$result"'
-                  sh {{ postgresql_auth_settings.default.PASSWORD | default('', true) | quote }}
-                  {{ postgresql_auth_settings.default.HOST | quote }}
-                  {{ postgresql_auth_settings.default.PORT | default('5432', true) | string | quote }}
-                  {{ postgresql_auth_settings.default.USER | quote }}
-                  {{ postgresql_auth_settings.default.NAME | quote }}
-                  {{ _postgresql_dump_remote_path | quote }}
+                  sh -c 'umask 077; exec "$@"' sh
+                  {{ postgresql_auth_settings | ansible.aap_snapshot.postgresql_client_command(
+                       ['pg_dump', '--clean', '--create', '-Fc', '--file', _postgresql_dump_remote_path]) }}
               register: _postgresql_dump_export_result
               failed_when: _postgresql_dump_export_result.rc != 0
               no_log: "{{ __postgresql_no_log }}"

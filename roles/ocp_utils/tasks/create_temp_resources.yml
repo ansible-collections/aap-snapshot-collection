@@ -45,8 +45,8 @@
                 imagePullPolicy: "{{ _ocp_utils_temp_image_pull_policy | default(omit) }}"
                 command: ["sleep", "infinity"]
                 securityContext: "{{ _ocp_utils_temp_security_context | default(omit) }}"
-                volumeMounts: "{{ _ocp_utils_temp_volume_mounts }}"
-            volumes: "{{ _ocp_utils_temp_volumes }}"
+                volumeMounts: "{{ _ocp_utils_temp_volume_mounts + ((postgresql_ocp_ssl_rootcert_secrets | default({})) | ansible.aap_snapshot.postgresql_ca_mounts).mounts }}"
+            volumes: "{{ _ocp_utils_temp_volumes + ((postgresql_ocp_ssl_rootcert_secrets | default({})) | ansible.aap_snapshot.postgresql_ca_mounts).volumes }}"
   vars:
     _ocp_utils_temp_volume_mounts:
       - name: migration-data

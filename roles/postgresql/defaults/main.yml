@@ -8,6 +8,10 @@ postgresql_aap_instance_name: >-
      | default(ocp_utils_aap_instance_name | default('aap')) }}
 postgresql_ocp_postgres_statefulset: "{{ postgresql_aap_instance_name }}-postgres-15"
 
+# Optional namespace-local CA Secrets for the temporary OCP PostgreSQL client.
+# Components: controller, hub, gateway, eda; key defaults to ca.crt.
+postgresql_ocp_ssl_rootcert_secrets: {}
+
 # Auth variables
 postgresql_django_manage_get_cmd: "from django.conf import settings; print(settings.DATABASES)"
 

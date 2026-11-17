@@ -1,0 +1,85 @@
+---
+- name: Resolve cached component connection and TLS environment
+  ansible.builtin.include_tasks: db_auth.yml
+
+- name: Inspect archive table of contents using restore client
+  kubernetes.core.k8s_exec:
+    namespace: "{{ postgresql_ocp_namespace }}"
+    pod: "{{ ocp_utils_temp_pod_name }}"
+    container: postgres
+    command: "{{ {} | ansible.aap_snapshot.postgresql_client_command(['pg_restore', '--list', _postgresql_ocp_archive_path]) }}"
+  register: _postgresql_archive_toc
+  changed_when: false
+  failed_when: _postgresql_archive_toc.rc != 0
+  no_log: "{{ __postgresql_no_log }}"
+
+- name: Inspect extension schema requirements without connecting to target
+  kubernetes.core.k8s_exec:
+    namespace: "{{ postgresql_ocp_namespace }}"
+    pod: "{{ ocp_utils_temp_pod_name }}"
+    container: postgres
+    command: >-
+      {{ {} | ansible.aap_snapshot.postgresql_client_command(
+           ['pg_restore', '--verbose', '--schema-only', '--no-owner', '--no-acl', '--file=-', _postgresql_ocp_archive_path]) }}
+  register: _postgresql_archive_schema
+  changed_when: false
+  failed_when: _postgresql_archive_schema.rc != 0
+  no_log: "{{ __postgresql_no_log }}"
+
+- name: Build extension-preserving restore list
+  ansible.builtin.set_fact:
+    _postgresql_archive_info: >-
+      {{ _postgresql_archive_toc.stdout | ansible.aap_snapshot.postgresql_archive_info(_postgresql_archive_schema.stdout) }}
+  no_log: "{{ __postgresql_no_log }}"
+
+- name: Read PostgreSQL restore client version
+  kubernetes.core.k8s_exec:
+    namespace: "{{ postgresql_ocp_namespace }}"
+    pod: "{{ ocp_utils_temp_pod_name }}"
+    container: postgres
+    command: pg_restore --version
+  register: _postgresql_restore_client_version
+  changed_when: false
+  failed_when: _postgresql_restore_client_version.rc != 0
+
+- name: Query target prerequisites from actual migration pod
+  kubernetes.core.k8s_exec:
+    namespace: "{{ postgresql_ocp_namespace }}"
+    pod: "{{ ocp_utils_temp_pod_name }}"
+    container: postgres
+    command: >-
+      {{ postgresql_auth_settings | ansible.aap_snapshot.postgresql_client_command(
+           ['psql', '-XAt', '--set=ON_ERROR_STOP=1', '--command', lookup('ansible.builtin.file', role_path ~ '/files/target_preflight.sql')]) }}
+  register: _postgresql_target_state
+  changed_when: false
+  failed_when: _postgresql_target_state.rc != 0
+  no_log: "{{ __postgresql_no_log }}"
+
+# Only sanitized prerequisite failures are exposed; raw connection errors stay no_log.
+- name: Validate target versions extensions and privileges before downtime
+  ansible.builtin.assert:
+    that:
+      - _postgresql_archive_info | ansible.aap_snapshot.postgresql_validate_target(
+          _postgresql_target_state.stdout | from_json, _postgresql_restore_client_version.stdout, postgresql_component_name)
+    quiet: true
+
+- name: Probe target application schema writability in a rolled-back transaction
+  kubernetes.core.k8s_exec:
+    namespace: "{{ postgresql_ocp_namespace }}"
+    pod: "{{ ocp_utils_temp_pod_name }}"
+    container: postgres
+    command: >-
+      {{ postgresql_auth_settings | ansible.aap_snapshot.postgresql_client_command(
+           ['psql', '-XAt', '--set=ON_ERROR_STOP=1', '--command', _postgresql_archive_info | ansible.aap_snapshot.postgresql_write_probe]) }}
+  register: _postgresql_write_probe
+  changed_when: false
+  failed_when: _postgresql_write_probe.rc != 0
+  no_log: "{{ __postgresql_no_log }}"
+
+- name: Transfer filtered restore list without command argument limits
+  ansible.builtin.include_tasks: stage_restore_list.yml
+
+- name: Cache validated restore list path for component
+  ansible.builtin.set_fact:
+    _postgresql_ocp_restore_lists: "{{ _postgresql_ocp_restore_lists | combine({postgresql_component_name: _postgresql_ocp_restore_list_path}) }}"
+...

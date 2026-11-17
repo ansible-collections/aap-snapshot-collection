@@ -233,6 +233,11 @@
   when: aap_platform == 'operator'
   environment: "{{ artifact_ocp_environment }}"
   block:
+    - name: Reset OCP import recovery state
+      ansible.builtin.set_fact:
+        _artifact_import_succeeded: false
+        _artifact_import_downtime_started: false
+
     # --- Pre-import checks ---
     - name: Validate target version matches artifact
       ansible.builtin.include_role:
@@ -303,6 +308,11 @@
       loop_control:
         label: "{{ item }}"
 
+    - name: Resolve all target database connections and CA Secrets
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.postgresql
+        tasks_from: prepare_ocp_import.yml
+
     # --- Stage artifact while AAP is still running ---
     - name: Create temporary migration resources
       ansible.builtin.include_role:
@@ -315,6 +325,23 @@
         tasks_from: transfer_artifact.yml
       vars:
         artifact_path: "{{ _preflight_resolved_artifact | default(artifact_file) }}"
+
+    - name: Validate each database from migration pod before downtime
+      ansible.builtin.include_role:
+        name: ansible.aap_snapshot.postgresql
+        tasks_from: preflight_ocp_component.yml
+      vars:
+        postgresql_component_name: "{{ _artifact_db_component }}"
+        _postgresql_ocp_archive_path: "/tmp/migration/artifact/{{ _artifact_db_component }}/{{ _artifact_db_component }}.pgc"
+        _postgresql_ocp_restore_list_path: "/tmp/migration/{{ _artifact_db_component }}.restore.list"
+      loop: "{{ _artifact_import_components }}"
+      loop_control:
+        loop_var: _artifact_db_component
+        label: "{{ _artifact_db_component }}"
+
+    - name: Record start of import downtime for recovery
+      ansible.builtin.set_fact:
+        _artifact_import_downtime_started: true
 
     - name: Scale Lightspeed and MCP workloads down before import
       ansible.builtin.include_role:
@@ -550,6 +577,7 @@
         tasks_from: scale_operators.yml
       vars:
         ocp_operator_replicas: 1
+      when: _artifact_import_downtime_started | default(false) | bool
 
     - name: Resume AAP (recovery)
       ansible.builtin.include_role:
@@ -557,6 +585,7 @@
         tasks_from: idle_aap.yml
       vars:
         ocp_idle_aap: false
+      when: _artifact_import_downtime_started | default(false) | bool
 
     - name: Restore Lightspeed and MCP workloads after failed import
       ansible.builtin.include_role:
@@ -564,13 +593,14 @@
         tasks_from: scale_lightspeed_mcp.yml
       vars:
         ocp_utils_lightspeed_mcp_scale_down: false
+      when: _artifact_import_downtime_started | default(false) | bool
 
     - name: Report import failure
       ansible.builtin.fail:
         msg: >-
-          Import failed. Operators and AAP have been restored.
+          Import failed. Recovery was attempted if downtime had started.
           Failed task: {{ ansible_failed_task.name | default('unknown') }}.
-          Error: {{ ansible_failed_result.msg | default(ansible_failed_result | to_nice_json) }}
+          Review the failed task; database output is protected by no_log.
 
   always:
     - name: Remove temporary migration resources

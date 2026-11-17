@@ -223,18 +223,21 @@ ansible-playbook ansible.aap_snapshot.artifact_import \
    imported and source version
 5. **Version match check** - fails immediately if source and target AAP
    versions differ
-6. **Fresh namespace path** (no CR): collection creates the AAP CR from
-   artifact metadata and waits for the operator to deploy all components
-7. **Existing CR path**: AAP is idled (`spec.idle_aap: true`), pods terminate
-8. **Operators scaled to zero** to prevent interference during DB restore
-9. **Temp resources created** - PVC and PostgreSQL pod for DB restore
-10. **Artifact transferred** to the temp pod
+6. **Existing target required**: create and configure the target AAP deployment,
+   databases, users, and extensions before import. The collection discovers its
+   database Secrets and preserves target connection settings; it does not
+   create an AAP CR or provision databases.
+7. **Temp resources created** - PVC and PostgreSQL client pod; artifact transferred
+8. **Database preflight** from that pod validates target connections, TLS, versions,
+   extensions, ownership, and writability before downtime
+9. **AAP idled** (`spec.idle_aap: true`), application pods terminate
+10. **Operators scaled to zero** to prevent interference during DB restore
 11. **Databases restored** per component via `pg_restore`
 12. **Encryption secrets** patched from artifact into K8s Secrets
 13. **Operators scaled back up**, AAP un-idled, pods restart
 14. **Reconcile** runs per component: schema migrations, admin password reset
     to match K8s secrets, orphan cleanup, content repair
-15. **Temp resources cleaned up** (always, even on failure)
+15. **Temp resources cleaned up** on success; preserved on failure by default
 16. **Summary and advisory** - migration complete, next steps listed
 
 ### Import decision points

@@ -62,9 +62,20 @@ Control artifact restoration to the target platform.
 | `artifact_file` | (required) | Path to the artifact archive to import. Validated at preflight before any destructive operations |
 | `target_aap_version` | (optional) | Target AAP version for compatibility validation |
 | `keep_temp_on_failure` | `true` | Keep temporary OCP migration resources (PVC, pod) on failure for debugging. Set `false` to auto-cleanup |
-| `postgresql_restore_admin_user` | `postgres` | PostgreSQL superuser for database restore operations |
 | `postgresql_restore_timeout` | `3600` | Async timeout in seconds for `pg_restore` |
 | `postgresql_temp_container_image` | `registry.redhat.io/rhel9/postgresql-15:latest` | Shared image for temporary PostgreSQL clients on containerized and OCP paths. Override if the PostgreSQL server version differs |
+
+### External PostgreSQL on OCP
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `postgresql_ocp_ssl_rootcert_secrets` | `{}` | Map of component names (`controller`, `hub`, `gateway`, `eda`) to namespace-local CA Secret references `{name, key}`. `key` defaults to `ca.crt`. Certificates are mounted read-only in the temporary PostgreSQL client pod. |
+
+The database configuration Secret supplies `sslmode`; the collection preserves
+that setting. RPM exports independently honor `sslmode`, `sslrootcert`,
+`sslcert`, and `sslkey` from the component's Django database options.
+See [external PostgreSQL migration](external-postgresql.md) for prerequisites,
+TLS examples, version checks, and live acceptance requirements.
 
 ### Hub Content Import
 

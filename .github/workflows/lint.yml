@@ -70,7 +70,7 @@ jobs:
           python-version: '${{ env.python_version }}'
 
       - name: Install test dependencies
-        run: pip install pytest pyyaml
+        run: pip install pytest pyyaml jinja2 packaging
 
       - name: Run unit tests
         run: pytest tests/unit/ -v

@@ -152,14 +152,10 @@ flowchart TD
     subgraph PLAY3["PLAY 3: Import (OCP) -- block/always"]
         subgraph PREIMPORT["Pre-Import Checks"]
             C1["check_version_match.yml<br/>Query ClusterServiceVersion<br/>Assert AAP version matches artifact"]
-            C2{"AAP CR<br/>exists?"}
-            C3["check_storage_class.yml<br/>Verify RWX StorageClass for Hub"]
-            C4["create_aap_cr.yml<br/>Seed encryption secrets from artifact<br/>Create AnsibleAutomationPlatform CR"]
-            C5["wait_aap_ready.yml<br/>Poll CR status -> Successful<br/>(40min timeout)"]
+            C2["Require an existing configured AAP CR<br/>Discover components and check Hub storage"]
+            C3["prepare_ocp_import.yml<br/>Resolve/cache target DB Secrets<br/>Validate CA Secret references"]
 
-            C1 --> C2
-            C2 -->|No| C3 --> C4 --> C5
-            C2 -->|Yes| C6
+            C1 --> C2 --> C3
         end
 
         subgraph QUIESCE["Quiesce Environment"]
@@ -173,11 +169,12 @@ flowchart TD
             C8["create_temp_resources.yml<br/>Create PVC: aap-snapshot-temp (60Gi)<br/>Create Deployment: postgresql-15 pod<br/>sleep infinity"]
             C9["transfer_artifact.yml<br/>k8s_cp artifact -> /tmp/migration/<br/>tar xf inside pod"]
 
-            C8 --> C9
+            C10["preflight_ocp_component.yml<br/>Validate pod connectivity, TLS, versions<br/>Check extensions, ownership, writability<br/>Stage filtered restore lists"]
+            C8 --> C9 --> C10
         end
 
         subgraph RESTORE["Restore Databases (per component)"]
-            D1["import_controller<br/>Read K8s Secret: aap-controller-postgres-configuration<br/>Find postgres pod: aap-postgres-15-0<br/>GRANT CREATEDB via k8s_exec on PG pod<br/>pg_restore via k8s_exec on TEMP pod<br/>REVOKE CREATEDB<br/>Patch aap-controller-secret-key"]
+            D1["import_controller<br/>Use cached resolved target DB Secret<br/>Validate TLS, extensions, versions before idle<br/>pg_restore --no-owner --no-acl via TEMP pod<br/>Preserve provisioned extensions<br/>Patch aap-controller-secret-key"]
             D2["import_hub<br/>Same pattern with hub credentials<br/>Patch aap-hub-db-fields-encryption<br/>+ aap-hub-secret-key"]
             D2a["delete_hub_file_storage_pvc<br/>Find PVC by label selector<br/>Delete hub file-storage PVC"]
             D3["import_gateway<br/>Same pattern with gateway credentials<br/>Patch aap-db-fields-encryption-secret"]
@@ -204,7 +201,7 @@ flowchart TD
             F1 --> F2 --> F3 --> F4
         end
 
-        PREIMPORT --> QUIESCE --> STAGE --> RESTORE --> RESUME --> RECONCILE
+        PREIMPORT --> STAGE --> QUIESCE --> RESTORE --> RESUME --> RECONCILE
 
         subgraph ALWAYS["ALWAYS: Cleanup"]
             G1["cleanup_temp_resources.yml<br/>Delete aap-snapshot-temp-postgres Deployment<br/>Delete aap-snapshot-temp PVC"]
@@ -280,6 +277,9 @@ flowchart TD
 | Hub        | `pulp`      | `pulpcore-manager`  | `pulpcore-api.service`       |
 
 ### Key: OCP K8s Secrets per Component
+
+Database Secret names below are conventional fallbacks. Import resolves the
+selected AAP deployment's configured Secret references before using them.
 
 | Component  | DB Credentials Secret                  | Encryption Secret                   |
 |------------|----------------------------------------|-------------------------------------|

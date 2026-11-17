@@ -1,0 +1,46 @@
+---
+# A large Controller TOC can exceed Linux's per-argument limit. Copy a file.
+- name: Stage restore list through a restricted local temporary file
+  block:
+    - name: Allocate local restore list file
+      ansible.builtin.tempfile:
+        state: file
+        suffix: .restore.list
+      register: _postgresql_local_restore_list
+      become: false
+
+    - name: Write filtered restore list locally
+      ansible.builtin.copy:
+        content: "{{ _postgresql_archive_info.restore_toc }}"
+        dest: "{{ _postgresql_local_restore_list.path }}"
+        mode: "0600"
+      become: false
+      no_log: "{{ __postgresql_no_log }}"
+
+    - name: Copy filtered restore list to migration pod
+      kubernetes.core.k8s_cp:
+        namespace: "{{ postgresql_ocp_namespace }}"
+        pod: "{{ ocp_utils_temp_pod_name }}"
+        container: postgres
+        local_path: "{{ _postgresql_local_restore_list.path }}"
+        remote_path: "{{ _postgresql_ocp_restore_list_path }}"
+        state: to_pod
+      no_log: "{{ __postgresql_no_log }}"
+
+    - name: Restrict restore list permissions in migration pod
+      kubernetes.core.k8s_exec:
+        namespace: "{{ postgresql_ocp_namespace }}"
+        pod: "{{ ocp_utils_temp_pod_name }}"
+        container: postgres
+        command: "chmod 0600 {{ _postgresql_ocp_restore_list_path | quote }}"
+      register: _postgresql_stage_restore_list
+      failed_when: _postgresql_stage_restore_list.rc != 0
+
+  always:
+    - name: Remove local restore list after transfer
+      ansible.builtin.file:
+        path: "{{ _postgresql_local_restore_list.path }}"
+        state: absent
+      become: false
+      when: _postgresql_local_restore_list.path is defined
+...
